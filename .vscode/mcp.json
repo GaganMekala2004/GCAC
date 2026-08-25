@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "vulnerability-data": {
+      "command": "dotnet",
+      "args": [
+        "${workspaceFolder}/mcp/VulnerabilityDataMcp/bin/Debug/net9.0/VulnerabilityDataMcp.dll"
+      ],
+      "env": {
+        "GCAS_WORKSPACE_ROOT": "${workspaceFolder}",
+        "DOTNET_CLI_TELEMETRY_OPTOUT": "1"
+      }
+    }
+  },
+  "servers": {
+    "vulnerability-data": {
+      "command": "dotnet",
+      "args": [
+        "${workspaceFolder}/mcp/VulnerabilityDataMcp/bin/Debug/net9.0/VulnerabilityDataMcp.dll"
+      ],
+      "env": {
+        "GCAS_WORKSPACE_ROOT": "${workspaceFolder}",
+        "DOTNET_CLI_TELEMETRY_OPTOUT": "1"
+      }
+    }
+  }
+}
+
+

@@ -1,0 +1,8 @@
+{
+  "vulnerabilityId": "GCAS-E2E-005",
+  "sourceClassification": "SpecializedAction",
+  "rawSourceClassification": "Secrets",
+  "derivedRemediationRoute": "DotNetSourceFix",
+  "technology": "dotnet",
+  "requiresHumanReview": true
+}

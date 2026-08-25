@@ -1,0 +1,37 @@
+# Build & Output Directories
+bin/
+obj/
+out/
+.vs/
+.idea/
+
+# Database & Storage (Never commit real DBs)
+data/*.db
+data/*.db-journal
+data/*.db-shm
+data/*.db-wal
+
+# Repository Workspaces (Never commit cloned target repositories)
+workspaces/*
+!workspaces/.gitkeep
+
+# Remediation Evidence (Never commit customer remediation details)
+evidence/*
+!evidence/.gitkeep
+
+# Sensitive Excel Files (Never commit real customer vulnerability workbooks)
+*.xlsx
+!sample-data/vulnerabilities-synthetic.xlsx
+
+# Credentials, Keys & Secrets
+*.env
+*.pem
+*.key
+*.pfx
+*.token
+appsettings.json
+!config/appsettings.example.json
+
+# Temporary & Log files
+*.log
+dotnet-install.ps1

@@ -1,0 +1,8 @@
+{
+  "vulnerabilityId": "GCAS-E2E-004",
+  "sourceClassification": "SpecializedAction",
+  "rawSourceClassification": "Path Traversal",
+  "derivedRemediationRoute": "DotNetSourceFix",
+  "technology": "dotnet",
+  "requiresHumanReview": true
+}

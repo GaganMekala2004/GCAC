@@ -1,0 +1,38 @@
+{
+  "APP-E2E-001": {
+    "applicationName": "GCAS Agentic E2E Test API",
+    "repositoryUrl": "sample-repos/gcas-agentic-e2e-test-repo",
+    "technology": "dotnet",
+    "defaultBranch": "main"
+  },
+  "APP-1001": {
+    "applicationName": "Payments API",
+    "repositoryUrl": "sample-repos/payments-api",
+    "technology": "dotnet",
+    "defaultBranch": "main"
+  },
+  "APP-1002": {
+    "applicationName": "Customer Service",
+    "repositoryUrl": "sample-repos/customer-service",
+    "technology": "java-spring",
+    "defaultBranch": "main"
+  },
+  "APP-1003": {
+    "applicationName": "Inventory Manager",
+    "repositoryUrl": "sample-repos/inventory-manager",
+    "technology": "dotnet",
+    "defaultBranch": "main"
+  },
+  "APP-1004": {
+    "applicationName": "Identity Provider",
+    "repositoryUrl": "sample-repos/identity-provider",
+    "technology": "dotnet",
+    "defaultBranch": "main"
+  },
+  "APP-1005": {
+    "applicationName": "Storefront Web API",
+    "repositoryUrl": "sample-repos/storefront-api",
+    "technology": "dotnet",
+    "defaultBranch": "main"
+  }
+}
