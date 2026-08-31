@@ -30,7 +30,7 @@ Restricted admin endpoints to authenticated users with ADMIN role in SecurityCon
 
 ## Validation & Security Audit Results
 - **Validation Command**     : `mvn clean test`
-- **Execution Duration**     : 13 ms
+- **Execution Duration**     : 10 ms
 - **Build / Test Result**    : **PASS** (Exit Code: 0)
 - **Unit Tests**             : Total: 1, Passed: 1, Failed: 0, Skipped: 0
 - **Security Review Rating** : **PASS**

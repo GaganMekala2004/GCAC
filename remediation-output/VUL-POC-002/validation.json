@@ -3,7 +3,7 @@
   "command": "mvn clean test",
   "buildResult": "PASS",
   "exitCode": 0,
-  "durationMs": 13,
+  "durationMs": 10,
   "testsExecuted": 1,
   "testsPassed": 1,
   "testsFailed": 0,

@@ -33,10 +33,10 @@ The **Vulnerability Data MCP Server** is a C# STDIO server (`mcp/VulnerabilityDa
     "vulnerability-data": {
       "command": "dotnet",
       "args": [
-        "c:/Users/SaiGanaLaxmiRohith/Desktop/Prototype_GCAS/mcp/VulnerabilityDataMcp/bin/Debug/net9.0/VulnerabilityDataMcp.dll"
+        "${workspaceFolder}/mcp/VulnerabilityDataMcp/bin/Debug/net9.0/VulnerabilityDataMcp.dll"
       ],
       "env": {
-        "GCAS_WORKSPACE_ROOT": "c:/Users/SaiGanaLaxmiRohith/Desktop/Prototype_GCAS",
+        "GCAS_WORKSPACE_ROOT": "${workspaceFolder}",
         "DOTNET_CLI_TELEMETRY_OPTOUT": "1"
       }
     }

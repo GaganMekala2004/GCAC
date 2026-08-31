@@ -1,8 +1,6 @@
 ---
 name: java-spring-fix
 description: Specialist Java / Spring Boot remediation agent for fixing source code vulnerabilities in Spring Security, JDBC/JPA, REST APIs, and input validation.
-skills:
-  - java-spring-secure-remediation
 ---
 
 # Java / Spring Security Fix Agent

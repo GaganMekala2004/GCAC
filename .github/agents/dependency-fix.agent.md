@@ -1,8 +1,6 @@
 ---
 name: dependency-fix
 description: Dependency remediation agent for safely updating NuGet, Maven, and Gradle packages to address CVE findings with minimal blast radius.
-skills:
-  - dependency-remediation
 ---
 
 # Dependency Fix Agent

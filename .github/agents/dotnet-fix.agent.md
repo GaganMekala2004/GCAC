@@ -1,8 +1,6 @@
 ---
 name: dotnet-fix
 description: Specialist C# / .NET remediation agent for fixing source code vulnerabilities in ASP.NET Core, Entity Framework Core, SQL queries, and authorization.
-skills:
-  - dotnet-secure-remediation
 ---
 
 # .NET Security Fix Agent

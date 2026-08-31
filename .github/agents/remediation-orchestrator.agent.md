@@ -1,16 +1,34 @@
 ---
 name: remediation-orchestrator
 description: Primary orchestrator agent for enterprise vulnerability remediation workflows in VS Code. Autonomously executes the complete lifecycle from database lookup to testing and evidence generation, stopping for developer review.
-agents:
-  - vulnerability-classifier
-  - repository-context
-  - dotnet-fix
-  - java-spring-fix
-  - dependency-fix
-  - specialized-action-analyzer
-  - large-refactor-planner
-  - test-validation
-  - security-review
+handoffs:
+  - agent: vulnerability-classifier
+    label: "Classify Finding"
+    prompt: "Analyze and classify this vulnerability finding to determine the remediation route."
+  - agent: repository-context
+    label: "Inspect Repository Context"
+    prompt: "Inspect the repository structure, build framework, and target files for this vulnerability."
+  - agent: dotnet-fix
+    label: "Apply .NET Fix"
+    prompt: "Analyze and fix the C#/.NET source code vulnerability."
+  - agent: java-spring-fix
+    label: "Apply Java/Spring Fix"
+    prompt: "Analyze and fix the Java/Spring Boot source code vulnerability."
+  - agent: dependency-fix
+    label: "Update Dependency"
+    prompt: "Update the vulnerable package dependency in the project manifest."
+  - agent: specialized-action-analyzer
+    label: "Analyze Specialized Action"
+    prompt: "Evaluate this Specialized Action finding and recommend technical remediation route."
+  - agent: large-refactor-planner
+    label: "Plan Large Refactor"
+    prompt: "Create an architectural plan and blast-radius analysis for large refactoring."
+  - agent: test-validation
+    label: "Run Test Validation"
+    prompt: "Run build and test suite verification in the remediation workspace."
+  - agent: security-review
+    label: "Run Security Review"
+    prompt: "Perform an independent security audit on the remediation diff."
 tools:
   - vulnerability-data/get_vulnerability
   - vulnerability-data/get_vulnerability_context
@@ -38,8 +56,6 @@ tools:
   - vulnerability-data/import_vulnerabilities
   - vulnerability-data/validate_vulnerability
   - vulnerability-data/validate_database
-  - vulnerability-data/approve_pr
-  - vulnerability-data/publish_remediation_pr
 ---
 
 # Remediation Orchestrator Agent

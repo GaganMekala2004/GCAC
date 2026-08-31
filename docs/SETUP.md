@@ -15,7 +15,7 @@
 
 1. **Navigate to Repository Workspace**:
    ```powershell
-   cd c:\Users\SaiGanaLaxmiRohith\Desktop\Prototype_GCAS
+   cd <repository-root>
    ```
 
 2. **Verify .NET 9 SDK**:

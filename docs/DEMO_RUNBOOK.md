@@ -8,7 +8,7 @@ Follow these steps to demonstrate and test the **Agentic AI Vulnerability Remedi
 
 1. **Open Workspace**:
    ```powershell
-   cd c:\Users\SaiGanaLaxmiRohith\Desktop\Prototype_GCAS
+   cd <repository-root>
    ```
 2. **Build and Test Suite**:
    ```powershell

@@ -1,8 +1,9 @@
 ---
 name: test-validation
 description: Test execution agent that runs actual build and test suite commands in target workspace and captures observed execution outputs without fabricating test results.
-skills:
-  - remediation-testing
+tools:
+  - vulnerability-data/run_tests
+  - vulnerability-data/run_validation_tests
 ---
 
 # Test and Validation Agent

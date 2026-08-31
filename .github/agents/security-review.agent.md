@@ -1,8 +1,9 @@
 ---
 name: security-review
 description: Independent read-only security review agent that audits code diffs, evaluates root cause resolution, checks for bypassability, and scans for hardcoded secrets.
-skills:
-  - security-validation
+tools:
+  - vulnerability-data/run_security_review
+  - vulnerability-data/get_vulnerability_diff
 ---
 
 # Security Review Agent
