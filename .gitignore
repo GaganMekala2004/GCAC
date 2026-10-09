@@ -31,6 +31,8 @@ evidence/*
 *.token
 appsettings.json
 !config/appsettings.example.json
+config/sharepoint.json
+!config/sharepoint.example.json
 
 # Temporary & Log files
 *.log

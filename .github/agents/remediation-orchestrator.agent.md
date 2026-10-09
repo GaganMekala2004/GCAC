@@ -1,61 +1,18 @@
 ---
 name: remediation-orchestrator
 description: Primary orchestrator agent for enterprise vulnerability remediation workflows in VS Code. Autonomously executes the complete lifecycle from database lookup to testing and evidence generation, stopping for developer review.
-handoffs:
-  - agent: vulnerability-classifier
-    label: "Classify Finding"
-    prompt: "Analyze and classify this vulnerability finding to determine the remediation route."
-  - agent: repository-context
-    label: "Inspect Repository Context"
-    prompt: "Inspect the repository structure, build framework, and target files for this vulnerability."
-  - agent: dotnet-fix
-    label: "Apply .NET Fix"
-    prompt: "Analyze and fix the C#/.NET source code vulnerability."
-  - agent: java-spring-fix
-    label: "Apply Java/Spring Fix"
-    prompt: "Analyze and fix the Java/Spring Boot source code vulnerability."
-  - agent: dependency-fix
-    label: "Update Dependency"
-    prompt: "Update the vulnerable package dependency in the project manifest."
-  - agent: specialized-action-analyzer
-    label: "Analyze Specialized Action"
-    prompt: "Evaluate this Specialized Action finding and recommend technical remediation route."
-  - agent: large-refactor-planner
-    label: "Plan Large Refactor"
-    prompt: "Create an architectural plan and blast-radius analysis for large refactoring."
-  - agent: test-validation
-    label: "Run Test Validation"
-    prompt: "Run build and test suite verification in the remediation workspace."
-  - agent: security-review
-    label: "Run Security Review"
-    prompt: "Perform an independent security audit on the remediation diff."
-tools:
-  - vulnerability-data/get_vulnerability
-  - vulnerability-data/get_vulnerability_context
-  - vulnerability-data/get_remediation_context
-  - vulnerability-data/get_application_vulnerabilities
-  - vulnerability-data/get_vulnerabilities_by_classification
-  - vulnerability-data/get_vulnerabilities_by_severity
-  - vulnerability-data/get_out_of_sla_vulnerabilities
-  - vulnerability-data/get_internet_facing_vulnerabilities
-  - vulnerability-data/get_repository_mapping
-  - vulnerability-data/get_vulnerability_status
-  - vulnerability-data/get_remediation_status
-  - vulnerability-data/get_batch_plan
-  - vulnerability-data/prepare_workspace
-  - vulnerability-data/prepare_remediation_workspace
-  - vulnerability-data/execute_remediation
-  - vulnerability-data/execute_batch_remediation
-  - vulnerability-data/run_tests
-  - vulnerability-data/run_validation_tests
-  - vulnerability-data/run_security_review
-  - vulnerability-data/generate_evidence
-  - vulnerability-data/get_vulnerability_diff
-  - vulnerability-data/get_evidence_report
-  - vulnerability-data/get_execution_trace_log
-  - vulnerability-data/import_vulnerabilities
-  - vulnerability-data/validate_vulnerability
-  - vulnerability-data/validate_database
+agents:
+  - vulnerability-classifier
+  - repository-context
+  - dotnet-fix
+  - java-spring-fix
+  - dependency-fix
+  - specialized-action-analyzer
+  - large-refactor-planner
+  - test-validation
+  - security-review
+tools:vscode, execute, read, agent, ms-dotnettools.vscode-dotnet-runtime/installDotNetSdk, ms-dotnettools.vscode-dotnet-runtime/listDotNetVersions, ms-dotnettools.vscode-dotnet-runtime/recommendedDotNetSdkVersion, ms-dotnettools.vscode-dotnet-runtime/findDotNetPath, ms-dotnettools.vscode-dotnet-runtime/uninstallSystemDotNetSdk, ms-dotnettools.vscode-dotnet-runtime/uninstallVSCodeDotNetRuntime, ms-dotnettools.vscode-dotnet-runtime/getDotNetSettingsInfo, ms-dotnettools.vscode-dotnet-runtime/listInstalledDotNetVersions, edit, search, web, browser, 'neon/*', todo
+[vscode, execute, read, agent, ms-azuretools.vscode-containers/containerToolsConfig, ms-dotnettools.vscode-dotnet-runtime/installDotNetSdk, ms-dotnettools.vscode-dotnet-runtime/listDotNetVersions, ms-dotnettools.vscode-dotnet-runtime/recommendedDotNetSdkVersion, ms-dotnettools.vscode-dotnet-runtime/findDotNetPath, ms-dotnettools.vscode-dotnet-runtime/uninstallSystemDotNetSdk, ms-dotnettools.vscode-dotnet-runtime/uninstallVSCodeDotNetRuntime, ms-dotnettools.vscode-dotnet-runtime/getDotNetSettingsInfo, ms-dotnettools.vscode-dotnet-runtime/listInstalledDotNetVersions, ms-python.python/getPythonEnvironmentInfo, ms-python.python/getPythonExecutableCommand, ms-python.python/installPythonPackage, ms-python.python/configurePythonEnvironment, ms-toolsai.jupyter/configureNotebook, ms-toolsai.jupyter/listNotebookPackages, ms-toolsai.jupyter/installNotebookPackages, edit, search, web, browser, 'neon/*', 'vulnerability-data/*', todo]
 ---
 
 # Remediation Orchestrator Agent

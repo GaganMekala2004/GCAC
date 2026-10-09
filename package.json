@@ -1,0 +1,57 @@
+{
+  "name": "gcac-vulnerability-remediation",
+  "displayName": "GCAC Vulnerability Remediation Hub",
+  "description": "Local Multi-Agent Security Remediation and Governance Dashboard for VS Code",
+  "version": "1.0.0",
+  "publisher": "gcac",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Security",
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:gcac.remediationView",
+    "onCommand:gcac.openDashboard"
+  ],
+  "main": "./extension/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "gcac.openDashboard",
+        "title": "GCAC: Open Remediation Dashboard",
+        "category": "GCAC",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "gcac.refreshData",
+        "title": "GCAC: Refresh Vulnerability Records",
+        "category": "GCAC",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gcac-remediation-hub",
+          "title": "GCAC Remediation",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "gcac-remediation-hub": [
+        {
+          "type": "webview",
+          "id": "gcac.remediationView",
+          "name": "Remediation Hub"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "start:preview": "node scripts/preview-dashboard.js"
+  }
+}
