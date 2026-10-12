@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "publisher": "gcac",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Security",
@@ -14,7 +14,8 @@
   ],
   "activationEvents": [
     "onView:gcac.remediationView",
-    "onCommand:gcac.openDashboard"
+    "onCommand:gcac.openDashboard",
+    "onChatParticipant:gcac.vulnerability-orchestrator"
   ],
   "main": "./extension/extension.js",
   "contributes": {
@@ -49,7 +50,29 @@
           "name": "Remediation Hub"
         }
       ]
-    }
+    },
+    "chatParticipants": [
+      {
+        "id": "gcac.vulnerability-orchestrator",
+        "name": "vulnerability-orchestrator",
+        "description": "Autonomous Multi-Agent Vulnerability Remediation Coordinator",
+        "isDefault": false,
+        "commands": [
+          {
+            "name": "remediate-vulnerability",
+            "description": "Execute the 7-stage autonomous LLM remediation pipeline on a vulnerability"
+          },
+          {
+            "name": "approve",
+            "description": "Grant Stage 4 Human Approval to apply patch and run Bench Tests"
+          },
+          {
+            "name": "final-approve",
+            "description": "Grant Stage 6 Final Approval and Sign-off"
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "start:preview": "node scripts/preview-dashboard.js"

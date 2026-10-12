@@ -1,30 +1,61 @@
 ---
 name: gcas-remediation
-description: Local bounded vulnerability remediation workflow for GCAC using GitHub Copilot agents, local CSV input, and Shared Markdown state.
+description: Local bounded vulnerability remediation workflow for GCAC using the 7-stage multi-agent architecture, local CSV input, and Shared Markdown state.
 ---
 
 # GCAC Vulnerability Remediation Skill
 
-This skill guides local vulnerability remediation across applications using the 7 bounded GitHub Copilot agents, local CSV files (`vulnerability/*.csv`), and Shared Vulnerability Markdown reports (`output/*.md`).
+This skill guides local vulnerability remediation across applications using the 7-stage multi-agent governance architecture, local CSV repository (`vulnerability/vulnerabilities.csv`), Shared Markdown reports (`output/<title>_<id>.md`), and full evidence persistence (`remediation-output/<id>/`).
 
-## Target POC Architecture
+## Target Architecture & Agent Flow
 
-- **Input**: Local CSV in `vulnerability/*.csv`
-- **Agents**: 7 Bounded Copilot Agents (`vulnerability-orchestrator`, `code-analysis-rca`, `unit-test`, `remediation`, `regression`, `final-validation`, `documentation`)
-- **Governance Gate**: Mandatory Human Approval Gate before any production code modification
-- **State**: Single Shared Vulnerability Markdown report (`output/<title>_<id>.md`)
-- **Output**: Controlled single-row CSV update by Documentation Agent only
-- **Environment**: Fully local in Visual Studio Code (No MCP, No SharePoint, No Graph, No SQLite, No external network APIs, No auto-push/PR)
+### Orchestrator Engine
+- **Role**: Manages workflow, state, sequencing, agent handoffs, retries, error handling, and context passing.
+- **Human Approval**: GitHub built-in human approval is required for every command other than read commands.
+- **Pillars**: State Management • Decision & Routing • Audit & Logging
 
-## Workflow Execution
+### The 7 Stages
 
-1. Trigger `/remediate-vulnerability` or invoke `@vulnerability-orchestrator`.
-2. Select vulnerability category from local CSV.
-3. Select EXACTLY ONE vulnerability finding.
-4. `@code-analysis-rca` inspects code, traces data flow, identifies root cause (Read-Only).
-5. `@unit-test` authors security unit tests and establishes baseline on unfixed code.
-6. **STOP at Human Approval Gate**: Review RCA and baseline evidence; authorize or reject fix.
-7. Upon approval only, `@remediation` applies the minimal secure fix and executes post-fix tests.
-8. `@regression` runs full build and existing regression test suite.
-9. `@final-validation` independently verifies diff and test outcomes (PASS / FAIL / PARTIAL, 0-100 score).
-10. `@documentation` finalizes the Shared Markdown report and updates the selected row in local CSV.
+1. **Classification Agent**
+   - Read vulnerabilities from repository/CSV
+   - Classify by severity, CWE, type
+   - Assess complexity & exploitability
+   - Prioritize remediation strategy
+
+2. **Code Analysis Agent (`</>`)**
+   - Locate vulnerable code (file, line)
+   - Analyze data flow & call flow
+   - Understand context & dependencies
+   - Identify root cause (Read-Only)
+
+3. **Remediation Agent (🛠️)**
+   - Determine secure fix strategy
+   - Generate .NET code changes (patch)
+   - Follow best practices & secure coding
+   - Prepare change summary
+   - Only uses existing remediation and knowledge if not stale
+
+4. **Human Approval Gate (🛡️ Pre-Test Authorization)**
+   - Review vulnerability analysis and proposed secure patch
+   - Decisions: **✓ Approve** (Proceed to Bench Test) | **✕ Reject** (Rework / Changes Requested routing)
+
+5. **Bench Test (🧪)**
+   - Create / update unit tests
+   - Cover vulnerable scenario
+   - Validate fix with targeted tests
+   - Retry on Test Failure loop back to Remediation Agent
+
+6. **Final Human Approval Gate (🛡️ Workflow Exit Sign-off)**
+   - Final Human Approval before workflow exit
+   - Decisions: **✓ Approve** (Proceed to Hand-off) | **✕ Reject** (Retry & Max rejection loop / Rework)
+
+7. **Final Manual Validations (Non-Agentic)**
+   - **Regression Testing**: To be performed by App Owners
+   - **Deployment**: Through existing CI/CD Pipeline performed by App Owners
+
+### Shared Foundation
+- **Context Store**: Code indexing, embeddings, cache
+- **Knowledge Base**: Vulnerability patterns, fix patterns, guidance, regular updates & stale knowledge removal
+- **Prompt & Template Library**: Standardized prompts, checklists, templates
+- **Tooling & Integrations**: VS Code, GitHub Copilot, .NET CLI, Test Runner
+- **Audit & Compliance**: Audit trail, approvals, governance, policies

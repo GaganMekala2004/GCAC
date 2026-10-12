@@ -1,269 +1,963 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GCAC Vulnerability Remediation Dashboard</title>
+    <title>GCAC Remediation Hub — Enterprise Security Workspace</title>
     <link rel="stylesheet" href="dashboard.css">
 </head>
-<body>
-    <div class="app-container">
-        <!-- Top Navigation / Brand Header -->
-        <header class="header">
-            <div class="brand-section">
-                <div class="brand-icon">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
-                    </svg>
-                </div>
-                <div class="brand-text">
-                    <div class="brand-title-wrap">
-                        <h1>GCAC Remediation Hub</h1>
-                        <span class="hub-pill">Multi-Agent Governance</span>
+<body class="theme-light">
+    <!-- Main Application Shell -->
+    <div class="app-shell" id="appShell">
+        
+        <!-- Left Navigation Sidebar -->
+        <aside class="app-sidebar" id="appSidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <div class="brand-glyph">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+                        </svg>
                     </div>
-                    <p>Autonomous Security Remediation &amp; Local Verification Engine</p>
+                    <div class="brand-meta">
+                        <div class="brand-title">GCAC</div>
+                        <div class="brand-tag">Remediation Hub</div>
+                    </div>
                 </div>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-secondary btn-sm" id="btnRefresh" title="Refresh local CSV and artifact data">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                <button class="sidebar-collapse-btn" id="btnToggleSidebar" title="Collapse or Expand Sidebar" aria-label="Toggle Sidebar">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
                     </svg>
-                    Refresh
                 </button>
             </div>
-        </header>
 
-        <!-- Metrics Overview Cards -->
-        <div class="metrics-grid">
-            <div class="metric-card filterable-metric" data-quick-filter="ALL" style="--metric-color: var(--accent-indigo); --metric-bg: rgba(99, 102, 241, 0.15);">
-                <div class="metric-info">
-                    <h3>Total Findings</h3>
-                    <div class="metric-value" id="metricTotal">0</div>
+            <!-- Primary Navigation Menu -->
+            <nav class="sidebar-nav" aria-label="Primary Navigation">
+                <button class="nav-item active" id="navItemDashboard" data-view="dashboard" title="Dashboard">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+                    </svg>
+                    <span class="nav-label">Dashboard</span>
+                </button>
+
+                <button class="nav-item" id="navItemVulnerabilities" data-view="vulnerabilities" title="Vulnerabilities">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v2h-2V7zm0 4h2v6h-2v-6z"/>
+                    </svg>
+                    <span class="nav-label">Vulnerabilities</span>
+                    <span class="nav-badge" id="navCountVulns">0</span>
+                </button>
+
+                <button class="nav-item" id="navItemActiveRuns" data-view="active-runs" title="Active Runs">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M13 2.05v3.03c3.39.49 6 3.39 6 6.92 0 .9-.18 1.75-.48 2.54l2.6 1.53c.56-1.24.88-2.62.88-4.07 0-5.18-3.95-9.45-9-9.95zM12 19c-3.87 0-7-3.13-7-7 0-3.53 2.61-6.43 6-6.92V2.05c-5.05.5-9 4.76-9 9.95 0 5.52 4.47 10 9.99 10 3.31 0 6.24-1.61 8.04-4.09l-2.45-1.45C16.19 17.8 14.28 19 12 19z"/>
+                    </svg>
+                    <span class="nav-label">Active Runs</span>
+                    <span class="nav-status-pulse" id="navActiveRunPulse" style="display: none;"></span>
+                </button>
+
+                <button class="nav-item" id="navItemReviewQueue" data-view="review-queue" title="Review Queue">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+                    </svg>
+                    <span class="nav-label">Review Queue</span>
+                    <span class="nav-badge badge-warning" id="navCountReview">0</span>
+                </button>
+
+                <button class="nav-item" id="navItemReports" data-view="reports" title="Reports">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                    </svg>
+                    <span class="nav-label">Reports</span>
+                </button>
+
+                <button class="nav-item" id="navItemSettings" data-view="settings" title="Settings">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                    </svg>
+                    <span class="nav-label">Settings</span>
+                </button>
+            </nav>
+
+            <!-- Sidebar Bottom Info -->
+            <div class="sidebar-footer">
+                <div class="secure-mode-badge" title="Local-First Secure Mode">
+                    <span class="secure-dot"></span>
+                    <span class="secure-text">Local Secure Mode</span>
                 </div>
-                <div class="metric-icon-box">
-                    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            </div>
+        </aside>
+
+        <!-- Main Workspace Area -->
+        <div class="app-main">
+            
+            <!-- Top Application Header -->
+            <header class="top-header" id="topHeader">
+                <!-- Tier 1: Main Title & Quick Actions Row -->
+                <div class="header-main-row">
+                    <div class="header-left">
+                        <button class="sidebar-rail-toggle" id="btnMobileMenu" aria-label="Toggle Navigation Sidebar" title="Toggle Sidebar">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                            </svg>
+                        </button>
+                        <div class="header-titles">
+                            <div class="header-primary-title">
+                                <h1 id="pageTitle">Vulnerability Dashboard</h1>
+                                <span class="env-pill">7-STAGE</span>
+                            </div>
+                            <p class="header-subtitle" id="pageSubtitle">Real-time overview of remediation activity and security posture.</p>
+                        </div>
+                    </div>
+
+                    <!-- Header Actions -->
+                    <div class="header-right">
+                        <!-- Current Run Indicator -->
+                        <div class="run-indicator-pill" id="headerRunIndicator" style="display: none;">
+                            <span class="live-pulse-dot"></span>
+                            <span id="headerRunText">Stage 1 Active</span>
+                        </div>
+
+                        <!-- Refresh Button -->
+                        <button class="btn btn-secondary btn-icon-only" id="btnHeaderRefresh" title="Refresh local data and reload artifacts" aria-label="Refresh">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                            </svg>
+                        </button>
+
+                        <!-- Theme Switcher -->
+                        <div class="theme-switcher" id="themeSwitcher">
+                            <button class="theme-btn" id="btnThemeToggle" title="Switch Theme (Light / Dark / Follow VS Code)">
+                                <span class="theme-icon" id="themeCurrentIcon">💻</span>
+                                <span class="theme-label" id="themeCurrentLabel">VS Code</span>
+                            </button>
+                            <div class="theme-dropdown" id="themeDropdown">
+                                <button class="theme-opt" data-theme-val="light">
+                                    <span>☀️</span> Light Theme
+                                </button>
+                                <button class="theme-opt" data-theme-val="dark">
+                                    <span>🌙</span> Dark Theme
+                                </button>
+                                <button class="theme-opt" data-theme-val="auto">
+                                    <span>💻</span> Follow VS Code
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Primary Action -->
+                        <button class="btn btn-primary btn-run-remediation" id="btnHeaderQuickRun" title="Run remediation on selected finding">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                            <span class="btn-text">Run Remediation</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tier 2: Dedicated Search Row (Full Width, Zero Collision) -->
+                <div class="header-search-row">
+                    <div class="header-search-wrap">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" class="search-icon">
+                            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                        </svg>
+                        <input type="text" class="header-search-input" id="globalSearchInput" placeholder="Search findings, CWE, files...">
+                        <button class="header-search-clear" id="btnGlobalSearchClear" title="Clear search">✕</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Active Target Repository & CSV Context Bar -->
+            <div class="target-context-bar" id="targetContextBar">
+                <div class="target-context-left">
+                    <div class="target-chip repo-chip" id="targetRepoChip" title="Target Repository">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="target-icon">
+                            <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                        </svg>
+                        <span class="target-label">Target Repo:</span>
+                        <span class="target-value" id="displayRepoName">Scanning workspace...</span>
+                        <button class="btn-target-browse" id="btnBrowseRepo">Change</button>
+                    </div>
+
+                    <div class="target-divider"></div>
+
+                    <div class="target-chip csv-chip" id="targetCsvChip" title="Active vulnerability scan CSV report">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="target-icon">
+                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                        </svg>
+                        <span class="target-label">Scan CSV:</span>
+                        <select class="target-csv-select" id="selectTargetCsv" aria-label="Select CSV Scan File">
+                            <option value="">Detecting CSV files...</option>
+                        </select>
+                        <button class="btn-target-browse" id="btnBrowseCsv">Browse...</button>
+                    </div>
+                </div>
+
+                <div class="target-context-right">
+                    <span class="target-security-badge" title="Execution strictly bounded to local context">
+                        <span class="secure-dot"></span>
+                        <span id="targetContextStatusText">Bounded Context Active</span>
+                    </span>
                 </div>
             </div>
 
-            <div class="metric-card filterable-metric" data-quick-filter="CRITICAL" style="--metric-color: var(--accent-rose); --metric-bg: rgba(244, 63, 94, 0.15);">
-                <div class="metric-info">
-                    <h3>Critical Severity</h3>
-                    <div class="metric-value" id="metricCritical">0</div>
-                </div>
-                <div class="metric-icon-box">
-                    <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-                </div>
-            </div>
+            <!-- Main Dynamic View Container -->
+            <div class="view-viewport" id="viewViewport">
+                
+                <!-- ===================================================================
+                     VIEW 1: DASHBOARD
+                     =================================================================== -->
+                <section class="app-view active" id="viewDashboard" data-view-id="dashboard">
+                    
+                    <!-- Dashboard Filter Bar -->
+                    <div class="dashboard-controls-bar">
+                        <div class="controls-left">
+                            <div class="controls-title">Overview &amp; Posture</div>
+                            <span class="controls-badge">Local Metrics Only</span>
+                        </div>
+                        <div class="controls-right">
+                            <select class="dash-select" id="dashFilterApp" aria-label="Filter by Application">
+                                <option value="ALL">All Applications</option>
+                            </select>
+                            <select class="dash-select" id="dashFilterSeverity" aria-label="Filter by Severity">
+                                <option value="ALL">All Severities</option>
+                                <option value="CRITICAL">Critical</option>
+                                <option value="HIGH">High</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="LOW">Low</option>
+                            </select>
+                            <select class="dash-select" id="dashFilterStatus" aria-label="Filter by Status">
+                                <option value="ALL">All Statuses</option>
+                                <option value="REMEDIATED">Remediated</option>
+                                <option value="APPROVED">Approved</option>
+                                <option value="REVIEW">Needs Review</option>
+                                <option value="PENDING">Pending</option>
+                            </select>
+                            <button class="btn btn-secondary btn-sm" id="btnResetDashFilters" title="Reset filters">
+                                Reset Filters
+                            </button>
+                        </div>
+                    </div>
 
-            <div class="metric-card filterable-metric" data-quick-filter="REMEDIATED" style="--metric-color: var(--accent-emerald); --metric-bg: rgba(16, 185, 129, 0.15);">
-                <div class="metric-info">
-                    <h3>Remediated (PASS)</h3>
-                    <div class="metric-value" id="metricRemediated">0</div>
-                </div>
-                <div class="metric-icon-box">
-                    <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
-                </div>
-            </div>
+                    <!-- Top 7 KPI Cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-title">Total Findings</span>
+                                <span class="kpi-icon-pill">●</span>
+                            </div>
+                            <div class="kpi-metric" id="dashKpiTotal">0</div>
+                            <div class="kpi-sub">Across repositories</div>
+                        </div>
 
-            <div class="metric-card filterable-metric" data-quick-filter="REVIEW" style="--metric-color: var(--accent-amber); --metric-bg: rgba(245, 158, 11, 0.15);">
-                <div class="metric-info">
-                    <h3>Human Reviews</h3>
-                    <div class="metric-value" id="metricReview">0</div>
-                </div>
-                <div class="metric-icon-box">
-                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                </div>
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-title">Critical</span>
+                                <span class="kpi-icon-pill" style="color: var(--danger);">●</span>
+                            </div>
+                            <div class="kpi-metric" id="dashKpiCritical" style="color: var(--danger);">0</div>
+                            <div class="kpi-sub">Immediate priority</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-title">In Progress</span>
+                                <span class="kpi-icon-pill" style="color: var(--info);">●</span>
+                            </div>
+                            <div class="kpi-metric" id="dashKpiInProgress">0</div>
+                            <div class="kpi-sub">Active pipeline</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-title">Remediated</span>
+                                <span class="kpi-icon-pill" style="color: var(--success);">●</span>
+                            </div>
+                            <div class="kpi-metric" id="dashKpiRemediated" style="color: var(--success);">0</div>
+                            <div class="kpi-sub">Signed off &amp; verified</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-title">Needs Review</span>
+                                <span class="kpi-icon-pill" style="color: var(--warning);">●</span>
+                            </div>
+                            <div class="kpi-metric" id="dashKpiReview" style="color: var(--warning);">0</div>
+                            <div class="kpi-sub">Awaiting gate decision</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-title">Success Rate</span>
+                                <span class="kpi-icon-pill">🎯</span>
+                            </div>
+                            <div class="kpi-metric" id="dashKpiSuccessRate">N/A</div>
+                            <div class="kpi-sub">Completed pipelines</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-title">Avg Remediation Time</span>
+                                <span class="kpi-icon-pill">⏱️</span>
+                            </div>
+                            <div class="kpi-metric" id="dashKpiAvgDuration">N/A</div>
+                            <div class="kpi-sub">End-to-end execution</div>
+                        </div>
+                    </div>
+
+                    <!-- Quality & Time Metrics Strip -->
+                    <div class="analytics-metrics-strip">
+                        <div class="strip-section">
+                            <div class="strip-header">
+                                <span class="strip-title">Stage Durations (Local Data)</span>
+                            </div>
+                            <div class="strip-items-grid">
+                                <div class="strip-item">
+                                    <span class="strip-label">Analysis Avg:</span>
+                                    <span class="strip-val" id="timeMetricAnalysis">N/A</span>
+                                </div>
+                                <div class="strip-item">
+                                    <span class="strip-label">Remediation Avg:</span>
+                                    <span class="strip-val" id="timeMetricRemediation">N/A</span>
+                                </div>
+                                <div class="strip-item">
+                                    <span class="strip-label">Bench Test Avg:</span>
+                                    <span class="strip-val" id="timeMetricTest">N/A</span>
+                                </div>
+                                <div class="strip-item">
+                                    <span class="strip-label">Human Gate Wait:</span>
+                                    <span class="strip-val" id="timeMetricApproval">N/A</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="strip-section">
+                            <div class="strip-header">
+                                <span class="strip-title">Verification Quality</span>
+                            </div>
+                            <div class="strip-items-grid">
+                                <div class="strip-item">
+                                    <span class="strip-label">First-Pass Rate:</span>
+                                    <span class="strip-val" id="qualityMetricFirstPass">N/A</span>
+                                </div>
+                                <div class="strip-item">
+                                    <span class="strip-label">Test Pass Rate:</span>
+                                    <span class="strip-val" id="qualityMetricTestPass">N/A</span>
+                                </div>
+                                <div class="strip-item">
+                                    <span class="strip-label">Validation Status:</span>
+                                    <span class="strip-val" id="qualityMetricValidation">N/A</span>
+                                </div>
+                                <div class="strip-item">
+                                    <span class="strip-label">Retries / Run:</span>
+                                    <span class="strip-val" id="qualityMetricRetries">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Grid -->
+                    <div class="dashboard-charts-grid">
+                        <!-- Chart 1: Remediation Activity Trend -->
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Remediation Activity Trend</div>
+                                <span class="chart-badge">Timeline</span>
+                            </div>
+                            <div class="chart-body" id="chartCategoryContainer">
+                                <!-- Rendered dynamically via dashboard.js using SVG -->
+                            </div>
+                        </div>
+
+                        <!-- Chart 2: Severity Distribution -->
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Severity Distribution</div>
+                                <span class="chart-badge">Risk Profile</span>
+                            </div>
+                            <div class="chart-body" id="chartSeverityContainer">
+                                <!-- Rendered dynamically via dashboard.js using SVG -->
+                            </div>
+                        </div>
+
+                        <!-- Chart 3: Status Distribution -->
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Status Distribution</div>
+                                <span class="chart-badge">Lifecycle</span>
+                            </div>
+                            <div class="chart-body" id="chartStatusContainer">
+                                <!-- Rendered dynamically via dashboard.js using SVG -->
+                            </div>
+                        </div>
+
+                        <!-- Chart 4: Average Time by 7-Agent Stage -->
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Average Time by Workflow Stage</div>
+                                <span class="chart-badge">Stage Latency</span>
+                            </div>
+                            <div class="chart-body" id="chartStageDurationContainer">
+                                <!-- Rendered dynamically via dashboard.js using SVG -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Bottom Panels: Recent Runs & Pending Reviews -->
+                    <div class="dashboard-bottom-grid">
+                        <div class="dash-panel">
+                            <div class="dash-panel-header">
+                                <div class="dash-panel-title">
+                                    <span>Recent Remediation Runs</span>
+                                    <span class="badge" id="dashRecentRunsCount">0 runs</span>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" id="btnGoToVulnerabilities">All Findings ➔</button>
+                            </div>
+                            <div class="dash-panel-content" id="dashRecentRunsList">
+                                <!-- Dynamic recent runs list -->
+                            </div>
+                        </div>
+
+                        <div class="dash-panel">
+                            <div class="dash-panel-header">
+                                <div class="dash-panel-title">
+                                    <span>Pending Human Reviews</span>
+                                    <span class="badge badge-warning" id="dashPendingCount">0 required</span>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" id="btnGoToReviewQueue">Review Queue ➔</button>
+                            </div>
+                            <div class="dash-panel-content" id="dashPendingReviewsList">
+                                <!-- Dynamic pending reviews populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- ===================================================================
+                     VIEW 2: VULNERABILITIES (WORK QUEUE & DETAIL INSPECTOR)
+                     =================================================================== -->
+                <section class="app-view" id="viewVulnerabilities" data-view-id="vulnerabilities">
+                    
+                    <!-- Quick KPI Mini Bar -->
+                    <div class="vuln-mini-kpi-bar">
+                        <div class="mini-kpi-chip" data-quick-filter="ALL">
+                            <span class="mini-kpi-num" id="miniKpiTotal">0</span>
+                            <span class="mini-kpi-lbl">Total</span>
+                        </div>
+                        <div class="mini-kpi-chip critical" data-quick-filter="CRITICAL">
+                            <span class="mini-kpi-num" id="miniKpiCritical">0</span>
+                            <span class="mini-kpi-lbl">Critical</span>
+                        </div>
+                        <div class="mini-kpi-chip review" data-quick-filter="REVIEW">
+                            <span class="mini-kpi-num" id="miniKpiReview">0</span>
+                            <span class="mini-kpi-lbl">Needs Review</span>
+                        </div>
+                        <div class="mini-kpi-chip remediated" data-quick-filter="REMEDIATED">
+                            <span class="mini-kpi-num" id="miniKpiRemediated">0</span>
+                            <span class="mini-kpi-lbl">Remediated</span>
+                        </div>
+                    </div>
+
+                    <!-- Split Container: Table on Left + Inspector Drawer on Right -->
+                    <div class="vuln-workspace-layout" id="vulnWorkspaceLayout">
+                        
+                        <!-- Table Panel -->
+                        <div class="panel vuln-table-panel">
+                            <div class="panel-header">
+                                <div class="panel-title-wrap">
+                                    <span class="panel-main-title">Findings Work Queue</span>
+                                    <span class="badge-count" id="tableVulnCounter">0 items</span>
+                                </div>
+
+                                <!-- Filter Chips -->
+                                <div class="filter-chips-row">
+                                    <button class="chip active" data-chip="ALL">All</button>
+                                    <button class="chip" data-chip="CRITICAL">Critical</button>
+                                    <button class="chip" data-chip="HIGH">High</button>
+                                    <button class="chip" data-chip="REVIEW">Needs Review</button>
+                                    <button class="chip" data-chip="REMEDIATED">Remediated</button>
+                                </div>
+                            </div>
+
+                            <!-- Toolbar -->
+                            <div class="table-toolbar">
+                                <div class="search-box">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                                        <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                    </svg>
+                                    <input type="text" class="search-input" id="tableSearchInput" placeholder="Filter by ID, CVE, title, path...">
+                                    <button class="clear-search-btn" id="btnTableClearSearch" title="Clear">✕</button>
+                                </div>
+
+                                <select class="select-filter" id="tableSeverityFilter" aria-label="Filter by Severity">
+                                    <option value="ALL">All Severities</option>
+                                    <option value="CRITICAL">Critical</option>
+                                    <option value="HIGH">High</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="LOW">Low</option>
+                                </select>
+
+                                <select class="select-filter" id="tableStatusFilter" aria-label="Filter by Status">
+                                    <option value="ALL">All Statuses</option>
+                                    <option value="PENDING">Pending</option>
+                                    <option value="APPROVED">Approved</option>
+                                    <option value="INPROGRESS">In Progress</option>
+                                    <option value="REMEDIATED">Remediated</option>
+                                    <option value="REVIEW">Needs Review</option>
+                                </select>
+
+                                <select class="select-filter" id="tableRepoFilter" aria-label="Filter by Repository">
+                                    <option value="ALL">All Repositories</option>
+                                </select>
+                            </div>
+
+                            <!-- Table Element -->
+                            <div class="table-container">
+                                <table class="vuln-table" id="mainVulnTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="sortable" data-sort="id">ID &amp; CVE <span class="sort-indicator">↕</span></th>
+                                            <th class="sortable" data-sort="title">Vulnerability <span class="sort-indicator">↕</span></th>
+                                            <th class="sortable" data-sort="severity">Severity <span class="sort-indicator">↕</span></th>
+                                            <th>Application / Repository</th>
+                                            <th>Location</th>
+                                            <th class="sortable" data-sort="status">Status <span class="sort-indicator">↕</span></th>
+                                            <th>Last Updated</th>
+                                            <th style="text-align: right;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vulnTableBody">
+                                        <!-- Populated via dashboard.js -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Right Drawer: Detail Inspector -->
+                        <aside class="panel detail-panel" id="detailPanel">
+                            <div class="panel-header">
+                                <div class="panel-title-wrap">
+                                    <span class="panel-main-title">Finding Detail</span>
+                                    <span class="id-badge" id="detailId">--</span>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" id="btnCloseDetail" title="Close" aria-label="Close Inspector">✕</button>
+                            </div>
+
+                            <div class="inspector-scroll-area">
+                                <div class="detail-header-card">
+                                    <div class="detail-title-row">
+                                        <div>
+                                            <h2 class="detail-title" id="detailTitle">Select a Vulnerability</h2>
+                                            <div class="cve-subtitle" id="detailCve">--</div>
+                                        </div>
+                                        <span class="badge" id="detailSeverity">--</span>
+                                    </div>
+
+                                    <div class="detail-meta-grid">
+                                        <div class="meta-item">
+                                            <span class="meta-label">Application</span>
+                                            <span class="meta-val" id="detailApp">--</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <span class="meta-label">Repository</span>
+                                            <span class="meta-val" id="detailRepo">--</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <span class="meta-label">Technology</span>
+                                            <span class="meta-val" id="detailTech">--</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <span class="meta-label">SLA Status</span>
+                                            <span class="meta-val" id="detailSla">--</span>
+                                        </div>
+                                        <div class="meta-item full-width">
+                                            <span class="meta-label">File &amp; Line</span>
+                                            <span class="meta-val font-mono" id="detailLocation">--</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="guidance-box" id="detailGuidanceBox">
+                                        <div class="guidance-title">
+                                            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                                            Remediation Guidance
+                                        </div>
+                                        <div class="guidance-content" id="detailGuidance">--</div>
+                                    </div>
+
+                                    <!-- Concise Actions: One Primary + Remaining Secondary -->
+                                    <div class="inspector-actions">
+                                        <button class="btn btn-primary btn-copilot-trigger" id="btnLaunchCopilot" title="Run with Copilot in VS Code Chat">
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5a2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5 2.5 2.5 0 0 0-2.5-2.5"/></svg>
+                                            <span>Run with Copilot</span>
+                                        </button>
+                                        <button class="btn btn-secondary btn-sm" id="btnRunRemediation" title="Execute local multi-agent pipeline">
+                                            <span id="btnRunRemediationText">Execute Engine</span>
+                                        </button>
+                                        <button class="btn btn-secondary btn-sm" id="btnOpenLocation" title="Jump to source file in VS Code">
+                                            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                                            Jump to Source
+                                        </button>
+                                        <button class="btn btn-secondary btn-sm" id="btnViewCodeModal" title="Preview file in modal">
+                                            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+                                            Preview Code
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Agent Execution Timeline -->
+                                <div class="pipeline-section">
+                                    <div class="pipeline-header">
+                                        <div class="pipeline-title">Agent Execution Timeline</div>
+                                        <span class="badge" id="pipelineOverallStatus">Ready</span>
+                                    </div>
+                                    <ul class="stepper-list" id="pipelineStepper">
+                                        <!-- Dynamically rendered timeline -->
+                                    </ul>
+                                </div>
+
+                                <!-- Stage 4 Human Approval Panel -->
+                                <div class="gate-decision-card" id="humanGateCard" style="display: none;">
+                                    <div class="gate-card-header">
+                                        <div class="gate-card-title">
+                                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                                            <span>Human Approval Gate (Stage 4)</span>
+                                        </div>
+                                        <span class="badge badge-warning">Review Required</span>
+                                    </div>
+                                    <div class="gate-card-body">
+                                        <p>Root Cause Analysis and proposed patch generated. Authorize code change to proceed to Bench Testing.</p>
+                                        <div id="gate4PatchSummary" style="margin-top: 6px;"></div>
+                                    </div>
+                                    <div class="gate-card-actions">
+                                        <button class="btn btn-success btn-sm" id="btnApprove">✓ Authorize Fix</button>
+                                        <button class="btn btn-secondary btn-sm" id="btnReject">Request Changes</button>
+                                        <button class="btn btn-danger btn-sm" id="btnRejectFinalSubtle">Reject</button>
+                                    </div>
+                                </div>
+
+                                <!-- Stage 6 Final Sign-off Gate Panel -->
+                                <div class="gate-decision-card final-gate" id="finalGateCard" style="display: none;">
+                                    <div class="gate-card-header">
+                                        <div class="gate-card-title">
+                                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                            <span>Final Sign-off Gate (Stage 6)</span>
+                                        </div>
+                                        <span class="badge badge-status-remediated">Validation Complete</span>
+                                    </div>
+                                    <div class="gate-card-body">
+                                        <p>Targeted bench tests and independent security verification passed. Sign off to hand off to Application Team CI/CD.</p>
+                                    </div>
+                                    <div class="gate-card-actions">
+                                        <button class="btn btn-success btn-sm" id="btnFinalApprove">✓ Final Sign-off</button>
+                                        <button class="btn btn-danger btn-sm" id="btnFinalReject">✕ Request Rework</button>
+                                    </div>
+                                </div>
+
+                                <!-- Structured Failure Recovery Panel -->
+                                <div class="failure-recovery-card" id="failureRecoveryCard" style="display: none;">
+                                    <div class="failure-header">
+                                        <div class="failure-title">
+                                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                                            <span id="failureStageTitle">Remediation could not be completed</span>
+                                        </div>
+                                        <span class="badge badge-status-failed">Failed</span>
+                                    </div>
+                                    <div class="failure-body" id="failureSummaryText">
+                                        Validation tests failed during stage execution.
+                                    </div>
+                                    <div class="failure-actions">
+                                        <button class="btn btn-primary btn-sm" id="btnRetryStage">Retry Stage</button>
+                                        <button class="btn btn-secondary btn-sm" id="btnReviewDiffFromFailure">Review Changes</button>
+                                    </div>
+                                </div>
+
+                                <!-- Evidence Tabs -->
+                                <div class="evidence-tabs-header">
+                                    <button class="tab-btn active" data-tab="report">Audit Report</button>
+                                    <button class="tab-btn" data-tab="diff">Patch Diff</button>
+                                    <button class="tab-btn" data-tab="validation">Test Evidence</button>
+                                    <button class="tab-btn" data-tab="trace">Agent Log</button>
+                                </div>
+
+                                <div class="evidence-tab-panes">
+                                    <!-- Tab 1: Audit Report -->
+                                    <div class="tab-pane active" id="tab-report">
+                                        <div id="reportContent">
+                                            <div class="empty-state">
+                                                <p>Select a finding to inspect the generated Shared Markdown audit report.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tab 2: Patch Diff -->
+                                    <div class="tab-pane" id="tab-diff">
+                                        <div class="diff-summary-bar" id="diffSummaryBar" style="display: none;">
+                                            <div class="diff-stats">
+                                                <span class="diff-stat-file" id="diffStatFile">File</span>
+                                                <span class="diff-stat-add" id="diffStatAdd">+0</span>
+                                                <span class="diff-stat-del" id="diffStatDel">-0</span>
+                                            </div>
+                                            <button class="btn btn-secondary btn-sm" id="btnCopyDiff">Copy Diff</button>
+                                        </div>
+                                        <div id="diffContent">
+                                            <div class="empty-state">
+                                                <p>No patch diff generated yet.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tab 3: Test Evidence -->
+                                    <div class="tab-pane" id="tab-validation">
+                                        <div id="valContent">
+                                            <div class="empty-state">
+                                                <p>Test evidence will appear after Stage 5 Bench Testing execution.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tab 4: Agent Log -->
+                                    <div class="tab-pane" id="tab-trace">
+                                        <div class="trace-header-bar">
+                                            <span class="trace-badge">Execution Trace</span>
+                                            <button class="btn btn-secondary btn-sm" id="btnCopyTrace">Copy Log</button>
+                                        </div>
+                                        <div id="traceContent">
+                                            <div class="empty-state">
+                                                <p>No trace logs recorded yet.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+                </section>
+
+
+                <!-- ===================================================================
+                     VIEW 3: ACTIVE RUNS (FOCUSED EXECUTION & SUMMARY)
+                     =================================================================== -->
+                <section class="app-view" id="viewActiveRuns" data-view-id="active-runs">
+                    <div class="active-runs-container">
+                        <div class="active-runs-header">
+                            <div>
+                                <h2 id="activeRunVulnTitle">Active Remediation Pipeline</h2>
+                                <p class="view-subtitle" id="activeRunVulnSubtitle">Real-time status of 7-stage autonomous execution &amp; verification</p>
+                            </div>
+                            <div class="active-run-controls">
+                                <span class="badge" id="activeRunStatusPill">Idle</span>
+                            </div>
+                        </div>
+
+                        <div class="active-run-body-grid">
+                            <!-- Left: Execution Timeline -->
+                            <div class="active-stepper-card">
+                                <div class="card-heading">7-Stage Pipeline Execution</div>
+                                <ul class="stepper-list" id="activeRunsStepper">
+                                    <!-- Dynamic stepper -->
+                                </ul>
+                            </div>
+
+                            <!-- Right: Run Summary & Live Terminal -->
+                            <div class="active-terminal-card">
+                                <div class="card-heading">Run Summary</div>
+                                <div class="detail-meta-grid" style="margin-bottom: 16px;">
+                                    <div class="meta-item">
+                                        <span class="meta-label">Finding ID</span>
+                                        <span class="meta-val" id="activeRunSummaryId">--</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="meta-label">Current Stage</span>
+                                        <span class="meta-val" id="activeRunSummaryStage">Idle</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="meta-label">Files Changed</span>
+                                        <span class="meta-val" id="activeRunSummaryFiles">--</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="meta-label">Test Status</span>
+                                        <span class="meta-val" id="activeRunSummaryTests">--</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="meta-label">Retry Count</span>
+                                        <span class="meta-val" id="activeRunSummaryRetries">0 of 3</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="meta-label">Pipeline Status</span>
+                                        <span class="meta-val" id="activeRunSummaryStatus">Ready</span>
+                                    </div>
+                                </div>
+
+                                <div class="terminal-header">
+                                    <div class="terminal-title">
+                                        <span class="terminal-dot red"></span>
+                                        <span class="terminal-dot yellow"></span>
+                                        <span class="terminal-dot green"></span>
+                                        <span style="margin-left: 6px;">Live Agent Output Stream</span>
+                                    </div>
+                                    <button class="btn btn-secondary btn-sm" id="btnClearTerminal">Clear</button>
+                                </div>
+                                <div class="terminal-body" id="activeRunsTerminal">
+                                    <div class="log-entry">
+                                        <span class="log-ts">[SYSTEM]</span>
+                                        <span class="log-msg">Pipeline ready. Run with Copilot or trigger execution from Findings queue.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- ===================================================================
+                     VIEW 4: REVIEW QUEUE
+                     =================================================================== -->
+                <section class="app-view" id="viewReviewQueue" data-view-id="review-queue">
+                    <div class="review-queue-container">
+                        <div class="review-queue-header">
+                            <div>
+                                <h2>Human Review Queue</h2>
+                                <p class="view-subtitle">Actionable governance gates awaiting developer authorization</p>
+                            </div>
+                            <span class="badge badge-warning" id="queueTotalBadge">0 Findings Requiring Authorization</span>
+                        </div>
+
+                        <div class="review-queue-cards-list" id="reviewQueueCardsList">
+                            <!-- Actionable review cards populated dynamically -->
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- ===================================================================
+                     VIEW 5: REPORTS & AUDIT EVIDENCE
+                     =================================================================== -->
+                <section class="app-view" id="viewReports" data-view-id="reports">
+                    <div class="reports-container">
+                        <div class="reports-header">
+                            <div>
+                                <h2>Audit Reports &amp; Evidence Store</h2>
+                                <p class="view-subtitle">Shared Markdown reports, patch artifacts, and independent validation outputs</p>
+                            </div>
+                            <div class="search-box" style="width: 260px;">
+                                <input type="text" class="search-input" id="reportsSearchInput" placeholder="Filter reports...">
+                            </div>
+                        </div>
+
+                        <div class="reports-layout-grid">
+                            <!-- Left: List of Reports -->
+                            <div class="reports-list-card">
+                                <div class="card-heading">Generated Reports</div>
+                                <div class="reports-items-list" id="reportsItemsList">
+                                    <!-- Dynamic report items -->
+                                </div>
+                            </div>
+
+                            <!-- Right: Report Viewer -->
+                            <div class="report-viewer-card">
+                                <div class="report-viewer-header">
+                                    <div class="report-viewer-title" id="reportViewerTitle">Select a report to view</div>
+                                    <button class="btn btn-secondary btn-sm" id="btnCopyReportMarkdown">Copy Markdown</button>
+                                </div>
+                                <div class="report-viewer-body markdown-body" id="reportViewerBody">
+                                    <div class="empty-state">
+                                        <p>Select a report from the list on the left to read full audit evidence.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- ===================================================================
+                     VIEW 6: SETTINGS
+                     =================================================================== -->
+                <section class="app-view" id="viewSettings" data-view-id="settings">
+                    <div class="settings-container">
+                        <div class="settings-header">
+                            <h2>Workspace &amp; Governance Settings</h2>
+                            <p class="view-subtitle">Local repository bounding, theme configuration, and security policy verification</p>
+                        </div>
+
+                        <div class="settings-grid">
+                            <!-- Active Repository & CSV Configuration Card -->
+                            <div class="settings-card">
+                                <div class="card-heading">Active Repository &amp; Scan Source Configuration</div>
+                                <p class="settings-desc">Specify which local repository and CSV vulnerability report to work with. Explicitly setting these prevents Copilot from reasoning about directory layouts and keeps execution tightly bounded.</p>
+                                
+                                <div class="settings-path-row">
+                                    <div class="settings-path-info">
+                                        <div class="settings-path-title">Target Repository Folder</div>
+                                        <div class="settings-path-val" id="settingsRepoVal">Not selected</div>
+                                    </div>
+                                    <button class="btn btn-secondary btn-sm" id="btnSettingsBrowseRepo">Browse Repository...</button>
+                                </div>
+
+                                <div class="settings-path-row" style="margin-top: 10px;">
+                                    <div class="settings-path-info">
+                                        <div class="settings-path-title">Vulnerability Scan CSV</div>
+                                        <div class="settings-path-val" id="settingsCsvVal">Not selected</div>
+                                    </div>
+                                    <button class="btn btn-secondary btn-sm" id="btnSettingsBrowseCsv">Browse CSV File...</button>
+                                </div>
+                            </div>
+
+                            <!-- Theme Preference Card -->
+                            <div class="settings-card">
+                                <div class="card-heading">Theme &amp; Visual Appearance</div>
+                                <p class="settings-desc">Choose your preferred visual appearance. Supports light theme, dark theme, or automatically matching VS Code.</p>
+                                
+                                <div class="theme-options-row">
+                                    <label class="theme-radio-opt">
+                                        <input type="radio" name="settingsTheme" value="auto" checked>
+                                        <span>💻 Follow VS Code / System (Default)</span>
+                                    </label>
+                                    <label class="theme-radio-opt">
+                                        <input type="radio" name="settingsTheme" value="light">
+                                        <span>☀️ Light Theme (Enterprise SaaS)</span>
+                                    </label>
+                                    <label class="theme-radio-opt">
+                                        <input type="radio" name="settingsTheme" value="dark">
+                                        <span>🌙 Dark Theme (Neutral Slate)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Local Security Audit Card -->
+                            <div class="settings-card">
+                                <div class="card-heading">Local-First Security Compliance</div>
+                                <div class="compliance-status-badge">
+                                    <span class="secure-dot"></span>
+                                    <span>Zero External Network Transmission Compliance: VERIFIED</span>
+                                </div>
+                                <ul class="compliance-list">
+                                    <li>✓ Local CSV authoritative state (<code>vulnerability/vulnerabilities.csv</code>)</li>
+                                    <li>✓ Local Shared Markdown Reports persistence (<code>output/</code>)</li>
+                                    <li>✓ Local Evidence Store (<code>remediation-output/</code>)</li>
+                                    <li>✓ No third-party APIs, GraphQL, MCP, or remote telemetry</li>
+                                    <li>✓ Native VS Code &amp; GitHub Copilot local chat integration only</li>
+                                </ul>
+                            </div>
+
+                            <!-- 7-Stage Agent Policy Card -->
+                            <div class="settings-card">
+                                <div class="card-heading">7-Stage Governance Workflow Policy</div>
+                                <div class="policy-steps-summary">
+                                    <div><strong>Stage 1:</strong> Classification Agent (Read-only discovery &amp; categorization)</div>
+                                    <div><strong>Stage 2:</strong> Code Analysis Agent (AST &amp; dataflow RCA)</div>
+                                    <div><strong>Stage 3:</strong> Remediation Agent (Minimal secure patch synthesis)</div>
+                                    <div><strong>Stage 4:</strong> Human Approval Gate (Mandatory stop before test execution)</div>
+                                    <div><strong>Stage 5:</strong> Bench Test (Targeted test validation &amp; retry loops)</div>
+                                    <div><strong>Stage 6:</strong> Final Human Approval Gate (Sign-off before workflow exit)</div>
+                                    <div><strong>Stage 7:</strong> Final Manual Validations (Application Owner CI/CD)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
-
-        <!-- Main Split-Screen Layout -->
-        <main class="main-layout" id="mainLayout">
-            <!-- Left Pane: Master Table & Triage -->
-            <section class="panel main-table-panel">
-                <div class="panel-header">
-                    <div class="panel-title">
-                        <span>Vulnerability Repository</span>
-                        <span class="badge-count" id="vulnCounter">0 items</span>
-                    </div>
-                    <!-- Quick Filter Chips -->
-                    <div class="quick-chips">
-                        <button class="chip active" data-chip="ALL">All</button>
-                        <button class="chip" data-chip="CRITICAL">Critical</button>
-                        <button class="chip" data-chip="REVIEW">Needs Review</button>
-                        <button class="chip" data-chip="REMEDIATED">Remediated</button>
-                    </div>
-                </div>
-
-                <!-- Filters & Search Toolbar -->
-                <div class="toolbar">
-                    <div class="search-box">
-                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                        <input type="text" class="search-input" id="searchInput" placeholder="Search by ID, CVE, Title, or Path...">
-                        <button class="clear-search-btn" id="btnClearSearch" title="Clear search">✕</button>
-                    </div>
-
-                    <select class="select-filter" id="severityFilter">
-                        <option value="ALL">All Severities</option>
-                        <option value="CRITICAL">Critical</option>
-                        <option value="HIGH">High</option>
-                        <option value="MEDIUM">Medium</option>
-                        <option value="LOW">Low</option>
-                    </select>
-
-                    <select class="select-filter" id="statusFilter">
-                        <option value="ALL">All Statuses</option>
-                        <option value="PENDING">Pending</option>
-                        <option value="APPROVED">Approved</option>
-                        <option value="INPROGRESS">In Progress</option>
-                        <option value="REMEDIATED">Remediated</option>
-                        <option value="REVIEW">Needs Review</option>
-                    </select>
-
-                    <select class="select-filter" id="repoFilter">
-                        <option value="ALL">All Repositories</option>
-                    </select>
-                </div>
-
-                <!-- Table Container -->
-                <div class="table-container">
-                    <table class="vuln-table">
-                        <thead>
-                            <tr>
-                                <th>Vulnerability ID</th>
-                                <th>Title &amp; CWE</th>
-                                <th>Application &amp; Location</th>
-                                <th>Severity</th>
-                                <th>Status</th>
-                                <th style="text-align: right;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="vulnTableBody">
-                            <!-- Populated dynamically via dashboard.js -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Right Pane: Pipeline & Evidence Inspector -->
-            <section class="panel detail-panel" id="detailPanel">
-                <div class="panel-header">
-                    <div class="panel-title">
-                        <span>Remediation Inspector</span>
-                        <span class="id-badge" id="detailId">--</span>
-                    </div>
-                    <button class="btn btn-secondary btn-sm" id="btnCloseDetail" title="Close Panel">✕</button>
-                </div>
-
-                <!-- Summary Header -->
-                <div class="detail-header-card">
-                    <div class="detail-title-row">
-                        <div>
-                            <h2 class="detail-title" id="detailTitle">Vulnerability Title</h2>
-                            <div class="cve-subtitle" id="detailCve">CVE-XXXX-XXXX</div>
-                        </div>
-                        <span class="badge" id="detailSeverity">Critical</span>
-                    </div>
-                    <div class="detail-meta-grid">
-                        <div class="meta-item">
-                            <span class="meta-label">Application</span>
-                            <span class="meta-val" id="detailApp">--</span>
-                        </div>
-                        <div class="meta-item">
-                            <span class="meta-label">SLA Status</span>
-                            <span class="meta-val" id="detailSla">--</span>
-                        </div>
-                        <div class="meta-item">
-                            <span class="meta-label">Technology</span>
-                            <span class="meta-val" id="detailTech">--</span>
-                        </div>
-                        <div class="meta-item">
-                            <span class="meta-label">Code Location</span>
-                            <span class="meta-val" id="detailLocation" style="font-family: var(--font-mono); font-size: 0.75rem;">--</span>
-                        </div>
-                    </div>
-                    <div class="guidance-box">
-                        <strong style="color: var(--accent-blue);">Guidance:</strong> <span id="detailGuidance">--</span>
-                    </div>
-                    <div class="inspector-actions">
-                        <button class="btn btn-primary btn-sm" id="btnLaunchCopilot" title="Launch GitHub Copilot Chat for this finding">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                            Run @vulnerability-orchestrator
-                        </button>
-                        <button class="btn btn-secondary btn-sm" id="btnOpenLocation" title="Open source file in editor">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-                            Jump to Source
-                        </button>
-                        <button class="btn btn-secondary btn-sm" id="btnViewCodeModal" title="Preview code in modal dialog">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
-                            Preview Code
-                        </button>
-                    </div>
-                </div>
-
-                <!-- 7-Stage Agent Pipeline Stepper -->
-                <div class="pipeline-container">
-                    <div class="pipeline-title">
-                        <span>7-Agent Remediation Pipeline</span>
-                        <span class="pipeline-status-badge" id="pipelineOverallStatus">Active</span>
-                    </div>
-                    <ul class="stepper-list" id="pipelineStepper">
-                        <!-- Populated dynamically via dashboard.js -->
-                    </ul>
-                </div>
-
-                <!-- Human Approval Gate Action Banner -->
-                <div class="human-gate-card" id="humanGateCard" style="display: none;">
-                    <div class="human-gate-header">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                        <span>Human Review &amp; Security Gate Authorization</span>
-                    </div>
-                    <div class="human-gate-body">
-                        Root cause analysis and security unit tests are verified. Authorize to apply the secure code patch and proceed with regression validation.
-                    </div>
-                    <div class="human-gate-actions">
-                        <button class="btn btn-success btn-sm" id="btnApprove">
-                            ✓ Authorize Secure Fix
-                        </button>
-                        <button class="btn btn-danger btn-sm" id="btnReject">
-                            ✕ Reject Fix
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Evidence & Audit Navigation Tabs -->
-                <div class="tabs-nav">
-                    <button class="tab-btn active" data-tab="report">Audit Report</button>
-                    <button class="tab-btn" data-tab="diff">Patch Diff</button>
-                    <button class="tab-btn" data-tab="validation">Test Evidence</button>
-                    <button class="tab-btn" data-tab="trace">Agent Log</button>
-                </div>
-
-                <!-- Tab Panes -->
-                <div class="tab-content">
-                    <div class="tab-pane" id="tab-report" style="display: block;">
-                        <div id="reportContent"></div>
-                    </div>
-                    <div class="tab-pane" id="tab-diff" style="display: none;">
-                        <div class="diff-header-bar" id="diffHeaderBar" style="display: none;">
-                            <span class="diff-filename" id="diffFileName">changes.patch</span>
-                            <button class="btn btn-secondary btn-sm" id="btnCopyDiff">Copy Diff</button>
-                        </div>
-                        <div id="diffContent"></div>
-                    </div>
-                    <div class="tab-pane" id="tab-validation" style="display: none;">
-                        <div id="valContent"></div>
-                    </div>
-                    <div class="tab-pane" id="tab-trace" style="display: none;">
-                        <div class="trace-header-bar">
-                            <span class="trace-badge">Execution Trace</span>
-                            <button class="btn btn-secondary btn-sm" id="btnCopyTrace">Copy Trace</button>
-                        </div>
-                        <div id="traceContent"></div>
-                    </div>
-                </div>
-            </section>
-        </main>
     </div>
 
     <!-- Source Code Viewer Modal -->
@@ -271,11 +965,11 @@
         <div class="modal-card">
             <div class="modal-header">
                 <div class="modal-title-wrap">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
                     <span id="modalFileName">source-file.cs</span>
-                    <span class="badge badge-medium" id="modalFileLine">Line 1</span>
+                    <span class="badge" id="modalFileLine">Line 1</span>
                 </div>
-                <button class="modal-close" id="btnModalClose">✕</button>
+                <button class="modal-close" id="btnModalClose" title="Close">✕</button>
             </div>
             <div class="modal-body">
                 <div class="code-viewer-container" id="modalCodeContainer">
@@ -290,25 +984,18 @@
         <div class="modal-card modal-sm">
             <div class="modal-header">
                 <div class="modal-title-wrap">
-                    <span class="brand-icon" style="width: 26px; height: 26px;"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg></span>
-                    <span>GitHub Copilot Orchestrator</span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                    <span>GitHub Copilot Orchestrator Command</span>
                 </div>
-                <button class="modal-close" id="btnCopilotModalClose">✕</button>
+                <button class="modal-close" id="btnCopilotModalClose" title="Close">✕</button>
             </div>
-            <div class="modal-body" style="padding: 20px;">
-                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">
-                    Use this command in VS Code Copilot Chat to trigger autonomous multi-agent remediation:
+            <div class="modal-body">
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                    Execute this command in VS Code Copilot Chat to remediate this finding:
                 </p>
                 <div class="command-box">
                     <code id="copilotCommandText">@vulnerability-orchestrator /remediate-vulnerability GCAS-E2E-001</code>
                     <button class="btn btn-primary btn-sm" id="btnCopyCopilotCommand">Copy</button>
-                </div>
-                <div class="workflow-steps-mini">
-                    <div class="step-mini">1. Code Analysis RCA</div>
-                    <div class="step-mini">2. Security Unit Test</div>
-                    <div class="step-mini">3. Human Review Authorization</div>
-                    <div class="step-mini">4. Automated Remediation Fix</div>
-                    <div class="step-mini">5. Regression Validation</div>
                 </div>
             </div>
         </div>
