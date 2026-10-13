@@ -1,33 +1,7 @@
 diff --git a/src/GcasE2ETestApi/ProductsController.cs b/src/GcasE2ETestApi/ProductsController.cs
-index 15d2d7f..f38893b 100644
 --- a/src/GcasE2ETestApi/ProductsController.cs
 +++ b/src/GcasE2ETestApi/ProductsController.cs
-@@ -15,7 +15,9 @@ public sealed class ProductsController : ControllerBase
- 
-         using var command = connection.CreateCommand();
-         // Intentionally vulnerable: untrusted input is concatenated into SQL.
--        command.CommandText = $"SELECT 1 WHERE 'demo' = '{name}'";
-+        // FIXED: Parameterized SQL query prevents SQL injection
-+        command.CommandText = "SELECT 1 WHERE 'demo' = @name";
-+        command.Parameters.AddWithValue("@name", name ?? string.Empty);
-         var result = command.ExecuteScalar();
- 
-         return Ok(new { matched = result is not null });
-diff --git a/src/GcasE2ETestApi/Program.cs b/src/GcasE2ETestApi/Program.cs
-index 599bc07..e92aabf 100644
---- a/src/GcasE2ETestApi/Program.cs
-+++ b/src/GcasE2ETestApi/Program.cs
-@@ -1,3 +1,4 @@
-+using GcasE2ETestApi;
- var builder = WebApplication.CreateBuilder(args);
- 
- builder.Services.AddControllers();
-diff --git a/tests/GcasE2ETestApi.Tests/HealthTests.cs b/tests/GcasE2ETestApi.Tests/HealthTests.cs
-index 2244dfe..feb6c92 100644
---- a/tests/GcasE2ETestApi.Tests/HealthTests.cs
-+++ b/tests/GcasE2ETestApi.Tests/HealthTests.cs
-@@ -1,3 +1,4 @@
-+using Xunit;
- using Microsoft.AspNetCore.Mvc.Testing;
- 
- namespace GcasE2ETestApi.Tests;
+@@ -16,3 +16,3 @@ public class ProductsController : ControllerBase
+-    string query = "SELECT * FROM Products WHERE Name = '" + name + "'";
++    string query = "SELECT * FROM Products WHERE Name = @Name";
++    command.Parameters.AddWithValue("@Name", name);

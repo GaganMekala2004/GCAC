@@ -1,0 +1,6 @@
+diff --git a/src/GcasE2ETestApi/SearchController.cs b/src/GcasE2ETestApi/SearchController.cs
+--- a/src/GcasE2ETestApi/SearchController.cs
++++ b/src/GcasE2ETestApi/SearchController.cs
+@@ -14,3 +14,3 @@ public class SearchController : ControllerBase
+-    return Content("<h1>Search Results for " + q + "</h1>", "text/html");
++    return Content("<h1>Search Results for " + HtmlEncoder.Default.Encode(q) + "</h1>", "text/html");

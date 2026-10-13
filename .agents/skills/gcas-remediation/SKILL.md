@@ -1,61 +1,33 @@
 ---
 name: gcas-remediation
-description: Local bounded vulnerability remediation workflow for GCAC using the 7-stage multi-agent architecture, local CSV input, and Shared Markdown state.
+description: Autonomous vulnerability remediation workflow for Prototype_GCAS using local MCP tools and deterministic remediation agents.
 ---
 
-# GCAC Vulnerability Remediation Skill
+# GCAS Vulnerability Remediation Skill
 
-This skill guides local vulnerability remediation across applications using the 7-stage multi-agent governance architecture, local CSV repository (`vulnerability/vulnerabilities.csv`), Shared Markdown reports (`output/<title>_<id>.md`), and full evidence persistence (`remediation-output/<id>/`).
+This skill guides autonomous remediation of security findings across enterprise application repositories using the local GCAS infrastructure.
 
-## Target Architecture & Agent Flow
+## Autonomous Remediation Workflow
 
-### Orchestrator Engine
-- **Role**: Manages workflow, state, sequencing, agent handoffs, retries, error handling, and context passing.
-- **Human Approval**: GitHub built-in human approval is required for every command other than read commands.
-- **Pillars**: State Management • Decision & Routing • Audit & Logging
+When requested to remediate a vulnerability (e.g., `remediate VUL-POC-002` or `remediate GCAS-E2E-004`):
 
-### The 7 Stages
+1. **Retrieve Vulnerability Context**:
+   - Query MCP tool `get_vulnerability_context` (or `get_remediation_context`) with `vulnerabilityId`.
+   - Extract `ApplicationNumber`, `DerivedRemediationRoute`, `Severity`, `LocationPath`, and repository mapping.
+   - Do NOT ask the user for details or file paths.
 
-1. **Classification Agent**
-   - Read vulnerabilities from repository/CSV
-   - Classify by severity, CWE, type
-   - Assess complexity & exploitability
-   - Prioritize remediation strategy
+2. **Prepare Workspace**:
+   - Query MCP tool `prepare_workspace` (or run CLI `dotnet run --project src/VulnerabilityRemediation.Cli -- prepare <VULN_ID>`).
+   - Clones target repo to `workspaces/<VULN_ID>/repository` and checks out `remediation/<vuln-id>`.
 
-2. **Code Analysis Agent (`</>`)**
-   - Locate vulnerable code (file, line)
-   - Analyze data flow & call flow
-   - Understand context & dependencies
-   - Identify root cause (Read-Only)
+3. **Execute Remediation Pipeline**:
+   - Query MCP tool `execute_remediation` with `vulnerabilityId` (or execute via `RemediationOrchestratorEngine`).
+   - The engine selects the appropriate fix agent (e.g. `JavaFixAgent`, `DotNetDependencyFixAgent`, `TerraformFixAgent`), applies the precise fix, executes real test validation (`mvn test`, `dotnet test`), runs the security review audit, and generates audit evidence.
 
-3. **Remediation Agent (🛠️)**
-   - Determine secure fix strategy
-   - Generate .NET code changes (patch)
-   - Follow best practices & secure coding
-   - Prepare change summary
-   - Only uses existing remediation and knowledge if not stale
+4. **Review Status and Evidence**:
+   - Validate that tests passed and security review returned `PASS`.
+   - Evidence is persisted to `remediation-output/<VULN_ID>/` (`changes.patch`, `remediation-report.md`, `agent-execution-trace.log`).
 
-4. **Human Approval Gate (🛡️ Pre-Test Authorization)**
-   - Review vulnerability analysis and proposed secure patch
-   - Decisions: **✓ Approve** (Proceed to Bench Test) | **✕ Reject** (Rework / Changes Requested routing)
-
-5. **Bench Test (🧪)**
-   - Create / update unit tests
-   - Cover vulnerable scenario
-   - Validate fix with targeted tests
-   - Retry on Test Failure loop back to Remediation Agent
-
-6. **Final Human Approval Gate (🛡️ Workflow Exit Sign-off)**
-   - Final Human Approval before workflow exit
-   - Decisions: **✓ Approve** (Proceed to Hand-off) | **✕ Reject** (Retry & Max rejection loop / Rework)
-
-7. **Final Manual Validations (Non-Agentic)**
-   - **Regression Testing**: To be performed by App Owners
-   - **Deployment**: Through existing CI/CD Pipeline performed by App Owners
-
-### Shared Foundation
-- **Context Store**: Code indexing, embeddings, cache
-- **Knowledge Base**: Vulnerability patterns, fix patterns, guidance, regular updates & stale knowledge removal
-- **Prompt & Template Library**: Standardized prompts, checklists, templates
-- **Tooling & Integrations**: VS Code, GitHub Copilot, .NET CLI, Test Runner
-- **Audit & Compliance**: Audit trail, approvals, governance, policies
+5. **Stop at Human Review Gate**:
+   - Set status to `AWAITING_HUMAN_REVIEW`.
+   - Never push to remote or open a PR until explicit human authorization is received.

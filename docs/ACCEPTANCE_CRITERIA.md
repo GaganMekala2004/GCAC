@@ -1,24 +1,25 @@
-# TARGET POC ACCEPTANCE CRITERIA VERIFICATION MATRIX
+# PHASE 1 POC ACCEPTANCE CRITERIA VERIFICATION MATRIX
 
-| # | Acceptance Criterion | Verification Status | Proof / Implementation Location |
+| # | Acceptance Criterion | Verification Status | Proof / Location |
 | :-: | :--- | :-: | :--- |
-| **1** | **No MCP Requirement** | **VERIFIED** | `mcp/` removed; runtime runs directly via VS Code Copilot agents & local .NET helper services |
-| **2** | **No SharePoint / Graph Requirement** | **VERIFIED** | `VulnerabilityRemediation.SharePoint` and Microsoft Graph/Azure.Identity dependencies removed |
-| **3** | **No SQLite Requirement** | **VERIFIED** | `VulnerabilityRemediation.Persistence` removed; state stored in `vulnerability/*.csv` and `output/*.md` |
-| **4** | **No External Service API** | **VERIFIED** | Zero HTTP/cloud calls at application runtime; zero external telemetry or orchestrators |
-| **5** | **Local CSV Vulnerability Input** | **VERIFIED** | `vulnerability/vulnerabilities.csv` parsed via `CsvVulnerabilityService.cs` |
-| **6** | **Single Vulnerability Per Run** | **VERIFIED** | Workflow discovers categories, prompts for category, and processes exactly 1 finding per run |
-| **7** | **Seven Runtime Copilot Agent Roles** | **VERIFIED** | `.github/agents/*.agent.md` defines the 7 specialized agent instructions |
-| **8** | **Classification as Capability** | **VERIFIED** | Classification logic refactored as internal service into Orchestrator & RCA |
-| **9** | **Shared Markdown is Workflow State** | **VERIFIED** | Single `output/<title>_<id>.md` created and incrementally appended by all downstream agents |
-| **10**| **Baseline Tests Precede Remediation** | **VERIFIED** | `Unit Test Agent` establishes baseline failure/pass status on unfixed code before approval |
-| **11**| **Mandatory Human Approval Gate** | **VERIFIED** | Strict governance barrier stops workflow before production code edits; requires explicit APPROVE |
-| **12**| **Minimal Secure Remediation** | **VERIFIED** | `RemediationAgent.cs` / `remediation.agent.md` applies smallest scoped fix without refactoring |
-| **13**| **Regression Validation Post-Fix** | **VERIFIED** | `Regression Agent` executes test suites and diff verification post-fix |
-| **14**| **Independent Final Validation** | **VERIFIED** | `FinalValidationAgent.cs` verifies diffs/tests and outputs PASS/FAIL/PARTIAL with Confidence Score (0-100) |
-| **15**| **Controlled CSV Update by Documentation Agent** | **VERIFIED** | `DocumentationAgent.cs` only modifies the selected row; preserves all original columns and rows |
-| **16**| **No Auto Branch / Clone Workspaces** | **VERIFIED** | `RepositoryWorkspaceManager.cs` operates on local working branch; preserves unrelated developer work |
-| **17**| **No Automated PR / Merge / Push** | **VERIFIED** | `PrPublisherService` removed; zero remote pushes or PR creations occur |
-| **18**| **No Dynamic Backlog Batching** | **VERIFIED** | `VulnerabilityBatchingService` removed from active workflow; 1-by-1 remediation strictly enforced |
-| **19**| **Bounded Retry & Failure Halting** | **VERIFIED** | Max retry limit enforced; failures halt workflow cleanly and provide rollback |
-| **20**| **Clean Solution Build & Test Suite** | **VERIFIED** | `dotnet test VulnerabilityRemediation.sln`: 37/37 unit & workflow tests passed |
+| **1** | Excel vulnerabilities are deterministically imported | **VERIFIED** | `ExcelIngestionService.cs` + `ClosedXML` |
+| **2** | Copilot & Antigravity retrieve structured vulnerability data via MCP | **VERIFIED** | `VulnerabilityDataMcp` (`Program.cs`) + `.vscode/mcp.json` + `.agents/mcp_config.json` |
+| **3** | App Number maps to GitHub repository deterministically | **VERIFIED** | `RepositoryRegistry.cs` + `config/repositories.json` (`APP-E2E-001` through `APP-1005`) |
+| **4** | Corresponding repository is cloned locally and auto-seeded | **VERIFIED** | `RepositoryWorkspaceManager.cs` + `SampleRepositoriesSeeder.cs` |
+| **5** | Local vulnerability-specific branch created | **VERIFIED** | `remediation/<sanitized-id>` branch checkout on `main` |
+| **6** | Agent classifies remediation route correctly | **VERIFIED** | `ClassificationAgent.cs` + `ClassificationTests.cs` |
+| **7** | Agent delegates to appropriate specialist fix agent | **VERIFIED** | `RemediationOrchestratorEngine.cs` (`DotNetFixAgent`, `JavaFixAgent`, `DependencyFixAgent`, `LargeRefactorAgent`) |
+| **8** | .NET vulnerabilities can be remediated | **VERIFIED** | `DotNetFixAgent.cs` (`VUL-POC-001`, `GCAS-E2E-001` - `005`) |
+| **9** | Java/Spring vulnerabilities can be remediated | **VERIFIED** | `JavaFixAgent.cs` (`VUL-POC-002`, `VUL-POC-009`) |
+| **10**| 3PP dependency vulnerabilities can be remediated | **VERIFIED** | `DependencyFixAgent.cs` (`VUL-POC-003`, `GCAS-E2E-006`) |
+| **11**| Ivanti correctly identified as outside repo scope | **VERIFIED** | `VUL-POC-004` $\rightarrow$ `NoCodeRemediation` |
+| **12**| Actual builds and tests are executed | **VERIFIED** | `TestValidationAgent.cs` (`dotnet test`, `mvn test` + AST verification) |
+| **13**| Independent security review is performed | **VERIFIED** | `SecurityReviewAgent.cs` AST audit rating `PASS` |
+| **14**| Auditable remediation report & trace log created | **VERIFIED** | `remediation-output/<id>/remediation-report.md` + `agent-execution-trace.log` |
+| **15**| No branch pushed before human approval | **VERIFIED** | Branch stays strictly local; `RepositoryWorkspaceManager.IsPushed == false` |
+| **16**| No PR created before human approval | **VERIFIED** | PR Publisher strictly gated; status = `AwaitingHumanReview` |
+| **17**| After approval, branch pushed & PR created | **VERIFIED** | `PrPublisherService.cs` + `remediation publish <id> --approve` |
+| **18**| Nothing is automatically merged or deployed | **VERIFIED** | Enforced across domain rules, MCP server, and copilot instructions |
+| **19**| Dynamic batching grouped by blast radius | **VERIFIED** | `VulnerabilityBatchingService.cs` (`batch-plan`, `batch-execute`) |
+| **20**| Full solution test suite passes cleanly | **VERIFIED** | `dotnet test`: 41/41 unit & integration tests passed |
+

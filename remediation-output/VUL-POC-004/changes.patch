@@ -1,0 +1,9 @@
+--- a//opt/ivanti/bin/service
++++ b//opt/ivanti/bin/service
+@@ -1,5 +1,7 @@
+ char buffer[256];
+ 
+- strcpy(buffer, user_input);
++ if (strlen(user_input) < sizeof(buffer)) {
++     strcpy(buffer, user_input);
++ }

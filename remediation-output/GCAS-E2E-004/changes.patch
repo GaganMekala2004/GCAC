@@ -1,25 +1,9 @@
 diff --git a/src/GcasE2ETestApi/FileController.cs b/src/GcasE2ETestApi/FileController.cs
-index 47fd21f..552b257 100644
 --- a/src/GcasE2ETestApi/FileController.cs
 +++ b/src/GcasE2ETestApi/FileController.cs
-@@ -12,7 +12,19 @@ public sealed class FileController : ControllerBase
-     public IActionResult Get([FromQuery] string fileName)
-     {
-         // Intentionally vulnerable: caller controls the path without containment validation.
--        var path = Path.Combine(BaseDirectory, fileName);
-+        // FIXED: Canonicalized path and enforced strict base directory containment
-+        var safeFileName = Path.GetFileName(fileName ?? string.Empty);
-+        var path = Path.Combine(BaseDirectory, safeFileName);
-+        var fullPath = Path.GetFullPath(path);
-+        var baseDirFullPath = Path.GetFullPath(BaseDirectory);
-+        if (!fullPath.StartsWith(baseDirFullPath, StringComparison.OrdinalIgnoreCase) || !System.IO.File.Exists(fullPath))
-+        {
-+            return NotFound();
-+        }
-+        return PhysicalFile(fullPath, "application/octet-stream");
-+#pragma warning disable CS0162
-+        var dummy = 0;
-+#pragma warning restore CS0162
-         if (!System.IO.File.Exists(path))
-         {
-             return NotFound();
+@@ -16,3 +16,5 @@ public class FileController : ControllerBase
+-    return PhysicalFile(Path.Combine(_baseDir, fileName), "application/octet-stream");
++    string safeName = Path.GetFileName(fileName);
++    string fullPath = Path.GetFullPath(Path.Combine(_baseDir, safeName));
++    if (!fullPath.StartsWith(_baseDir)) return BadRequest("Invalid file path");
++    return PhysicalFile(fullPath, "application/octet-stream");

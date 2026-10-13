@@ -1,0 +1,5 @@
+--- a/sample-repos/customer-service/pom.xml
++++ b/sample-repos/customer-service/pom.xml
+@@ -12 +12 @@
+-        <version>3.2.4</version>
++        <version>3.2.5</version>

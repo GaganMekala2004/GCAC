@@ -1,0 +1,6 @@
+diff --git a/src/GcasE2ETestApi/GcasE2ETestApi.csproj b/src/GcasE2ETestApi/GcasE2ETestApi.csproj
+--- a/src/GcasE2ETestApi/GcasE2ETestApi.csproj
++++ b/src/GcasE2ETestApi/GcasE2ETestApi.csproj
+@@ -10,1 +10,1 @@
+-    <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
++    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

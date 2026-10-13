@@ -1,4 +1,6 @@
 {
-  "github.copilot.chat.agent.enabled": false
+  "github.copilot.chat.agent.enabled": true,
+  "mcp.serverConfigurationFiles": [
+    ".vscode/mcp.json"
+  ]
 }
-

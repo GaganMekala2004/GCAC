@@ -1,9 +1,0 @@
-{
-  "vulnerabilityId": "VUL-POC-002",
-  "applicationNumber": "APP-1002",
-  "applicationName": "Customer Service",
-  "repositoryUrl": "sample-repos/customer-service",
-  "defaultBranch": "main",
-  "localBranch": "remediation/vul-poc-002",
-  "baseCommitSha": "e45f5aa46c9db856927a76155977edc33c94ccd8"
-}

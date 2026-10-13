@@ -1,194 +1,202 @@
-# GCAC / Prototype_GCAS — Agentic Vulnerability Remediation (Local POC)
+# Prototype_GCAS — Agentic AI Vulnerability Remediation Platform
 
 [![.NET 9.0](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/)
-[![Tests](https://img.shields.io/badge/Tests-37%20Passed-brightgreen.svg)]()
-[![Environment](https://img.shields.io/badge/Environment-Local%20VS%20Code-blue.svg)]()
-[![Governance](https://img.shields.io/badge/Governance-Human%20Approval%20Gate-orange.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-41%20Passed-brightgreen.svg)]()
+[![MCP Server](https://img.shields.io/badge/MCP-Protocol%202024--11--05-blue.svg)](https://modelcontextprotocol.io/)
+[![Security Guardrails](https://img.shields.io/badge/Guardrails-HITL%20Enforced-orange.svg)]()
 
-**GCAC (Prototype_GCAS)** is a local, bounded, human-governed **Agentic AI Vulnerability Remediation Proof of Concept (POC)** designed to execute within the developer's approved Visual Studio Code environment using **GitHub Copilot agents**.
-
----
-
-## 1. Target POC Architecture
-
-The solution operates purely on local repository state:
-
-```
-Local CSV (vulnerability/*.csv)
-      ↓
-GitHub Copilot inside VS Code
-      ↓
-Bounded Agent Workflow (7 Agents + 1 Governance Gate)
-      ↓
-Local Repository
-      ↓
-Shared Vulnerability Markdown (output/<sanitized_title>_<vulnerability_id>.md)
-      ↓
-Controlled Selected-Row CSV Update
-```
-
-### Core Architecture Principles
-- **Local Execution**: Executes entirely within the developer's local VS Code workspace.
-- **Local CSV Input**: Vulnerabilities are discovered from local CSV files in `vulnerability/*.csv`.
-- **Single-Vulnerability Focus**: Processes **EXACTLY ONE** selected vulnerability per run (no backlog batching).
-- **Shared Markdown State**: Single auditable report at `output/<sanitized_title>_<id>.md` acts as the persistent workflow state.
-- **Controlled CSV Update**: Only the Documentation Agent updates the local CSV, modifying only the selected row and preserving all original columns and rows.
-- **Mandatory Human Approval**: Human Approval is an explicit **GOVERNANCE GATE** (not an AI agent) that blocks any production code modifications until the developer authorizes the fix.
-- **Zero External Dependencies**:
-  - NO Model Context Protocol (MCP)
-  - NO Microsoft Graph or SharePoint integrations
-  - NO Azure service APIs or third-party APIs
-  - NO external or SQLite database for workflow state
-  - NO automated Pull Request creation, remote push, or auto-merge
-  - NO automatic disposable workspace clone or branch creation
+**Prototype_GCAS** is an enterprise-grade, deterministic, agentic AI platform designed to autonomously ingest, validate, classify, remediate, test, and audit security vulnerabilities across enterprise software repositories with strict **Human-in-the-Loop (HITL)** approval gates.
 
 ---
 
-## 2. Logical Architecture vs Runtime Workflow
-
-| Capability | Logical POC Architecture | Current Runtime Implementation |
-| :--- | :--- | :--- |
-| **Ingestion & Discovery** | CSV-based input discovery & parsing | `CsvVulnerabilityService` (`vulnerability/*.csv`) |
-| **Classification & Mapping** | Dynamic vulnerability classification & routing | Handled internally by **Vulnerability Orchestrator** & **Code Analysis / RCA Agent** |
-| **Root Cause Analysis** | AST-level vulnerability tracing | **Code Analysis / RCA Agent** (Read-Only) |
-| **Baseline Testing** | Establish unfixed empirical baseline | **Unit Test Agent** (local `dotnet test` / `mvn test`) |
-| **Human Review Gate** | Mandatory developer authorization gate | **Human Approval Gate** (**GOVERNANCE GATE**, not an AI agent) |
-| **Code Remediation** | Minimal targeted secure fix | **Remediation Agent** (internal .NET, Dependency, Config, Java strategies) |
-| **Regression Testing** | Verification of existing test suites | **Regression Agent** (distinguishes pre-existing from fix regressions) |
-| **Independent Verification** | Skeptical multi-dimensional review | **Final Validation Agent** (PASS/FAIL/PARTIAL, 0-100 score) |
-| **Reporting & CSV Sync** | Consolidated audit report & CSV update | **Documentation Agent** (Shared Markdown & single-row CSV update) |
-
----
-
-## 3. Exact 16-Step Workflow Lifecycle
+## Architecture Overview
 
 ```
-STEP 1: Developer invokes /remediate-vulnerability (or @vulnerability-orchestrator)
-STEP 2: Vulnerability Orchestrator discovers local CSV files in vulnerability/*.csv
-STEP 3: Developer selects ONE vulnerability category/type
-STEP 4: Orchestrator displays matching findings
-STEP 5: Developer selects EXACTLY ONE vulnerability finding
-STEP 6: Initialize Shared Markdown report: output/<sanitized_title>_<vulnerability_id>.md
-STEP 7: Code Analysis / RCA Agent traces data/call flow and determines root cause (Read-Only)
-STEP 8: Unit Test Agent inspects test framework and drafts security tests
-STEP 9: Unit Test Agent executes baseline tests on UNFIXED code -> Appends to Shared Markdown
-STEP 10: STOP at Human Approval Gate -> Developer inspects RCA and baseline; decides APPROVE/REQUEST CHANGES/REJECT
-STEP 11: After approval only: Remediation Agent applies minimal secure code fix
-STEP 12: Remediation Agent executes post-fix verification tests -> Appends to Shared Markdown
-STEP 13: Regression Agent executes full regression test suite -> Appends to Shared Markdown
-STEP 14: Final Validation Agent independently verifies code, diff, and tests -> Assigns PASS/FAIL/PARTIAL and score (0-100)
-STEP 15: Documentation Agent consolidates evidence and finalizes report in Shared Markdown
-STEP 16: Documentation Agent updates the selected vulnerability row in the local CSV
+                                  ┌─────────────────────────────────────────┐
+                                  │      AI Model & Agent Orchestration     │
+                                  │  • GitHub Copilot Chat (VS Code)        │
+                                  │  • Antigravity Agent & Skills           │
+                                  └────────────────────┬────────────────────┘
+                                                       │ JSON-RPC 2.0 (STDIO)
+                                                       ▼
+┌───────────────────────────────────────────────────────────────────────────────────────────┐
+│                           VulnerabilityDataMcp (MCP Server)                               │
+│  • Context Retrieval  • Workspace Preparation  • Remediation Engine  • Security Audit     │
+└──────────────────────────────────────────────┬────────────────────────────────────────────┘
+                                               │
+┌──────────────────────────────────────────────┴────────────────────────────────────────────┐
+│                              Core GCAS Services & Agents                                  │
+├──────────────────────────┬─────────────────────────────┬──────────────────────────────────┤
+│ Ingestion & Validation   │ Repository Workspace Mgr    │ Deterministic Fix Agents         │
+│ • ExcelIngestionService  │ • RepositoryRegistry        │ • DotNetFixAgent                 │
+│ • DomainValidator        │ • SampleRepositoriesSeeder  │ • JavaFixAgent                   │
+│ • VulnerabilityDbContext │ • Git Workspace Preparation │ • DependencyFixAgent             │
+│ • SQLite Database Store  │   (workspaces/<VULN_ID>/)   │ • LargeRefactorAgent             │
+├──────────────────────────┼─────────────────────────────┼──────────────────────────────────┤
+│ Testing & Validation     │ Independent Security Audit  │ Evidence & Publishing            │
+│ • TestValidationAgent    │ • SecurityReviewAgent       │ • EvidenceGeneratorService       │
+│ • dotnet test / mvn test │ • AST & Diff Inspection     │ • PrPublisherService             │
+│ • Real Execution Logs    │ • Secret / Bypass Detection │ • AWAITING_HUMAN_REVIEW (Gate)   │
+└──────────────────────────┴─────────────────────────────┴──────────────────────────────────┘
 ```
 
 ---
 
-## 4. Repository Structure
+## Key Features
 
-```
-GCAC/
-├── .github/
-│   ├── agents/
-│   │   ├── vulnerability-orchestrator.agent.md
-│   │   ├── code-analysis-rca.agent.md
-│   │   ├── unit-test.agent.md
-│   │   ├── remediation.agent.md
-│   │   ├── regression.agent.md
-│   │   ├── final-validation.agent.md
-│   │   └── documentation.agent.md
-│   ├── prompts/
-│   │   └── remediate-vulnerability.prompt.md
-│   └── copilot-instructions.md
-├── vulnerability/
-│   └── vulnerabilities.csv
-├── output/
-│   └── <sanitized_vulnerability_title>_<vulnerability_id>.md
-├── src/
-│   ├── VulnerabilityRemediation.Domain/
-│   ├── VulnerabilityRemediation.Repository/
-│   └── VulnerabilityRemediation.Cli/
-├── tests/
-│   └── VulnerabilityRemediation.Tests/
-├── config/
-│   └── repositories.json
-├── sample-repos/
-│   ├── gcas-agentic-e2e-test-repo/
-│   ├── payments-api/
-│   ├── customer-service/
-│   ├── inventory-manager/
-│   ├── identity-provider/
-│   └── storefront-api/
-└── docs/
-```
+1. **Deterministic Repository Resolution**:
+   - Maps `ApplicationNumber` to source repositories via `config/repositories.json` without guessing or hallucinating paths.
+   - Auto-seeds baseline repositories (`sample-repos/`) on `main` branch with clean git state.
+
+2. **Autonomous End-to-End Execution**:
+   - Retrieves vulnerability context, creates isolated branch `remediation/<vuln-id>`, inspects AST, applies precise fix, executes real test suites (`dotnet test`, `mvn test`), and conducts security audit.
+
+3. **Dynamic Batching Engine**:
+   - Groups findings by application and blast radius:
+     - **Large Batches**: Identical 3PP dependency and package upgrades across applications.
+     - **Medium Batches**: Related controller/service-level vulnerabilities.
+     - **Small/Individual**: Complex source code refactors and architectural changes.
+
+4. **Independent Security Review & Audit Evidence**:
+   - Performs independent security review on git diffs before requesting human review.
+   - Generates full evidence package in `remediation-output/<VULN_ID>/`:
+     - `changes.patch` (Git unified diff)
+     - `remediation-report.md` (Markdown audit report)
+     - `agent-execution-trace.log` (Full execution trace)
+
+5. **Immutable Human-in-the-Loop Review Gate**:
+   - Automated remediation strictly stops at status `AWAITING_HUMAN_REVIEW`.
+   - Never auto-pushes to remote git repositories or opens Pull Requests without explicit human confirmation (`approve-pr` / `isApproved: true`).
 
 ---
 
-## 5. Quick Start Guide
+## Supported Applications & Repositories
+
+| Application | Name | Technology | Repository Path | Target Vulnerabilities |
+| :--- | :--- | :--- | :--- | :--- |
+| **`APP-E2E-001`** | GCAS Agentic E2E Test API | .NET 9 | `sample-repos/gcas-agentic-e2e-test-repo` | `GCAS-E2E-001` (SQLi), `GCAS-E2E-002` (Cmd Injection), `GCAS-E2E-003` (Path Traversal), `GCAS-E2E-004` (Reflected XSS), `GCAS-E2E-005` (Hardcoded Secret), `GCAS-E2E-006` (Newtonsoft.Json) |
+| **`APP-1001`** | Payments API | .NET 9 | `sample-repos/payments-api` | `VUL-POC-001` (SQLi), `VUL-POC-005` (DES Refactor), `VUL-POC-006` (Cmd Injection), `VUL-POC-007` (API Secret) |
+| **`APP-1002`** | Customer Service | Java Spring | `sample-repos/customer-service` | `VUL-POC-002` (Auth Bypass), `VUL-POC-008` (Spring Boot 3.1.2), `VUL-POC-009` (Path Traversal) |
+| **`APP-1003`** | Inventory Manager | .NET 9 | `sample-repos/inventory-manager` | `VUL-POC-003` (Newtonsoft.Json), `VUL-POC-010` (Encodings.Web) |
+| **`APP-1004`** | Identity Provider | Infra / VM | `sample-repos/identity-provider` | `VUL-POC-004` (Ivanti Server Buffer Overflow — No Code Fix) |
+| **`APP-1005`** | Storefront Web API | .NET 9 | `sample-repos/storefront-api` | `VUL-POC-011` (Reflected XSS) |
+
+---
+
+## Quick Start Guide
 
 ### Prerequisites
 - **.NET 9.0 SDK** (`dotnet --version`)
 - **Git 2.30+** (`git --version`)
-- **Visual Studio Code** with GitHub Copilot Chat
+- **Visual Studio Code** or **Antigravity IDE**
 
-### Build and Test Solution
+### Build and Run Tests
 ```powershell
-# Restore dependencies and build local solution
-dotnet build VulnerabilityRemediation.sln
+# Restore dependencies and build solution
+dotnet build
 
-# Run all 37 unit, CSV, markdown, and workflow tests
-dotnet test VulnerabilityRemediation.sln
+# Run all 41 unit and integration tests
+dotnet test
 ```
 
-### Local CLI Helper Commands
+---
+
+## Control CLI Commands Reference
+
+The CLI is located in `src/VulnerabilityRemediation.Cli`:
+
 ```powershell
-# List findings from local CSV
+# List all ingested vulnerabilities
 dotnet run --project src/VulnerabilityRemediation.Cli -- list
 
-# List available vulnerability categories/types in CSV
-dotnet run --project src/VulnerabilityRemediation.Cli -- categories
+# Show details of a specific vulnerability
+dotnet run --project src/VulnerabilityRemediation.Cli -- show VUL-POC-002
 
-# Show complete details for a single vulnerability
-dotnet run --project src/VulnerabilityRemediation.Cli -- show VUL-POC-001
+# Validate database integrity against domain business rules
+dotnet run --project src/VulnerabilityRemediation.Cli -- validate
 
-# Run the 16-step remediation workflow (stops at Human Approval Gate)
-dotnet run --project src/VulnerabilityRemediation.Cli -- execute VUL-POC-001
+# Generate dynamic remediation batch plan
+dotnet run --project src/VulnerabilityRemediation.Cli -- batch-plan
 
-# Authorize and complete remediation
-dotnet run --project src/VulnerabilityRemediation.Cli -- execute VUL-POC-001 --approve
+# Prepare workspace & local remediation branch
+dotnet run --project src/VulnerabilityRemediation.Cli -- prepare VUL-POC-002
 
-# View the generated Shared Markdown report
-dotnet run --project src/VulnerabilityRemediation.Cli -- report VUL-POC-001
+# Execute autonomous remediation, real tests, security audit, and evidence generation
+dotnet run --project src/VulnerabilityRemediation.Cli -- execute VUL-POC-002
 
-# View local Git diff
-dotnet run --project src/VulnerabilityRemediation.Cli -- diff VUL-POC-001
+# Execute remediation for an entire batch
+dotnet run --project src/VulnerabilityRemediation.Cli -- batch-execute BATCH-APP-1003-DEP-02
+
+# View git diff patch evidence
+dotnet run --project src/VulnerabilityRemediation.Cli -- diff VUL-POC-002
+
+# View markdown audit report
+dotnet run --project src/VulnerabilityRemediation.Cli -- evidence VUL-POC-002
+
+# Check lifecycle and human review status
+dotnet run --project src/VulnerabilityRemediation.Cli -- status VUL-POC-002
+
+# Approve remediation and publish Pull Request (HITL Gate)
+dotnet run --project src/VulnerabilityRemediation.Cli -- publish VUL-POC-002 --approve
+dotnet run --project src/VulnerabilityRemediation.Cli -- approve-pr VUL-POC-002
 ```
 
 ---
 
-## 6. GitHub Copilot Workflow in VS Code
+## Model Context Protocol (MCP) Server
 
-1. Open GitHub Copilot Chat in VS Code.
-2. Run prompt:
-   ```
-   /remediate-vulnerability
-   ```
-   or invoke the orchestrator directly:
-   ```
-   @vulnerability-orchestrator Remediate VUL-POC-001
-   ```
-3. Select the vulnerability category and specific finding.
-4. Review the generated Root Cause Analysis and Baseline Test results.
-5. Grant explicit human approval (`APPROVE`) at the Human Approval Gate.
-6. The agents apply the targeted fix, run regression tests, conduct independent validation, finalize the Shared Markdown report in `output/`, and update the CSV record.
+The MCP server is located in `mcp/VulnerabilityDataMcp` and communicates over STDIO JSON-RPC 2.0.
+
+### Configuration
+- **VS Code**: `.vscode/mcp.json`
+- **Antigravity**: `.agents/mcp_config.json`
+
+### Key MCP Tools
+- `get_vulnerability_context(vulnerabilityId)`: Returns structured context, repository mapping, and route.
+- `prepare_workspace(vulnerabilityId)`: Clones repository to workspace and checks out local remediation branch.
+- `execute_remediation(vulnerabilityId)`: Executes complete fix, test runner, security audit, and evidence generation.
+- `run_validation_tests(vulnerabilityId)`: Runs real build and test suites and returns execution metrics.
+- `run_security_review(vulnerabilityId)`: Conducts AST security audit on git diff.
+- `generate_evidence(vulnerabilityId)`: Collects patch, report, and execution trace.
+- `get_vulnerability_diff(vulnerabilityId)`: Retrieves unified git diff.
+- `get_evidence_report(vulnerabilityId)`: Retrieves markdown audit report.
+- `get_batch_plan()`: Generates dynamic batch plan grouped by application and blast radius.
+- `approve_pr(vulnerabilityId)`: Publishes approved branch and opens GitHub Pull Request upon explicit human approval.
 
 ---
 
-## 7. Documentation Index
+## AI Agent Integrations
+
+### GitHub Copilot Chat (VS Code)
+1. Open GitHub Copilot Chat in VS Code.
+2. Enter:
+   ```
+   remediate VUL-POC-002
+   ```
+   or with custom agent:
+   ```
+   @remediation-orchestrator Remediate GCAS-E2E-005
+   ```
+3. Copilot autonomously executes the remediation pipeline and provides the complete finalized report with git diff, test results, security audit rating, and stops at `AWAITING_HUMAN_REVIEW`.
+
+### Antigravity AI
+1. Skill defined in `.agents/skills/gcas-remediation/SKILL.md`.
+2. Antigravity connects to `vulnerability-data` MCP server via `.agents/mcp_config.json`.
+3. Enter:
+   ```
+   remediate VUL-POC-002
+   ```
+
+---
+
+## Documentation Index
 
 - [Architecture Specification](docs/ARCHITECTURE.md)
-- [Agent Workflow & Roles](docs/AGENT_WORKFLOW.md)
-- [Human-in-the-Loop Governance Gate](docs/HUMAN_REVIEW.md)
+- [Model Context Protocol (MCP) Guide](docs/MCP.md)
+- [Agent Workflow & Delegation Matrix](docs/AGENT_WORKFLOW.md)
+- [Demonstration & Real-Time Runbook](docs/DEMO_RUNBOOK.md)
+- [Human-in-the-Loop Review Gate](docs/HUMAN_REVIEW.md)
 - [Security Guardrails](docs/SECURITY_GUARDRAILS.md)
 - [Acceptance Criteria Verification Matrix](docs/ACCEPTANCE_CRITERIA.md)
 - [Environment Setup & Installation](docs/SETUP.md)
-- [Demo Runbook](docs/DEMO_RUNBOOK.md)
+- [Model Routing Strategy](docs/MODEL_ROUTING.md)

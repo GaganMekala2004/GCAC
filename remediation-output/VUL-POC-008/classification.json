@@ -1,0 +1,11 @@
+{
+  "cwe": "CWE-1395 Vulnerable 3PP Dependency",
+  "severity": "High",
+  "exploitability": "Medium with concise justification: The vulnerability arises from using an outdated dependency, which may have known exploits, but actual exploitation requires specific conditions.",
+  "route": "ConfigUpdate",
+  "strategy": "Upgrade the Spring Boot parent version in the pom.xml to 3.2.4 to mitigate the vulnerability.",
+  "attackVector": "Dependency exploitation through known vulnerabilities in outdated libraries, requiring the application to be deployed with the vulnerable version.",
+  "summary": "The application is using an outdated Spring Boot starter parent, which poses a high security risk due to potential vulnerabilities in the dependency.",
+  "vulnerabilityId": "VUL-POC-008",
+  "cveId": "CVE-2024-22250"
+}

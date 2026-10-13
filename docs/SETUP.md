@@ -1,21 +1,21 @@
-# ENVIRONMENT SETUP & PREREQUISITES GUIDE (TARGET POC)
+# ENVIRONMENT SETUP & PREREQUISITES GUIDE
 
 ## 1. System Requirements & Prerequisites
 
 - **Operating System**: Windows 10/11, macOS, or Linux
 - **Runtime**: [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
 - **Version Control**: Git 2.30+
-- **AI Coding Assistant**:
+- **AI Coding Assistants**:
   - Visual Studio Code with GitHub Copilot Chat extension, OR
   - Antigravity IDE
 
 ---
 
-## 2. Step-by-Step Installation & Verification
+## 2. Step-by-Step Installation & Build
 
-1. **Clone/Open Repository Root**:
+1. **Navigate to Repository Workspace**:
    ```powershell
-   cd <repository-root>
+   cd c:\Users\NAGASATYAMEKALA\Desktop\Prototype_GCAS
    ```
 
 2. **Verify .NET 9 SDK**:
@@ -25,55 +25,44 @@
 
 3. **Restore Dependencies & Build Solution**:
    ```powershell
-   dotnet build VulnerabilityRemediation.sln
+   dotnet build
    ```
 
-4. **Execute Full Test Suite**:
+4. **Execute Full Test Suite (41 Tests)**:
    ```powershell
-   dotnet test VulnerabilityRemediation.sln
+   dotnet test
    ```
 
-5. **Verify Local CSV Findings**:
+5. **Verify Database Findings**:
    ```powershell
-   dotnet run --project src/VulnerabilityRemediation.Cli -- list-csv
+   dotnet run --project src/VulnerabilityRemediation.Cli -- list
+   dotnet run --project src/VulnerabilityRemediation.Cli -- validate
    ```
 
 ---
 
-## 3. Directory Layout
+## 3. Sample Repositories Auto-Seeding
 
-The solution uses a clean, file-based architecture without external infrastructure:
-
-```
-GCAC/
-├── .github/
-│   ├── agents/                   # 7 bounded Copilot agent instructions
-│   ├── prompts/                  # /remediate-vulnerability workflow prompt
-│   └── copilot-instructions.md   # Shared governance & security rules
-├── vulnerability/                # Input vulnerability CSV files
-│   └── vulnerabilities.csv
-├── output/                       # Output Shared Vulnerability Markdown reports
-├── src/                          # Local .NET helper libraries (Domain, Repository, Cli)
-├── tests/                        # Local unit and workflow tests
-└── docs/                         # Architectural documentation & runbooks
-```
+The platform includes a built-in repository seeder (`SampleRepositoriesSeeder.cs`). When any CLI command, MCP tool, or integration test executes, it automatically checks and initializes clean baseline Git repositories under `sample-repos/` on branch `main`:
+- `sample-repos/gcas-agentic-e2e-test-repo` (APP-E2E-001)
+- `sample-repos/payments-api` (APP-1001)
+- `sample-repos/customer-service` (APP-1002)
+- `sample-repos/inventory-manager` (APP-1003)
+- `sample-repos/identity-provider` (APP-1004)
+- `sample-repos/storefront-api` (APP-1005)
 
 ---
 
-## 4. Running the Remediation Workflow in VS Code
+## 4. IDE & Agent Integrations
 
-1. Open the repository root in **Visual Studio Code**.
-2. Open **GitHub Copilot Chat** (`Ctrl+Alt+I` on Windows/Linux or `Cmd+Option+I` on macOS).
-3. Enter:
-   ```
-   /remediate-vulnerability
-   ```
-4. Follow the interactive steps:
-   - Select a vulnerability category.
-   - Select exactly one vulnerability finding.
-   - Review Code Analysis & RCA.
-   - Review baseline test execution results.
-   - Explicitly provide **Human Approval** (`APPROVE`, `REQUEST CHANGES`, `REJECT`).
-   - Review post-fix remediation and regression test runs.
-   - Review Final Validation verdict and finalized Markdown report.
-   - Verify that the Documentation Agent updated the selected CSV row.
+### A. Visual Studio Code Setup
+1. Open the repository root in VS Code.
+2. The `.vscode/settings.json` and `.vscode/mcp.json` automatically register the `vulnerability-data` MCP server.
+3. Open **GitHub Copilot Chat** (`Ctrl+Alt+I` / `Cmd+Option+I`).
+4. Type `remediate VUL-POC-002` or `@remediation-orchestrator Remediate GCAS-E2E-005` to trigger autonomous remediation.
+
+### B. Antigravity Setup
+1. The `.agents/mcp_config.json` configures the `vulnerability-data` MCP server.
+2. The remediation skill is configured in `.agents/skills/gcas-remediation/SKILL.md`.
+3. Type `remediate VUL-POC-002` to run the remediation workflow.
+

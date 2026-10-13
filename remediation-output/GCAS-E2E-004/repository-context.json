@@ -1,9 +1,0 @@
-{
-  "vulnerabilityId": "GCAS-E2E-004",
-  "applicationNumber": "APP-E2E-001",
-  "applicationName": "GCAS Agentic E2E Test API",
-  "repositoryUrl": "https://github.com/ksgl-rohith/gcas-agentic-e2e-test-repo.git",
-  "defaultBranch": "main",
-  "localBranch": "remediation/gcas-e2e-004",
-  "baseCommitSha": "7075159c77b3ed28fc2ca45b67c754fff799178d"
-}

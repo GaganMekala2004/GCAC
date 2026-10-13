@@ -1,50 +1,43 @@
-# HUMAN APPROVAL GOVERNANCE GATE SPECIFICATION
+# DEVELOPER HUMAN REVIEW GUIDE
 
-## 1. Governance Concept
+## Developer Review Procedure
 
-In the **Target POC Architecture**, Human Approval is an explicit **GOVERNANCE GATE** positioned immediately after Root Cause Analysis and Baseline Testing (Step 9/10), and strictly **BEFORE** any production code modification (Step 11).
+When the `remediation-orchestrator` agent completes its local workflow, it sets the status to `AWAITING_HUMAN_REVIEW` and halts execution. No remote branches or Pull Requests exist at this point.
 
-> [!IMPORTANT]
-> **Human Approval is NOT an AI agent.**
-> It is an immutable governance barrier where the system halts and presents evidence to the human developer.
-> No agent possesses the authority to bypass this gate or modify source code without documented human authorization.
+### Step 1: Inspect Evidence Package
+Review the generated audit report located at:
+`remediation-output/<vulnerability-id>/remediation-report.md`
 
----
+Verify:
+- **Root Cause Summary**: Was the vulnerability accurately identified?
+- **Remediation Summary**: Does the fix address the root cause cleanly without scanner rule suppression?
+- **Files Changed**: Are changes strictly limited to relevant code files?
+- **Validation Results**: Did `dotnet test` or `mvn test` pass cleanly?
+- **Security Audit Rating**: Is the independent security review rating `PASS`?
 
-## 2. Review Gate Information
-
-When the workflow stops at the Human Approval Gate, the following evidence is presented to the developer:
-
-1. **Vulnerability Overview**: Vulnerability ID, CVE, Application, Severity, Category, Location.
-2. **Root Cause Analysis (RCA)**: Data flow from untrusted source to sink, affected methods, and security impact.
-3. **Proposed Remediation**: Specific architectural or coding changes proposed to eliminate the vulnerability.
-4. **Baseline Test Results**: Actual CLI execution logs demonstrating the unfixed baseline behavior on the current branch.
-
----
-
-## 3. Governance Decisions
-
-The developer can make one of three decisions:
-
-### A. APPROVE
-- **Action**: Authorizes the Remediation Agent to proceed with the smallest secure fix and post-fix testing.
-- **Shared Markdown Record**: `## Human Approval Gate` is appended with `Decision: APPROVED`, reviewer name, and timestamp.
-
-### B. REQUEST CHANGES
-- **Action**: Provides corrective feedback or alternative implementation constraints to the RCA or Unit Test agents without modifying code.
-- **Shared Markdown Record**: Feedback appended for iterative re-planning.
-
-### C. REJECT
-- **Action**: Aborts the remediation attempt. The rejection rationale is recorded in the Shared Markdown report, the CSV status is updated to `Rejected / Manual Review Required`, and all files remain untouched.
-
----
-
-## 4. Local Review Commands
-
+### Step 2: Inspect Unified Git Diff
+Run the CLI diff command or inspect Git changes in VS Code / Antigravity:
 ```powershell
-# View Shared Markdown report up to Human Approval Gate
-dotnet run --project src/VulnerabilityRemediation.Cli -- report VUL-POC-001
-
-# Execute remediation with explicit human authorization
-dotnet run --project src/VulnerabilityRemediation.Cli -- execute VUL-POC-001 --approve
+dotnet run --project src/VulnerabilityRemediation.Cli -- diff VUL-POC-002
 ```
+Or view the patch directly:
+`remediation-output/<vulnerability-id>/changes.patch`
+
+### Step 3: Approval / Rejection Decision
+
+- **If Approved**:
+  - In VS Code GitHub Copilot Chat:
+    ```
+    APPROVE PR VUL-POC-002
+    ```
+  - Via Control CLI:
+    ```powershell
+    dotnet run --project src/VulnerabilityRemediation.Cli -- publish VUL-POC-002 --approve
+    dotnet run --project src/VulnerabilityRemediation.Cli -- approve-pr VUL-POC-002
+    ```
+  - Via MCP Tool:
+    Call `approve_pr(vulnerabilityId: "VUL-POC-002", approvalNotes: "Verified secure auth configuration.")`
+
+- **If Rejection / Revision Required**:
+  Prompt the agent with specific revision feedback (e.g. *"Revise authorization rules in SecurityConfig.java"*).
+

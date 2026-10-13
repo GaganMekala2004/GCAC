@@ -1,8 +1,0 @@
-{
-  "vulnerabilityId": "VUL-POC-002",
-  "sourceClassification": "SpecializedAction",
-  "rawSourceClassification": "Specialized Action",
-  "derivedRemediationRoute": "JavaSpringSourceFix",
-  "technology": "java-spring",
-  "requiresHumanReview": true
-}

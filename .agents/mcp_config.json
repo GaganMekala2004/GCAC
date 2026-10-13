@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "vulnerability-data": {
+      "command": "dotnet",
+      "args": [
+        "c:/Users/NAGASATYAMEKALA/Desktop/GCAC-main/mcp/VulnerabilityDataMcp/bin/Debug/net9.0/VulnerabilityDataMcp.dll"
+      ],
+      "env": {
+        "GCAS_WORKSPACE_ROOT": "c:/Users/NAGASATYAMEKALA/Desktop/GCAC-main",
+        "DOTNET_CLI_TELEMETRY_OPTOUT": "1"
+      }
+    }
+  }
+}

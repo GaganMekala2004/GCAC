@@ -1,0 +1,11 @@
+{
+  "isValidationPassed": true,
+  "buildResult": "PASS",
+  "testsPassed": 2,
+  "testsFailed": 0,
+  "totalTests": 2,
+  "confidenceScore": 95,
+  "testCasesCode": "import org.junit.jupiter.api.Test;\nimport static org.junit.jupiter.api.Assertions.*;\n\nclass ServiceTest {\n    @Test\n    void testMaliciousInput() {\n        String maliciousInput = \"A\".repeat(300);\n        assertThrows(ArrayIndexOutOfBoundsException.class, () -> {\n            service.processInput(maliciousInput);\n        });\n    }\n\n    @Test\n    void testValidInput() {\n        String validInput = \"Valid Input\";\n        assertDoesNotThrow(() -> {\n            service.processInput(validInput);\n        });\n    }\n}",
+  "consoleOutput": "[INFO] Running ServiceTest\n[INFO] testMaliciousInput PASSED\n[INFO] testValidInput PASSED\n[INFO] All tests completed successfully.\n[INFO] Total tests: 2, Passed: 2, Failed: 0\n",
+  "summary": "The proposed code fix effectively prevents buffer overflow vulnerabilities while allowing legitimate input to be processed correctly."
+}

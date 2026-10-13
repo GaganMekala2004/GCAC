@@ -1,7 +1,7 @@
 {
   "APP-E2E-001": {
     "applicationName": "GCAS Agentic E2E Test API",
-    "repositoryUrl": "https://github.com/ksgl-rohith/gcas-agentic-e2e-test-repo.git",
+    "repositoryUrl": "sample-repos/gcas-agentic-e2e-test-repo",
     "technology": "dotnet",
     "defaultBranch": "main"
   },

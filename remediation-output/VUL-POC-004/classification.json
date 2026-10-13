@@ -1,0 +1,11 @@
+{
+  "cwe": "CWE-120 Buffer Overflow",
+  "severity": "Critical",
+  "exploitability": "High due to the nature of buffer overflow vulnerabilities which can be easily exploited if the attacker has access to the affected service.",
+  "route": "SpecializedAction",
+  "strategy": "Apply the vendor patch to the hosting VM/server to mitigate the vulnerability immediately.",
+  "attackVector": "Remote code execution through crafted input to the Ivanti Connect Secure service, requiring network access to the service.",
+  "summary": "The Ivanti Connect Secure Buffer Overflow vulnerability (CVE-2024-21887) poses a critical risk and requires immediate remediation through vendor patching.",
+  "vulnerabilityId": "VUL-POC-004",
+  "cveId": "CVE-2024-21887"
+}

@@ -1,15 +1,16 @@
 diff --git a/src/GcasE2ETestApi/DiagnosticsController.cs b/src/GcasE2ETestApi/DiagnosticsController.cs
-index 4c4334b..d4d43a1 100644
 --- a/src/GcasE2ETestApi/DiagnosticsController.cs
 +++ b/src/GcasE2ETestApi/DiagnosticsController.cs
-@@ -12,6 +12,11 @@ public sealed class DiagnosticsController : ControllerBase
-     {
-         using var process = new Process();
-         process.StartInfo.FileName = "sh";
-+        if (string.IsNullOrWhiteSpace(host) || !System.Text.RegularExpressions.Regex.IsMatch(host, @"^[a-zA-Z0-9\.\-]+$"))
-+        {
-+            return BadRequest(new { error = "Invalid host parameter" });
-+        }
-         process.StartInfo.Arguments = "-c \"ping -c 1 " + host + "\"";
-         process.StartInfo.RedirectStandardOutput = true;
-         process.StartInfo.RedirectStandardError = true;
+@@ -16,3 +16,11 @@ public class DiagnosticsController : ControllerBase
+-    var process = Process.Start("cmd.exe", "/c ping " + host);
++    if (!IPAddress.TryParse(host, out _) && Uri.CheckHostName(host) != UriHostNameType.Dns)
++        return BadRequest("Invalid host target");
++
++    var startInfo = new ProcessStartInfo
++    {
++        FileName = "ping",
++        UseShellExecute = false,
++        CreateNoWindow = true
++    };
++    startInfo.ArgumentList.Add(host);
++    using var process = Process.Start(startInfo);

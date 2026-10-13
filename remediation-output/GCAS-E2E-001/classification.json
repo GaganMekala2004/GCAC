@@ -1,8 +1,0 @@
-{
-  "vulnerabilityId": "GCAS-E2E-001",
-  "sourceClassification": "SpecializedAction",
-  "rawSourceClassification": "Injection",
-  "derivedRemediationRoute": "DotNetSourceFix",
-  "technology": "dotnet",
-  "requiresHumanReview": true
-}

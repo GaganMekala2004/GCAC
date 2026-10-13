@@ -1,7 +1,0 @@
---- a/src/PaymentsAPI/appsettings.json
-+++ b/src/PaymentsAPI/appsettings.json
-@@ -6,4 +6,3 @@
-   "PaymentGateway": {
--    "ApiKey": "sk_live_99887766554433221100aabbccddeeff",
-     "Endpoint": "https://api.paymentgateway.internal/v1"
-   }

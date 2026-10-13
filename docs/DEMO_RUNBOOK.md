@@ -1,122 +1,117 @@
-# DEMONSTRATION & TESTING RUNBOOK (TARGET POC)
+# DEMONSTRATION & REAL-TIME TESTING RUNBOOK
 
-Follow these steps to demonstrate and test the **Agentic Vulnerability Remediation POC** inside Visual Studio Code using GitHub Copilot Chat, Antigravity, and the local helper CLI.
+Follow these steps to demonstrate and test the **Agentic AI Vulnerability Remediation System** inside Visual Studio Code, Antigravity, and via the Control CLI:
 
 ---
 
-## 1. Environment Setup & Verification
+## 1. Setup & Ingestion
 
 1. **Open Workspace**:
    ```powershell
-   cd <repository-root>
+   cd c:\Users\NAGASATYAMEKALA\Desktop\Prototype_GCAS
    ```
-
 2. **Build and Test Suite**:
    ```powershell
    dotnet build
    dotnet test
    ```
-
-3. **Inspect Local Vulnerability CSV**:
+3. **Inspect Persisted Findings & Database Integrity**:
    ```powershell
-   dotnet run --project src/VulnerabilityRemediation.Cli -- list-csv
+   dotnet run --project src/VulnerabilityRemediation.Cli -- list
+   dotnet run --project src/VulnerabilityRemediation.Cli -- validate
    ```
 
 ---
 
-## 2. Interactive AI Remediation Workflow in VS Code / GitHub Copilot
+## 2. Dynamic Batch Planning Demonstration
 
-### Step-by-Step Interactive Run
+Generate and view dynamic remediation batches grouped by blast radius:
+```powershell
+dotnet run --project src/VulnerabilityRemediation.Cli -- batch-plan
+```
 
-1. Open **GitHub Copilot Chat** in VS Code (or Antigravity Chat).
-2. Enter the workflow command:
-   ```
-   /remediate-vulnerability
-   ```
-3. **Stage 1 - Discovery & Selection**:
-   - The **Vulnerability Orchestrator** scans `vulnerability/*.csv` and lists distinct vulnerability categories (e.g., *SQL Injection*, *Command Injection*, *Path Traversal*, *Dependency Vulnerability*, *Hardcoded Secret*).
-   - Prompt response: Select ONE vulnerability type (e.g., `SQL Injection`).
-   - The Orchestrator lists matching findings.
-   - Prompt response: Select EXACTLY ONE vulnerability (e.g., `GCAS-E2E-001` or `VUL-POC-001`).
-
-4. **Stage 2 - Shared Markdown Initialization**:
-   - Creates `output/<sanitized_vulnerability_title>_<vulnerability_id>.md` (e.g., `output/sql_injection_in_weatherforecastcontroller_gcas_e2e_001.md`).
-   - Records vulnerability metadata and initializes the single shared audit report.
-
-5. **Stage 3 - Code Analysis & Root Cause Analysis (RCA)**:
-   - **Code Analysis / RCA Agent** inspects the target code without modifying production code.
-   - Traces source-to-sink data flow, call hierarchy, affected files/lines, and root cause.
-   - Appends findings to the Shared Markdown report.
-
-6. **Stage 4 - Unit Testing & Baseline Verification**:
-   - **Unit Test Agent** inspects existing test conventions (`xUnit`, `NUnit`, `MSTest`).
-   - Generates security-focused unit tests reproducing the vulnerability.
-   - Executes baseline tests against the **unfixed code**.
-   - Appends execution commands, baseline results, and failure logs to the Shared Markdown report.
-
-7. **Stage 5 - MANDATORY HUMAN APPROVAL GATE**:
-   - Workflow **STOPS completely**.
-   - Displays selected vulnerability, root cause analysis, affected files, proposed remediation, and baseline test evidence.
-   - Developer reviews the proposal and issues explicit decision:
-     - `APPROVE` $\rightarrow$ Proceeds to production-code remediation.
-     - `REQUEST CHANGES` $\rightarrow$ Re-runs analysis or test generation with feedback.
-     - `REJECT` $\rightarrow$ Workflow terminates with audit log.
-   - **NO PRODUCTION CODE MODIFICATION OCCURS BEFORE APPROVAL.**
-
-8. **Stage 6 - Remediation**:
-   - **Remediation Agent** applies the minimal, secure code fix.
-   - No unrelated refactoring or formatting churn.
-   - Executes post-fix security tests and appends before/after context and test outcomes to the Shared Markdown.
-
-9. **Stage 7 - Regression Testing**:
-   - **Regression Agent** inspects Git diff and runs existing project build and regression suites (`dotnet test`).
-   - Confirms zero regressions; distinguishes pre-existing failures from remediation changes.
-   - Appends results to the Shared Markdown.
-
-10. **Stage 8 - Final Independent Validation**:
-    - **Final Validation Agent** independently validates diffs, build results, test outcomes, and security rules.
-    - Emits `PASS`, `FAIL`, or `PARTIAL` with a Confidence Score (0-100).
-    - Appends validation verdict to the Shared Markdown.
-
-11. **Stage 9 - Documentation & Controlled CSV Update**:
-    - **Documentation Agent** finalizes the Shared Markdown report.
-    - Performs an in-place update on **ONLY the selected vulnerability row** in `vulnerability/*.csv`.
-    - Preserves all original rows and all original columns.
+Execute an entire batch of dependency updates:
+```powershell
+dotnet run --project src/VulnerabilityRemediation.Cli -- batch-execute BATCH-APP-1003-DEP-02
+```
 
 ---
 
-## 3. Local Helper CLI Verification (Optional Developer Utilities)
+## 3. Interactive AI Remediation Demos
 
-You can also inspect local CSVs, run workflow stages, view git diffs, and inspect Markdown reports via the local CLI:
-
-1. **List all vulnerabilities in local CSV**:
-   ```powershell
-   dotnet run --project src/VulnerabilityRemediation.Cli -- list-csv
+### A. Single Vulnerability Remediation in GitHub Copilot Chat
+1. Open **GitHub Copilot Chat** in VS Code.
+2. Enter:
    ```
-
-2. **Run remediation engine on a finding**:
-   ```powershell
-   dotnet run --project src/VulnerabilityRemediation.Cli -- run-remediation GCAS-E2E-001
+   remediate VUL-POC-002
    ```
-
-3. **Inspect Git diff**:
-   ```powershell
-   dotnet run --project src/VulnerabilityRemediation.Cli -- show-diff
+   or for E2E suite:
    ```
-
-4. **View Shared Markdown report**:
-   ```powershell
-   dotnet run --project src/VulnerabilityRemediation.Cli -- show-report GCAS-E2E-001
+   remediate GCAS-E2E-005
    ```
+3. **Autonomous Execution Flow**:
+   - Queries `vulnerability-data` MCP server via `get_remediation_context`.
+   - Prepares isolated workspace `workspaces/<VULN_ID>/repository` on branch `remediation/<vuln-id>`.
+   - Selects correct fix agent (`JavaFixAgent`, `DotNetFixAgent`, etc.) and applies precise code fix.
+   - Executes real test suite (`mvn test`, `dotnet test`) and records execution metrics.
+   - Runs independent AST security review (`Rating = PASS`).
+   - Generates evidence package in `remediation-output/<VULN_ID>/`.
+   - **STOPS at status `AWAITING_HUMAN_REVIEW` (Zero remote pushes, Zero PRs)**.
+
+### B. Antigravity Remediation Demo
+1. In Antigravity chat, enter:
+   ```
+   remediate VUL-POC-002
+   ```
+2. Antigravity leverages `.agents/skills/gcas-remediation/SKILL.md` and MCP server to execute the pipeline and stop at `AWAITING_HUMAN_REVIEW`.
 
 ---
 
-## 4. Key Governance & POC Rules
+## 4. Human Review & PR Publishing Demo
 
-| Guardrail | Enforcement Rule |
-| :--- | :--- |
-| **No Remote Git Push** | Changes remain exclusively on the local working branch for developer review. Zero automated push/merge. |
-| **No Automated PRs** | Pull request publishing is out of scope for this POC. |
-| **No SQLite / MCP / SharePoint** | All runtime state is maintained via `vulnerability/*.csv` and `output/*.md`. |
-| **Single Vulnerability Per Run** | Exactly one vulnerability is selected and remediated per execution. |
-| **Preservation of User Work** | Rollback and file tracking preserve unrelated developer modifications. |
+1. **Developer Inspects Git Diff & Audit Evidence**:
+   ```powershell
+   dotnet run --project src/VulnerabilityRemediation.Cli -- diff VUL-POC-002
+   dotnet run --project src/VulnerabilityRemediation.Cli -- evidence VUL-POC-002
+   dotnet run --project src/VulnerabilityRemediation.Cli -- status VUL-POC-002
+   ```
+2. **Developer Issues Explicit Approval**:
+   In Copilot Chat:
+   ```
+   APPROVE PR VUL-POC-002
+   ```
+   *Or via Control CLI:*
+   ```powershell
+   dotnet run --project src/VulnerabilityRemediation.Cli -- publish VUL-POC-002 --approve
+   dotnet run --project src/VulnerabilityRemediation.Cli -- approve-pr VUL-POC-002
+   ```
+3. **Observe PR Publisher Execution**:
+   - Validates human approval flag (`isApproved == true`).
+   - Pushes branch `remediation/vul-poc-002` to remote repository.
+   - Creates GitHub Pull Request with complete audit details.
+   - Status transitions to `PrCreated`.
+
+---
+
+## 5. Complete Vulnerability Scenarios Matrix
+
+| Vulnerability ID | Target App / Repository | Technology | Flaw & Scenario | Derived Route | Human Review Gate |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`GCAS-E2E-001`** | `sample-repos/gcas-agentic-e2e-test-repo` | .NET 9 Web API | SQL Injection in `ProductsController.cs` | `DotNetSourceFix` | Local Code Fix $\rightarrow$ PR on Approval |
+| **`GCAS-E2E-002`** | `sample-repos/gcas-agentic-e2e-test-repo` | .NET 9 Web API | Command Injection in `DiagnosticsController.cs` | `DotNetSourceFix` | Local Code Fix $\rightarrow$ PR on Approval |
+| **`GCAS-E2E-003`** | `sample-repos/gcas-agentic-e2e-test-repo` | .NET 9 Web API | Reflected XSS in `SearchController.cs` | `DotNetSourceFix` | Local Code Fix $\rightarrow$ PR on Approval |
+| **`GCAS-E2E-004`** | `sample-repos/gcas-agentic-e2e-test-repo` | .NET 9 Web API | Path Traversal in `FileController.cs` | `DotNetSourceFix` | Local Code Fix $\rightarrow$ PR on Approval |
+| **`GCAS-E2E-005`** | `sample-repos/gcas-agentic-e2e-test-repo` | .NET 9 Web API | Hardcoded Secret in `SecretService.cs` | `DotNetSourceFix` | Local Code Fix $\rightarrow$ PR on Approval |
+| **`GCAS-E2E-006`** | `sample-repos/gcas-agentic-e2e-test-repo` | .NET 9 Web API | Vulnerable `Newtonsoft.Json` in `.csproj` | `DependencyUpdate` | Dependency Update $\rightarrow$ PR on Approval |
+| **`VUL-POC-001`** | `sample-repos/payments-api` | .NET 9 Web API | SQL Injection in `PaymentController.cs` | `DotNetSourceFix` | Local Code Fix $\rightarrow$ PR on Approval |
+| **`VUL-POC-002`** | `sample-repos/customer-service` | Java Spring Boot | Auth Bypass in `SecurityConfig.java` | `JavaSpringSourceFix` | Local Code Fix $\rightarrow$ PR on Approval |
+| **`VUL-POC-003`** | `sample-repos/inventory-manager` | .NET 9 Service | Vulnerable `Newtonsoft.Json` in `.csproj` | `DependencyUpdate` | Dependency Update $\rightarrow$ PR on Approval |
+| **`VUL-POC-004`** | `sample-repos/identity-provider` | Infrastructure / VM | Ivanti Server Buffer Overflow | `NoCodeRemediation` | Server Patch Report $\rightarrow$ STOP |
+| **`VUL-POC-005`** | `sample-repos/payments-api` | .NET 9 Web API | DES Protocol Refactor in `LegacyCrypto.cs` | `LargeRefactor` | Architecture Plan $\rightarrow$ STOP |
+| **`VUL-POC-006`** | `sample-repos/payments-api` | .NET 9 Web API | Command Injection in `ReceiptController.cs` | `DotNetSourceFix` | Local Code Fix $\rightarrow$ PR on Approval |
+| **`VUL-POC-007`** | `sample-repos/payments-api` | .NET 9 Web API | Hardcoded API Secret in `appsettings.json` | `ConfigurationChange` | Local Config Fix $\rightarrow$ PR on Approval |
+| **`VUL-POC-008`** | `sample-repos/customer-service` | Java Spring Boot | Vulnerable Spring Boot parent in `pom.xml` | `DependencyUpdate` | Dependency Update $\rightarrow$ PR on Approval |
+| **`VUL-POC-009`** | `sample-repos/customer-service` | Java Spring Boot | Path Traversal in `DocumentDownloadController.java`| `JavaSpringSourceFix`| Local Code Fix $\rightarrow$ PR on Approval |
+| **`VUL-POC-010`** | `sample-repos/inventory-manager` | .NET 9 Service | Vulnerable `System.Text.Encodings.Web` | `DependencyUpdate` | Dependency Update $\rightarrow$ PR on Approval |
+| **`VUL-POC-011`** | `sample-repos/storefront-api` | .NET 9 Web API | Reflected XSS in `SearchController.cs` | `DotNetSourceFix` | Local Code Fix $\rightarrow$ PR on Approval |
+

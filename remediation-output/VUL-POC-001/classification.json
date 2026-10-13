@@ -1,8 +1,0 @@
-{
-  "vulnerabilityId": "VUL-POC-001",
-  "cveId": "CVE-2024-21401",
-  "severity": "Critical",
-  "cwe": "CWE-89 SQL Injection",
-  "strategy": "Autonomous remediation route: SpecializedAction. Priority: Critical.",
-  "route": "SpecializedAction"
-}
