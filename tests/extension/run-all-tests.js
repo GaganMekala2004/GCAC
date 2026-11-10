@@ -7,6 +7,7 @@ const metricsTests = require('./metrics.test');
 const scannerAdaptersTests = require('./scannerAdapters.test');
 const findingsStoreTests = require('./findingsStore.test');
 const reScanVerificationTests = require('./reScanVerification.test');
+const phase1SecurityTests = require('./phase1Security.test');
 
 async function main() {
     console.log('===============================================================');
@@ -23,7 +24,8 @@ async function main() {
         { name: 'Dashboard Metrics & Quality Accuracy', fn: metricsTests.run },
         { name: 'Scanner Adapters & Controller Execution', fn: scannerAdaptersTests.run },
         { name: 'Normalized Findings Model & Storage', fn: findingsStoreTests.run },
-        { name: 'Post-Remediation Re-Scanning & Verification', fn: reScanVerificationTests.run }
+        { name: 'Post-Remediation Re-Scanning & Verification', fn: reScanVerificationTests.run },
+        { name: 'Phase 1 P0 Security Containment & Core Integrity', fn: phase1SecurityTests.run }
     ];
 
     let passedSuites = 0;

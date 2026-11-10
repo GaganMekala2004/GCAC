@@ -5,6 +5,8 @@
  * No local LLMs, no external third-party endpoints, no templates, no mock data.
  */
 
+const { outboundContextGate } = require('./outboundContextGate');
+
 let vscode = null;
 try {
     vscode = require('vscode');
@@ -73,6 +75,19 @@ class LlmClient {
      * @returns {Promise<string>} Full response text
      */
     async generateCompletion(prompt, options = {}) {
+        // Fail-closed outbound context gate BEFORE any model discovery or transmission
+        const gate = options.outboundGate || outboundContextGate;
+        gate.assertAllowed({
+            prompt,
+            systemPrompt: options.systemPrompt,
+            filePath: options.filePath,
+            targetPaths: options.targetPaths,
+            sourceCode: options.sourceCode,
+            untrustedContent: options.untrustedContent,
+            findingContext: options.findingContext,
+            runId: options.runId
+        });
+
         const models = await this.getAvailableModels();
 
         if (models.length === 0) {

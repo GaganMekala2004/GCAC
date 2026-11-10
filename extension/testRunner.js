@@ -1,6 +1,7 @@
-const { spawn, execSync } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { OUTCOME_STATUS } = require('./outcomeContract');
 
 /**
  * Deterministic Test Runner for GCAC Vulnerability Remediation
@@ -25,8 +26,8 @@ function isExecutableAvailable(executableName) {
         return false;
     }
     try {
-        const cmd = process.platform === 'win32' ? `where ${executableName}` : `which ${executableName}`;
-        execSync(cmd, { stdio: 'ignore', timeout: 3000 });
+        const lookupBin = process.platform === 'win32' ? 'where' : 'which';
+        execFileSync(lookupBin, [executableName], { stdio: 'ignore', timeout: 3000, shell: false });
         return true;
     } catch (e) {
         return false;
@@ -101,12 +102,18 @@ function parseDotnetOutput(stdout, stderr, exitCode) {
     const compilationFailed = /Build FAILED/i.test(combined) || /CS\d{4}:/i.test(combined);
 
     let status = 'PASS';
+    let machineStatus = OUTCOME_STATUS.PASSED;
     if (compilationFailed || exitCode !== 0 || testsFailed > 0) {
         status = 'FAIL';
+        machineStatus = OUTCOME_STATUS.FAILED;
+    } else if (testsTotal <= 0) {
+        status = 'UNTESTED';
+        machineStatus = OUTCOME_STATUS.UNTESTED;
     }
 
     return {
         status,
+        machineStatus,
         testsPassed,
         testsFailed,
         testsSkipped,
@@ -139,12 +146,18 @@ function parseMavenOutput(stdout, stderr, exitCode) {
     const compilationFailed = /Compilation failure/i.test(combined) || /\[ERROR\] COMPILATION ERROR/i.test(combined);
 
     let status = 'PASS';
+    let machineStatus = OUTCOME_STATUS.PASSED;
     if (buildFailure || compilationFailed || exitCode !== 0 || testsFailed > 0 || testsErrors > 0) {
         status = 'FAIL';
+        machineStatus = OUTCOME_STATUS.FAILED;
+    } else if (testsTotal <= 0) {
+        status = 'UNTESTED';
+        machineStatus = OUTCOME_STATUS.UNTESTED;
     }
 
     return {
         status,
+        machineStatus,
         testsPassed,
         testsFailed: testsFailed + testsErrors,
         testsSkipped,
@@ -162,23 +175,35 @@ function parseNpmOutput(stdout, stderr, exitCode) {
     let testsFailed = 0;
     let testsTotal = 0;
 
-    const passMatch = combined.match(/Tests:\s*(\d+)\s*passed/i);
-    const failMatch = combined.match(/Tests:\s*(\d+)\s*failed/i);
-    const totalMatch = combined.match(/Tests:\s*(\d+)\s*total/i);
+    const passMatch = combined.match(/Tests:\s*(\d+)\s*passed/i) || combined.match(/Passed Suites:\s*(\d+)/i);
+    const failMatch = combined.match(/Tests:\s*(\d+)\s*failed/i) || combined.match(/Failed Suites:\s*(\d+)/i);
+    const totalMatch = combined.match(/Tests:\s*(\d+)\s*total/i) || combined.match(/Total Suites:\s*(\d+)/i);
 
     if (passMatch) testsPassed = parseInt(passMatch[1], 10);
     if (failMatch) testsFailed = parseInt(failMatch[1], 10);
     if (totalMatch) testsTotal = parseInt(totalMatch[1], 10);
     else testsTotal = testsPassed + testsFailed;
 
-    const status = (exitCode === 0 && testsFailed === 0) ? 'PASS' : 'FAIL';
+    const compilationFailed = exitCode !== 0 && testsTotal === 0;
+    let status = 'PASS';
+    let machineStatus = OUTCOME_STATUS.PASSED;
+
+    if (exitCode !== 0 || testsFailed > 0) {
+        status = 'FAIL';
+        machineStatus = OUTCOME_STATUS.FAILED;
+    } else if (testsTotal <= 0) {
+        status = 'UNTESTED';
+        machineStatus = OUTCOME_STATUS.UNTESTED;
+    }
+
     return {
         status,
+        machineStatus,
         testsPassed,
         testsFailed,
         testsSkipped: 0,
         testsTotal,
-        compilationFailed: exitCode !== 0 && testsTotal === 0
+        compilationFailed
     };
 }
 
@@ -211,6 +236,7 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
             resolve({
                 executed: false,
                 status: 'NOT EXECUTED',
+                machineStatus: OUTCOME_STATUS.BLOCKED,
                 reason: `Unauthorized test runner executable: '${executable}'`,
                 executable,
                 command: `${executable} ${args.join(' ')}`,
@@ -235,6 +261,7 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
             resolve({
                 executed: false,
                 status: 'NOT EXECUTED',
+                machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
                 reason: 'Required runtime unavailable',
                 executable,
                 command: `${executable} ${args.join(' ')}`,
@@ -259,6 +286,7 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
             resolve({
                 executed: false,
                 status: 'NOT EXECUTED',
+                machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
                 reason: 'Working directory not found',
                 executable,
                 command: `${executable} ${args.join(' ')}`,
@@ -287,6 +315,7 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
         try {
             child = spawn(executable, args, {
                 cwd,
+                shell: false,
                 env: { ...process.env, CI: 'true', DOTNET_CLI_TELEMETRY_OPTOUT: '1' },
                 stdio: ['ignore', 'pipe', 'pipe']
             });
@@ -295,6 +324,7 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
             resolve({
                 executed: false,
                 status: 'NOT EXECUTED',
+                machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
                 reason: `Process spawn error: ${err.message}`,
                 executable,
                 command: `${executable} ${args.join(' ')}`,
@@ -334,6 +364,7 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
             resolve({
                 executed: false,
                 status: 'NOT EXECUTED',
+                machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
                 reason: `Execution failed: ${err.message}`,
                 executable,
                 command: `${executable} ${args.join(' ')}`,
@@ -360,6 +391,7 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
                 resolve({
                     executed: true,
                     status: 'FAIL',
+                    machineStatus: OUTCOME_STATUS.FAILED,
                     reason: `Execution timed out after ${timeoutMs}ms`,
                     executable,
                     command: `${executable} ${args.join(' ')}`,
@@ -378,8 +410,14 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
                 return;
             }
 
-            // Parse test counts and pass/fail status
-            let parsed = { status: code === 0 ? 'PASS' : 'FAIL', testsPassed: 0, testsFailed: 0, testsTotal: 0 };
+            // Parse test counts and pass/fail status cleanly (zero fabricated counts)
+            let parsed = {
+                status: code === 0 ? 'UNTESTED' : 'FAIL',
+                machineStatus: code === 0 ? OUTCOME_STATUS.UNTESTED : OUTCOME_STATUS.FAILED,
+                testsPassed: 0,
+                testsFailed: 0,
+                testsTotal: 0
+            };
             if (executable === 'dotnet') {
                 parsed = parseDotnetOutput(stdout, stderr, code);
             } else if (executable === 'mvn') {
@@ -391,14 +429,25 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
             const cleanOut = redactSensitiveOutput(stdout);
             const cleanErr = redactSensitiveOutput(stderr);
 
-            const summary = parsed.status === 'PASS'
-                ? `PASS — Tests passed (${parsed.testsPassed}/${parsed.testsTotal || parsed.testsPassed || 1}), Exit Code: ${code}`
-                : `FAIL — Test run failed (Passed: ${parsed.testsPassed}, Failed: ${parsed.testsFailed}), Exit Code: ${code}`;
+            let summary;
+            let reason;
+            if (parsed.machineStatus === OUTCOME_STATUS.PASSED) {
+                summary = `PASS — Tests passed (${parsed.testsPassed}/${parsed.testsTotal}), Exit Code: ${code}`;
+                reason = 'All assertions passed';
+            } else if (parsed.machineStatus === OUTCOME_STATUS.UNTESTED) {
+                summary = `UNTESTED — Process exited 0 but zero tests executed (${parsed.testsPassed}/${parsed.testsTotal})`;
+                reason = 'Zero tests executed where validation requires test coverage';
+            } else {
+                summary = `FAIL — Test run failed (Passed: ${parsed.testsPassed}, Failed: ${parsed.testsFailed}), Exit Code: ${code}`;
+                reason = parsed.compilationFailed ? 'Compilation failed' : 'Test assertions failed';
+            }
 
             resolve({
                 executed: true,
+                passed: parsed.machineStatus === OUTCOME_STATUS.PASSED,
                 status: parsed.status,
-                reason: parsed.status === 'PASS' ? 'All assertions passed' : (parsed.compilationFailed ? 'Compilation failed' : 'Test assertions failed'),
+                machineStatus: parsed.machineStatus,
+                reason,
                 executable,
                 command: `${executable} ${args.join(' ')}`,
                 workingDirectory: cwd,
@@ -432,7 +481,9 @@ async function runBaselineTests(finding, workspaceRoot) {
     if (!runner) {
         return {
             executed: false,
+            passed: false,
             status: 'NOT EXECUTED',
+            machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
             reason: 'No compatible test runner detected',
             summary: 'NOT EXECUTED — No test runner detected for technology ' + (finding.Technology || 'unknown')
         };
@@ -455,7 +506,9 @@ async function runPostFixTests(finding, workspaceRoot) {
     if (!runner) {
         return {
             executed: false,
+            passed: false,
             status: 'NOT EXECUTED',
+            machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
             reason: 'No compatible test runner detected',
             summary: 'NOT EXECUTED — No test runner detected for technology ' + (finding.Technology || 'unknown')
         };
@@ -467,6 +520,9 @@ async function runPostFixTests(finding, workspaceRoot) {
 module.exports = {
     isExecutableAvailable,
     detectRunner,
+    parseDotnetOutput,
+    parseMavenOutput,
+    parseNpmOutput,
     executeRealTestRunner,
     runBaselineTests,
     runPostFixTests

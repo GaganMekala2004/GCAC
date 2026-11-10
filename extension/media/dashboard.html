@@ -61,7 +61,7 @@
                             d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
                     </svg>
                     <span class="nav-label">Local Scans</span>
-                    <span class="nav-badge badge-info" id="navCountScans" style="display: none;">0</span>
+                    <span class="nav-badge badge-info u-hidden" id="navCountScans">0</span>
                 </button>
 
                 <button class="nav-item" id="navItemActiveRuns" data-view="active-runs" title="Active Runs">
@@ -70,7 +70,7 @@
                             d="M13 2.05v3.03c3.39.49 6 3.39 6 6.92 0 .9-.18 1.75-.48 2.54l2.6 1.53c.56-1.24.88-2.62.88-4.07 0-5.18-3.95-9.45-9-9.95zM12 19c-3.87 0-7-3.13-7-7 0-3.53 2.61-6.43 6-6.92V2.05c-5.05.5-9 4.76-9 9.95 0 5.52 4.47 10 9.99 10 3.31 0 6.24-1.61 8.04-4.09l-2.45-1.45C16.19 17.8 14.28 19 12 19z" />
                     </svg>
                     <span class="nav-label">Active Runs</span>
-                    <span class="nav-status-pulse" id="navActiveRunPulse" style="display: none;"></span>
+                    <span class="nav-status-pulse u-hidden" id="navActiveRunPulse"></span>
                 </button>
 
                 <button class="nav-item" id="navItemReviewQueue" data-view="review-queue" title="Review Queue">
@@ -135,7 +135,7 @@
                     <!-- Header Actions -->
                     <div class="header-right">
                         <!-- Current Run Indicator -->
-                        <div class="run-indicator-pill" id="headerRunIndicator" style="display: none;">
+                        <div class="run-indicator-pill u-hidden" id="headerRunIndicator">
                             <span class="live-pulse-dot"></span>
                             <span id="headerRunText">Stage 1 Active</span>
                         </div>
@@ -279,13 +279,11 @@
                     </div>
 
                     <!-- Zero State Info Banner (When no findings scanned yet) -->
-                    <div class="zero-state-banner" id="dashZeroStateBanner"
-                        style="display: flex; margin-bottom: 20px; background: var(--bg-surface-raised); border: 1px dashed var(--border-default); border-radius: 8px; padding: 16px 20px; align-items: center; justify-content: space-between;">
+                    <div class="zero-state-banner zero-state-banner-layout" id="dashZeroStateBanner">
                         <div>
-                            <div
-                                style="font-weight: 600; font-size: 13px; color: var(--text-primary); margin-bottom: 3px;">
+                            <div class="u-fw-600 u-font-13 u-text-primary u-mb-3">
                                 ⚡ Initial State — Dashboard at 0 Findings</div>
-                            <div style="font-size: 12px; color: var(--text-muted);">Select files or a repository and run
+                            <div class="u-font-12 u-text-muted">Select files or a repository and run
                                 a scan to detect vulnerabilities and populate live metrics.</div>
                         </div>
                         <button class="btn btn-primary btn-sm" id="btnDashScanNow">
@@ -307,16 +305,16 @@
                         <div class="kpi-card">
                             <div class="kpi-header">
                                 <span class="kpi-title">Critical</span>
-                                <span class="kpi-icon-pill" style="color: var(--danger);">●</span>
+                                <span class="kpi-icon-pill u-text-danger">●</span>
                             </div>
-                            <div class="kpi-metric" id="dashKpiCritical" style="color: var(--danger);">0</div>
+                            <div class="kpi-metric u-text-danger" id="dashKpiCritical">0</div>
                             <div class="kpi-sub">Immediate priority</div>
                         </div>
 
                         <div class="kpi-card">
                             <div class="kpi-header">
                                 <span class="kpi-title">In Progress</span>
-                                <span class="kpi-icon-pill" style="color: var(--info);">●</span>
+                                <span class="kpi-icon-pill u-text-info">●</span>
                             </div>
                             <div class="kpi-metric" id="dashKpiInProgress">0</div>
                             <div class="kpi-sub">Active pipeline</div>
@@ -325,18 +323,18 @@
                         <div class="kpi-card">
                             <div class="kpi-header">
                                 <span class="kpi-title">Remediated</span>
-                                <span class="kpi-icon-pill" style="color: var(--success);">●</span>
+                                <span class="kpi-icon-pill u-text-success">●</span>
                             </div>
-                            <div class="kpi-metric" id="dashKpiRemediated" style="color: var(--success);">0</div>
+                            <div class="kpi-metric u-text-success" id="dashKpiRemediated">0</div>
                             <div class="kpi-sub">Signed off &amp; verified</div>
                         </div>
 
                         <div class="kpi-card">
                             <div class="kpi-header">
                                 <span class="kpi-title">Needs Review</span>
-                                <span class="kpi-icon-pill" style="color: var(--warning);">●</span>
+                                <span class="kpi-icon-pill u-text-warning">●</span>
                             </div>
-                            <div class="kpi-metric" id="dashKpiReview" style="color: var(--warning);">0</div>
+                            <div class="kpi-metric u-text-warning" id="dashKpiReview">0</div>
                             <div class="kpi-sub">Awaiting gate decision</div>
                         </div>
 
@@ -593,7 +591,7 @@
                                             <th class="sortable" data-sort="status">Status <span
                                                     class="sort-indicator">↕</span></th>
                                             <th>Last Updated</th>
-                                            <th style="text-align: right;">Action</th>
+                                            <th class="u-text-right">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="vulnTableBody">
@@ -703,7 +701,7 @@
                                 </div>
 
                                 <!-- Stage 4 Human Approval Panel -->
-                                <div class="gate-decision-card" id="humanGateCard" style="display: none;">
+                                <div class="gate-decision-card u-hidden" id="humanGateCard">
                                     <div class="gate-card-header">
                                         <div class="gate-card-title">
                                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -717,7 +715,7 @@
                                     <div class="gate-card-body">
                                         <p>Root Cause Analysis and proposed patch generated. Authorize code change to
                                             proceed to Bench Testing.</p>
-                                        <div id="gate4PatchSummary" style="margin-top: 6px;"></div>
+                                        <div id="gate4PatchSummary" class="u-mt-6"></div>
                                     </div>
                                     <div class="gate-card-actions">
                                         <button class="btn btn-success btn-sm" id="btnApprove">✓ Authorize Fix</button>
@@ -727,7 +725,7 @@
                                 </div>
 
                                 <!-- Stage 6 Final Sign-off Gate Panel -->
-                                <div class="gate-decision-card final-gate" id="finalGateCard" style="display: none;">
+                                <div class="gate-decision-card final-gate u-hidden" id="finalGateCard">
                                     <div class="gate-card-header">
                                         <div class="gate-card-title">
                                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -750,7 +748,7 @@
                                 </div>
 
                                 <!-- Structured Failure Recovery Panel -->
-                                <div class="failure-recovery-card" id="failureRecoveryCard" style="display: none;">
+                                <div class="failure-recovery-card u-hidden" id="failureRecoveryCard">
                                     <div class="failure-header">
                                         <div class="failure-title">
                                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -792,13 +790,13 @@
 
                                     <!-- Tab 2: Patch Diff -->
                                     <div class="tab-pane" id="tab-diff">
-                                        <div class="diff-summary-bar" id="diffSummaryBar" style="display: none;">
+                                        <div class="diff-summary-bar u-hidden" id="diffSummaryBar">
                                             <div class="diff-stats">
                                                 <span class="diff-stat-file" id="diffStatFile">File</span>
                                                 <span class="diff-stat-add" id="diffStatAdd">+0</span>
                                                 <span class="diff-stat-del" id="diffStatDel">-0</span>
                                             </div>
-                                            <div class="diff-actions" style="display: flex; gap: 8px;">
+                                            <div class="diff-actions u-flex-row u-gap-8">
                                                 <button class="btn btn-secondary btn-sm" id="btnOpenNativeDiff"
                                                     title="Open Native VS Code Side-by-Side Diff Editor">Open in VS Code
                                                     Diff</button>
@@ -869,7 +867,7 @@
                             <!-- Right: Run Summary & Live Terminal -->
                             <div class="active-terminal-card">
                                 <div class="card-heading">Run Summary</div>
-                                <div class="detail-meta-grid" style="margin-bottom: 16px;">
+                                <div class="detail-meta-grid u-mb-16">
                                     <div class="meta-item">
                                         <span class="meta-label">Finding ID</span>
                                         <span class="meta-val" id="activeRunSummaryId">--</span>
@@ -901,7 +899,7 @@
                                         <span class="terminal-dot red"></span>
                                         <span class="terminal-dot yellow"></span>
                                         <span class="terminal-dot green"></span>
-                                        <span style="margin-left: 6px;">Live Agent Output Stream</span>
+                                        <span class="u-ml-6">Live Agent Output Stream</span>
                                     </div>
                                     <button class="btn btn-secondary btn-sm" id="btnClearTerminal">Clear</button>
                                 </div>
@@ -951,7 +949,7 @@
                                 <p class="view-subtitle">Shared Markdown reports, patch artifacts, and independent
                                     validation outputs</p>
                             </div>
-                            <div class="search-box" style="width: 260px;">
+                            <div class="search-box u-w-260">
                                 <input type="text" class="search-input" id="reportsSearchInput"
                                     placeholder="Filter reports...">
                             </div>
@@ -1008,13 +1006,12 @@
                                     title="Reset scan findings and dashboard metrics back to zero">
                                     <span>Reset to Zeros</span>
                                 </button>
-                                <button class="btn btn-secondary btn-danger" id="btnCancelScan"
-                                    style="display: none;">Cancel Scan</button>
+                                <button class="btn btn-secondary btn-danger u-hidden" id="btnCancelScan">Cancel Scan</button>
                             </div>
                         </div>
 
                         <!-- Scan Progress Banner -->
-                        <div class="scan-progress-card" id="scanProgressCard" style="display: none;">
+                        <div class="scan-progress-card u-hidden" id="scanProgressCard">
                             <div class="scan-progress-header">
                                 <div class="scan-progress-title">
                                     <span class="live-pulse-dot"></span>
@@ -1023,29 +1020,26 @@
                                 <div class="scan-progress-timer" id="scanProgressTimer">0s</div>
                             </div>
                             <div class="scan-progress-bar-track">
-                                <div class="scan-progress-bar-fill" id="scanProgressBarFill" style="width: 0%;"></div>
+                                <div class="scan-progress-bar-fill scan-progress-init" id="scanProgressBarFill"></div>
                             </div>
                         </div>
 
                         <!-- Target Selection & File Chooser -->
                         <div class="scan-scope-card" id="scanTargetSelectionCard">
-                            <div class="card-heading"
-                                style="display: flex; justify-content: space-between; align-items: center;">
+                            <div class="card-heading u-flex-between">
                                 <span>1. Select Target Files or Repositories to Scan</span>
                                 <span class="badge badge-info" id="selectedTargetBadge">No Target Selected</span>
                             </div>
-                            <p class="settings-desc" style="margin-bottom: 12px;">
+                            <p class="settings-desc u-mb-12">
                                 Choose a specific repository, folder, or file for static security inspection. Dashboard
                                 metrics will only populate after a scan is initiated.
                             </p>
 
-                            <div
-                                style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;">
-                                <div style="flex: 1; min-width: 240px;">
-                                    <label
-                                        style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Preset
+                            <div class="u-flex-row u-gap-12 u-wrap u-mb-14">
+                                <div class="scan-preset-col">
+                                    <label class="u-font-11 u-fw-600 u-text-muted u-block u-mb-4">Preset
                                         Repository / Folder:</label>
-                                    <select class="dash-select" id="selectScanPreset" style="width: 100%;">
+                                    <select class="dash-select u-w-full" id="selectScanPreset">
                                         <option value="">-- Choose Repository or Target --</option>
                                         <option value="sample-repos/payments-api">payments-api
                                             (sample-repos/payments-api)</option>
@@ -1064,7 +1058,7 @@
                                     </select>
                                 </div>
 
-                                <div style="display: flex; gap: 8px; align-self: flex-end;">
+                                <div class="u-flex-row u-gap-8 u-self-end">
                                     <button class="btn btn-secondary btn-sm" id="btnChooseFolder"
                                         title="Browse for a folder/repository in your workspace">
                                         📁 Choose Folder...
@@ -1076,13 +1070,11 @@
                                 </div>
                             </div>
 
-                            <div style="display: flex; gap: 8px; align-items: center;">
-                                <span
-                                    style="font-size: 12px; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Target
+                            <div class="u-flex-row u-gap-8">
+                                <span class="u-font-12 u-fw-600 u-text-secondary u-nowrap">Target
                                     Path:</span>
-                                <input type="text" class="search-input" id="inputScanTargetPath"
-                                    placeholder="Select a preset or click Choose Folder / File..."
-                                    style="flex: 1; font-family: var(--font-mono); font-size: 12px;">
+                                <input type="text" class="search-input scan-target-input" id="inputScanTargetPath"
+                                    placeholder="Select a preset or click Choose Folder / File...">
                                 <button class="btn btn-secondary btn-sm" id="btnClearScanTarget"
                                     title="Clear selection">Clear</button>
                             </div>
@@ -1122,27 +1114,27 @@
 
                         <!-- CodeQL Status Panel -->
                         <div class="scan-scope-card" id="codeqlStatusPanel">
-                            <div class="card-heading" style="display:flex; justify-content:space-between; align-items:center;">
+                            <div class="card-heading u-flex-between">
                                 <span>
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="margin-right:6px; vertical-align:middle;">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" class="codeql-heading-icon">
                                         <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
                                     </svg>
                                     GitHub CodeQL CLI Status
                                 </span>
                                 <button class="btn btn-secondary btn-sm" id="btnRefreshCodeqlStatus" title="Re-check CodeQL status">↻ Refresh</button>
                             </div>
-                            <div id="codeqlStatusContent" style="padding: 8px 0;">
-                                <div style="display:flex; align-items:center; gap:10px;">
+                            <div id="codeqlStatusContent" class="u-py-8">
+                                <div class="u-flex-row u-gap-10">
                                     <span class="badge badge-secondary" id="codeqlStatusBadge">Checking...</span>
-                                    <span id="codeqlStatusText" style="font-size:12px; color:var(--text-secondary);">Detecting CodeQL CLI installation...</span>
+                                    <span id="codeqlStatusText" class="u-font-12 u-text-secondary">Detecting CodeQL CLI installation...</span>
                                 </div>
-                                <div id="codeqlInstallGuide" style="display:none; margin-top:12px; padding:12px; background:var(--bg-secondary); border-radius:6px; border-left:3px solid var(--color-warning);">
-                                    <div style="font-weight:600; font-size:12px; margin-bottom:8px; color:var(--text-primary);">⚠ CodeQL CLI Not Installed</div>
-                                    <p style="font-size:11px; color:var(--text-secondary); margin-bottom:10px;">
+                                <div id="codeqlInstallGuide" class="codeql-guide-box">
+                                    <div class="u-fw-600 u-font-12 u-mb-8 u-text-primary">⚠ CodeQL CLI Not Installed</div>
+                                    <p class="u-font-11 u-text-secondary u-mb-10">
                                         CodeQL performs semantic data-flow analysis (SQL Injection, XSS, Path Traversal, etc.) across C#, Java, JavaScript, and Python codebases.
                                         The other 3 scanner adapters work without it.
                                     </p>
-                                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                                    <div class="u-flex-row u-gap-8 u-wrap u-mb-8">
                                         <button class="btn btn-primary btn-sm" id="btnInstallCodeql" title="Auto-install CodeQL CLI to tools/codeql/">
                                             ⬇ Auto-Install CodeQL CLI
                                         </button>
@@ -1150,15 +1142,15 @@
                                             📋 Copy Install Command
                                         </button>
                                     </div>
-                                    <code id="codeqlInstallCmd" style="display:block; font-size:10px; padding:6px 10px; background:var(--bg-code); border-radius:4px; font-family:var(--font-mono); color:var(--text-secondary);">node scripts/setup-codeql.js</code>
+                                    <code id="codeqlInstallCmd" class="codeql-install-cmd">node scripts/setup-codeql.js</code>
                                 </div>
-                                <div id="codeqlInstalledInfo" style="display:none; margin-top:10px; padding:10px; background:var(--bg-secondary); border-radius:6px; border-left:3px solid var(--color-success);">
-                                    <div style="font-weight:600; font-size:12px; margin-bottom:4px; color:var(--text-primary);">✓ CodeQL CLI Ready</div>
-                                    <div style="font-size:11px; color:var(--text-secondary);">
-                                        Version: <code id="codeqlVersionDisplay" style="font-family:var(--font-mono);">--</code>
+                                <div id="codeqlInstalledInfo" class="codeql-installed-box">
+                                    <div class="u-fw-600 u-font-12 u-mb-4 u-text-primary">✓ CodeQL CLI Ready</div>
+                                    <div class="u-font-11 u-text-secondary">
+                                        Version: <code id="codeqlVersionDisplay" class="u-mono">--</code>
                                     </div>
-                                    <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">
-                                        Binary: <code id="codeqlBinaryDisplay" style="font-family:var(--font-mono); font-size:10px;">--</code>
+                                    <div class="u-font-11 u-text-secondary u-mt-1">
+                                        Binary: <code id="codeqlBinaryDisplay" class="u-mono u-font-10">--</code>
                                     </div>
                                 </div>
                             </div>
@@ -1181,8 +1173,7 @@
                                     </thead>
                                     <tbody id="scanHistoryTableBody">
                                         <tr>
-                                            <td colspan="6" class="empty-cell"
-                                                style="text-align: center; padding: 24px; color: var(--text-muted);">No
+                                            <td colspan="6" class="empty-cell u-empty-history-cell">No
                                                 scan history recorded yet. Run a scan to discover local vulnerabilities.
                                             </td>
                                         </tr>
@@ -1222,7 +1213,7 @@
                                         Repository...</button>
                                 </div>
 
-                                <div class="settings-path-row" style="margin-top: 10px;">
+                                <div class="settings-path-row u-mt-10">
                                     <div class="settings-path-info">
                                         <div class="settings-path-title">Vulnerability Scan CSV</div>
                                         <div class="settings-path-val" id="settingsCsvVal">Not selected</div>
@@ -1256,37 +1247,34 @@
 
                             <!-- Local Security Audit Card -->
                             <div class="settings-card">
-                                <div class="card-heading">Local-First Security Compliance</div>
+                                <div class="card-heading">Phase 1 Security Containment &amp; Governance</div>
                                 <div class="compliance-status-badge">
                                     <span class="secure-dot"></span>
-                                    <span>Zero External Network Transmission Compliance: VERIFIED</span>
+                                    <span>Autonomous Publishing Disabled • Fail-Closed AI Context Screening</span>
                                 </div>
                                 <ul class="compliance-list">
-                                    <li>✓ Local CSV authoritative state (<code>vulnerability/vulnerabilities.csv</code>)
+                                    <li>✓ Local CSV / Scanner Store state (<code>vulnerability/</code> &amp; <code>output/scans/</code>)
                                     </li>
-                                    <li>✓ Local Shared Markdown Reports persistence (<code>output/</code>)</li>
-                                    <li>✓ Local Evidence Store (<code>remediation-output/</code>)</li>
-                                    <li>✓ No third-party APIs, GraphQL, MCP, or remote telemetry</li>
-                                    <li>✓ Native VS Code &amp; GitHub Copilot local chat integration only</li>
+                                    <li>✓ Minimized evidence persistence (<code>output/</code> &amp; <code>remediation-output/</code>)</li>
+                                    <li>✓ OutboundContextGate fail-closed screening before extension <code>vscode.lm</code> calls</li>
+                                    <li>✓ Autonomous Git push &amp; PR publishing blocked; standalone legacy .NET MCP disabled for auto-publish</li>
+                                    <li>✓ Native VS Code GitHub Copilot Chat handoff (extension does not proxy interactive Copilot Chat tools)</li>
                                 </ul>
                             </div>
 
                             <!-- 7-Stage Agent Policy Card -->
                             <div class="settings-card">
-                                <div class="card-heading">7-Stage Governance Workflow Policy</div>
+                                <div class="card-heading">7-Stage Fail-Closed Governance Workflow</div>
                                 <div class="policy-steps-summary">
-                                    <div><strong>Stage 1:</strong> Classification Agent (Read-only discovery &amp;
-                                        categorization)</div>
-                                    <div><strong>Stage 2:</strong> Code Analysis Agent (AST &amp; dataflow RCA)</div>
-                                    <div><strong>Stage 3:</strong> Remediation Agent (Minimal secure patch synthesis)
+                                    <div><strong>Stage 1:</strong> Classification &amp; Severity Governance (Original severity remains immutable)</div>
+                                    <div><strong>Stage 2:</strong> Code Analysis (Scoped single-finding RCA)</div>
+                                    <div><strong>Stage 3:</strong> Remediation Synthesis (Minimal verified patch proposal)
                                     </div>
                                     <div><strong>Stage 4:</strong> Human Approval Gate (Mandatory stop before test
-                                        execution)</div>
-                                    <div><strong>Stage 5:</strong> Bench Test (Targeted test validation &amp; retry
-                                        loops)</div>
-                                    <div><strong>Stage 6:</strong> Final Human Approval Gate (Sign-off before workflow
-                                        exit)</div>
-                                    <div><strong>Stage 7:</strong> Final Manual Validations (Application Owner CI/CD)
+                                        execution &amp; diff binding)</div>
+                                    <div><strong>Stage 5:</strong> Real Build/Test &amp; Security Review (Zero-test / suppression fails closed)</div>
+                                    <div><strong>Stage 6:</strong> Originating Scanner Re-Scan &amp; Final Human Sign-off Gate</div>
+                                    <div><strong>Stage 7:</strong> Human-Controlled Git Review &amp; CI/CD Handoff (No autonomous push/PR)
                                     </div>
                                 </div>
                             </div>
@@ -1298,7 +1286,7 @@
     </div>
 
     <!-- Source Code Viewer Modal -->
-    <div class="modal-overlay" id="codeModal" style="display: none;">
+    <div class="modal-overlay u-hidden" id="codeModal">
         <div class="modal-card">
             <div class="modal-header">
                 <div class="modal-title-wrap">
@@ -1320,7 +1308,7 @@
     </div>
 
     <!-- Copilot Command Modal -->
-    <div class="modal-overlay" id="copilotModal" style="display: none;">
+    <div class="modal-overlay u-hidden" id="copilotModal">
         <div class="modal-card modal-sm">
             <div class="modal-header">
                 <div class="modal-title-wrap">
@@ -1333,7 +1321,7 @@
                 <button class="modal-close" id="btnCopilotModalClose" title="Close">✕</button>
             </div>
             <div class="modal-body">
-                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                <p class="u-font-12 u-text-secondary u-mb-10">
                     Execute this command in VS Code Copilot Chat to remediate this finding:
                 </p>
                 <div class="command-box">
@@ -1346,7 +1334,7 @@
     </div>
 
     <!-- Target Selection Modal (For browser/preview mode) -->
-    <div class="modal-overlay" id="targetPickerModal" style="display: none;">
+    <div class="modal-overlay u-hidden" id="targetPickerModal">
         <div class="modal-card">
             <div class="modal-header">
                 <div class="modal-title-wrap">
@@ -1358,12 +1346,10 @@
                 </div>
                 <button class="modal-close" id="btnTargetPickerClose" title="Close">✕</button>
             </div>
-            <div class="modal-body" style="padding: 16px;">
-                <input type="text" class="search-input" id="targetPickerSearch"
-                    placeholder="Search target folder or file..."
-                    style="width: 100%; margin-bottom: 12px; box-sizing: border-box;">
-                <div id="targetPickerList"
-                    style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+            <div class="modal-body u-p-16">
+                <input type="text" class="search-input u-w-full u-mb-12 u-box-border" id="targetPickerSearch"
+                    placeholder="Search target folder or file...">
+                <div id="targetPickerList" class="target-picker-list-box">
                     <!-- Dynamically populated targets -->
                 </div>
             </div>

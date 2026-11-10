@@ -3,6 +3,165 @@
  * Minimal • SaaS Aesthetic • Local-First • 7-Stage Governance
  */
 (function () {
+    // --------------------------------------------------------------------------
+    // Pure Data Aggregators & CSP-Safe CSSOM Style Application
+    // --------------------------------------------------------------------------
+    function applyDynamicStyles(root) {
+        if (!root || typeof root.querySelectorAll !== 'function') return;
+        root.querySelectorAll('[data-bar-width]').forEach(el => {
+            el.style.width = el.getAttribute('data-bar-width');
+        });
+    }
+
+    function aggregateActivityTrend(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+            return { labels: [], totalCounts: [], remediatedCounts: [] };
+        }
+
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const buckets = new Map();
+
+        for (const item of data) {
+            const rawDate = item.Finding_Date || item.Timestamp || '';
+            const parsed = rawDate ? new Date(rawDate) : null;
+            let key = '9999-99';
+            let label = 'Undated';
+
+            if (parsed && !Number.isNaN(parsed.getTime())) {
+                const yyyy = parsed.getUTCFullYear();
+                const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+                key = `${yyyy}-${mm}`;
+                label = `${monthNames[parsed.getUTCMonth()]} ${String(yyyy).slice(-2)}`;
+            }
+
+            if (!buckets.has(key)) {
+                buckets.set(key, { key, label, total: 0, remediated: 0 });
+            }
+            const bucket = buckets.get(key);
+            bucket.total += 1;
+            if ((item.Remediation_Status || '').toLowerCase() === 'remediated') {
+                bucket.remediated += 1;
+            }
+        }
+
+        const ordered = Array.from(buckets.values()).sort((a, b) => a.key.localeCompare(b.key)).slice(-6);
+        return {
+            labels: ordered.map(b => b.label),
+            totalCounts: ordered.map(b => b.total),
+            remediatedCounts: ordered.map(b => b.remediated)
+        };
+    }
+
+    function computeStatusBreakdown(data) {
+        const list = Array.isArray(data) ? data : [];
+        return {
+            remediated: list.filter(v => (v.Remediation_Status || '').toLowerCase() === 'remediated').length,
+            approved: list.filter(v => (v.Remediation_Status || '').toLowerCase() === 'approved').length,
+            review: list.filter(v => (v.Requires_Human_Review || '').toLowerCase() === 'true' || (v.Remediation_Status || '').toLowerCase().includes('review')).length,
+            inProgress: list.filter(v => (v.Remediation_Status || '').toLowerCase().includes('progress')).length,
+            pending: list.filter(v => (v.Remediation_Status || '').toLowerCase() === 'pending').length
+        };
+    }
+
+    function aggregateStageDurations(detailsList) {
+        const acc = {
+            analysis: { sum: 0, count: 0 },
+            remediation: { sum: 0, count: 0 },
+            approvalWait: { sum: 0, count: 0 },
+            test: { sum: 0, count: 0 },
+            validation: { sum: 0, count: 0 }
+        };
+
+        for (const det of (detailsList || [])) {
+            const t = det && det.timings;
+            if (!t) continue;
+            if (typeof t.analysisDurationSec === 'number') { acc.analysis.sum += t.analysisDurationSec; acc.analysis.count++; }
+            if (typeof t.remediationDurationSec === 'number') { acc.remediation.sum += t.remediationDurationSec; acc.remediation.count++; }
+            if (typeof t.approvalWaitDurationSec === 'number') { acc.approvalWait.sum += t.approvalWaitDurationSec; acc.approvalWait.count++; }
+            if (typeof t.testDurationSec === 'number') { acc.test.sum += t.testDurationSec; acc.test.count++; }
+            if (typeof t.validationDurationSec === 'number') { acc.validation.sum += t.validationDurationSec; acc.validation.count++; }
+        }
+
+        const avg = (slot) => slot.count > 0 ? parseFloat((slot.sum / slot.count).toFixed(2)) : null;
+        const stages = [
+            { label: 'Code Analysis', duration: avg(acc.analysis), colorClass: 'legend-bg-info' },
+            { label: 'Remediation', duration: avg(acc.remediation), colorClass: 'legend-bg-warning' },
+            { label: 'Human Gate', duration: avg(acc.approvalWait), colorClass: 'legend-bg-stage4' },
+            { label: 'Bench Test', duration: avg(acc.test), colorClass: 'legend-bg-success' },
+            { label: 'Final Validation', duration: avg(acc.validation), colorClass: 'legend-bg-stage6' }
+        ];
+        const hasData = stages.some(s => s.duration !== null);
+        return { hasData, stages };
+    }
+
+    function normalizeScanProgressEvent(data) {
+        if (!data || typeof data !== 'object') return null;
+        const evt = (data.event && typeof data.event === 'object') ? data.event : data;
+
+        let percent = evt.percent;
+        if (percent === undefined || percent === null) {
+            if (typeof evt.totalScanners === 'number' && evt.totalScanners > 0 && typeof evt.progressIndex === 'number') {
+                percent = Math.round((evt.progressIndex / evt.totalScanners) * 100);
+            } else if (evt.type === 'SCAN_FINISHED') {
+                percent = 100;
+            } else if (evt.type === 'SCAN_STARTED') {
+                percent = 5;
+            }
+        }
+        if (typeof percent === 'number') {
+            percent = Math.min(100, Math.max(5, percent));
+        }
+
+        let message = evt.message;
+        if (!message) {
+            if (evt.type === 'SCAN_STARTED') {
+                message = 'Starting local security scan...';
+            } else if (evt.type === 'SCANNER_START') {
+                message = `Running ${evt.scannerName || evt.scannerId || 'scanner'}...`;
+            } else if (evt.type === 'SCANNER_COMPLETE') {
+                message = `Completed ${evt.scannerName || evt.scannerId || 'scanner'} (${evt.findingsCount ?? 0} findings)`;
+            } else if (evt.type === 'SCAN_FINISHED') {
+                message = `Scan complete (${evt.findingsCount ?? 0} total findings)`;
+            }
+        }
+
+        return { percent, message };
+    }
+
+    function formatScanHistoryEntry(item) {
+        const rawTime = item.timestamp || item.startTime;
+        const parsedTime = rawTime ? new Date(rawTime) : null;
+        const dateStr = (parsedTime && !Number.isNaN(parsedTime.getTime())) ? parsedTime.toLocaleTimeString() : '--';
+        const rawTarget = item.targetPath || item.targetDir || '';
+        const targetBase = rawTarget ? (rawTarget.split(/[/\\]/).filter(Boolean).pop() || 'workspace') : 'workspace';
+        const durationSec = item.durationMs ? `${(item.durationMs / 1000).toFixed(1)}s` : '--';
+        const counts = item.findingsSummary || { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+        const status = item.status || 'Completed';
+
+        return {
+            scanId: item.scanId || '--',
+            dateStr,
+            targetBase,
+            durationSec,
+            status,
+            counts
+        };
+    }
+
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {
+            aggregateActivityTrend,
+            computeStatusBreakdown,
+            aggregateStageDurations,
+            normalizeScanProgressEvent,
+            formatScanHistoryEntry
+        };
+    }
+
+    if (typeof document === 'undefined') {
+        return;
+    }
+
     // Acquire VS Code API or mock fallback for standalone preview
     let vscode = null;
     try {
@@ -1408,8 +1567,8 @@
                 dashPendingReviewsList.innerHTML = pendingItems.map(item => `
                     <div class="dash-list-item" data-id="${escapeHtml(item.Vulnerability_ID)}">
                         <div>
-                            <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(item.Vulnerability_ID)}: ${escapeHtml(item.Title)}</div>
-                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(item.Application_Name)} • ${escapeHtml(item.Severity)}</div>
+                            <div class="u-fw-600 u-text-primary">${escapeHtml(item.Vulnerability_ID)}: ${escapeHtml(item.Title)}</div>
+                            <div class="u-font-11 u-text-muted u-mt-1">${escapeHtml(item.Application_Name)} • ${escapeHtml(item.Severity)}</div>
                         </div>
                         <button class="btn btn-secondary btn-sm btn-dash-review" data-id="${escapeHtml(item.Vulnerability_ID)}">Review ➔</button>
                     </div>
@@ -1442,10 +1601,10 @@
                     return `
                         <div class="dash-list-item" data-id="${escapeHtml(item.Vulnerability_ID)}">
                             <div>
-                                <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(item.Vulnerability_ID)}</div>
-                                <div style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(item.Title)}</div>
+                                <div class="u-fw-600 u-text-primary">${escapeHtml(item.Vulnerability_ID)}</div>
+                                <div class="u-font-11 u-text-muted u-mt-1">${escapeHtml(item.Title)}</div>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="u-flex-row u-gap-8">
                                 <span class="badge ${statusClass}">${escapeHtml(item.Remediation_Status || 'Done')}</span>
                                 <button class="btn btn-secondary btn-sm btn-dash-view" data-id="${escapeHtml(item.Vulnerability_ID)}">Inspect</button>
                             </div>
@@ -1492,18 +1651,18 @@
 
         if (!data || data.length === 0) {
             chartCategoryContainer.innerHTML = `
-                <div class="empty-state" style="padding: 30px; text-align: center; width: 100%;">
-                    <p style="font-weight: 500; color: var(--text-muted); font-size: 13px;">No scan activity recorded yet.</p>
-                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Run a vulnerability scan to populate trend data.</p>
+                <div class="empty-state u-p-30 u-text-center u-w-full">
+                    <p class="u-fw-500 u-text-muted u-font-13">No scan activity recorded yet.</p>
+                    <p class="u-font-11 u-text-muted u-mt-4">Run a vulnerability scan to populate trend data.</p>
                 </div>
             `;
             return;
         }
 
-        // Group data by chronological buckets based on finding dates
-        const months = ['Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'];
-        const totalCounts = [2, 5, 8, 12, data.length, data.length];
-        const remediatedCounts = [0, 1, 2, 4, 7, 7];
+        const trend = aggregateActivityTrend(data);
+        const months = trend.labels;
+        const totalCounts = trend.totalCounts;
+        const remediatedCounts = trend.remediatedCounts;
 
         const width = 460;
         const height = 180;
@@ -1511,29 +1670,33 @@
         const padY = 24;
         const graphW = width - padX * 2;
         const graphH = height - padY * 2;
-        const maxVal = Math.max(...totalCounts, 10);
+        const maxVal = Math.max(...totalCounts, 1);
+
+        const xAt = (idx) => months.length <= 1 ? (padX + graphW / 2) : (padX + (idx / (months.length - 1)) * graphW);
 
         // Calculate points
-        const pointsTotal = totalCounts.map((val, idx) => {
-            const x = padX + (idx / (months.length - 1)) * graphW;
-            const y = height - padY - (val / maxVal) * graphH;
-            return { x, y, val };
-        });
+        const pointsTotal = totalCounts.map((val, idx) => ({
+            x: xAt(idx),
+            y: height - padY - (val / maxVal) * graphH,
+            val
+        }));
 
-        const pointsRemediated = remediatedCounts.map((val, idx) => {
-            const x = padX + (idx / (months.length - 1)) * graphW;
-            const y = height - padY - (val / maxVal) * graphH;
-            return { x, y, val };
-        });
+        const pointsRemediated = remediatedCounts.map((val, idx) => ({
+            x: xAt(idx),
+            y: height - padY - (val / maxVal) * graphH,
+            val
+        }));
 
         const lineTotalPath = pointsTotal.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
-        const areaTotalPath = `${lineTotalPath} L ${pointsTotal[pointsTotal.length - 1].x} ${height - padY} L ${pointsTotal[0].x} ${height - padY} Z`;
+        const areaTotalPath = months.length > 1
+            ? `${lineTotalPath} L ${pointsTotal[pointsTotal.length - 1].x} ${height - padY} L ${pointsTotal[0].x} ${height - padY} Z`
+            : '';
 
         const lineRemPath = pointsRemediated.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
 
         chartCategoryContainer.innerHTML = `
-            <div style="width: 100%; display: flex; flex-direction: column; align-items: center;">
-                <svg viewBox="0 0 ${width} ${height}" style="width: 100%; max-height: 180px;">
+            <div class="u-flex-col-items-center">
+                <svg viewBox="0 0 ${width} ${height}" class="activity-trend-svg">
                     <defs>
                         <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2" />
@@ -1547,33 +1710,32 @@
                     <line x1="${padX}" y1="${height - padY}" x2="${width - padX}" y2="${height - padY}" stroke="var(--border-subtle)" />
 
                     <!-- Area & Line Paths -->
-                    <path d="${areaTotalPath}" fill="url(#areaGrad)" />
-                    <path d="${lineTotalPath}" fill="none" stroke="var(--accent)" stroke-width="2" />
-                    <path d="${lineRemPath}" fill="none" stroke="var(--success)" stroke-width="2" stroke-dasharray="4,2" />
+                    ${areaTotalPath ? `<path d="${areaTotalPath}" fill="url(#areaGrad)" />` : ''}
+                    ${months.length > 1 ? `<path d="${lineTotalPath}" fill="none" stroke="var(--accent)" stroke-width="2" />` : ''}
+                    ${months.length > 1 ? `<path d="${lineRemPath}" fill="none" stroke="var(--success)" stroke-width="2" stroke-dasharray="4,2" />` : ''}
 
                     <!-- Points -->
                     ${pointsTotal.map(p => `
-                        <circle cx="${p.x}" cy="${p.y}" r="3" fill="var(--bg-surface)" stroke="var(--accent)" stroke-width="2" />
+                        <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--bg-surface)" stroke="var(--accent)" stroke-width="2" />
                     `).join('')}
 
                     ${pointsRemediated.map(p => `
-                        <circle cx="${p.x}" cy="${p.y}" r="3" fill="var(--bg-surface)" stroke="var(--success)" stroke-width="2" />
+                        <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--bg-surface)" stroke="var(--success)" stroke-width="2" />
                     `).join('')}
 
                     <!-- X-Axis Labels -->
-                    ${months.map((m, i) => {
-            const x = padX + (i / (months.length - 1)) * graphW;
-            return `<text x="${x}" y="${height - 6}" font-size="10" fill="var(--text-muted)" text-anchor="middle" font-family="var(--font-sans)">${m}</text>`;
-        }).join('')}
+                    ${months.map((m, i) => `
+                        <text x="${xAt(i)}" y="${height - 6}" font-size="10" fill="var(--text-muted)" text-anchor="middle" font-family="var(--font-sans)">${escapeHtml(m)}</text>
+                    `).join('')}
                 </svg>
 
-                <div class="chart-legend" style="justify-content: center; margin-top: 8px;">
+                <div class="chart-legend chart-legend-centered">
                     <div class="legend-item">
-                        <span class="legend-color" style="background: var(--accent);"></span>
+                        <span class="legend-color legend-bg-accent"></span>
                         <span>Total Identified</span>
                     </div>
                     <div class="legend-item">
-                        <span class="legend-color" style="background: var(--success);"></span>
+                        <span class="legend-color legend-bg-success"></span>
                         <span>Remediated &amp; Validated</span>
                     </div>
                 </div>
@@ -1589,21 +1751,21 @@
             const strokeWidth = 18;
             const radius = (size - strokeWidth) / 2;
             chartSeverityContainer.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-around; width: 100%;">
-                    <div style="position: relative; width: ${size}px; height: ${size}px;">
+                <div class="u-flex-around">
+                    <div class="donut-wrap">
                         <svg viewBox="0 0 ${size} ${size}" class="svg-chart">
                             <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="var(--bg-surface-hover)" stroke-width="${strokeWidth}" />
                         </svg>
-                        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
-                            <span style="font-size: 20px; font-weight: 700; color: var(--text-primary); line-height: 1;">0</span>
-                            <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px;">Total</span>
+                        <div class="donut-center-overlay">
+                            <span class="donut-total-val">0</span>
+                            <span class="donut-total-sub">Total</span>
                         </div>
                     </div>
-                    <div class="chart-legend" style="flex-direction: column; align-items: flex-start; gap: 8px;">
-                        <div class="legend-item"><span class="legend-color" style="background: var(--danger);"></span><span>Critical:</span><strong style="color: var(--text-primary); margin-left: 4px;">0</strong></div>
-                        <div class="legend-item"><span class="legend-color" style="background: var(--warning);"></span><span>High:</span><strong style="color: var(--text-primary); margin-left: 4px;">0</strong></div>
-                        <div class="legend-item"><span class="legend-color" style="background: var(--sev-medium-text);"></span><span>Medium:</span><strong style="color: var(--text-primary); margin-left: 4px;">0</strong></div>
-                        <div class="legend-item"><span class="legend-color" style="background: var(--accent);"></span><span>Low:</span><strong style="color: var(--text-primary); margin-left: 4px;">0</strong></div>
+                    <div class="chart-legend chart-legend-col">
+                        <div class="legend-item"><span class="legend-color legend-bg-danger"></span><span>Critical:</span><strong class="u-text-primary u-ml-4">0</strong></div>
+                        <div class="legend-item"><span class="legend-color legend-bg-warning"></span><span>High:</span><strong class="u-text-primary u-ml-4">0</strong></div>
+                        <div class="legend-item"><span class="legend-color legend-bg-medium"></span><span>Medium:</span><strong class="u-text-primary u-ml-4">0</strong></div>
+                        <div class="legend-item"><span class="legend-color legend-bg-accent"></span><span>Low:</span><strong class="u-text-primary u-ml-4">0</strong></div>
                     </div>
                 </div>
             `;
@@ -1622,10 +1784,10 @@
         const circumference = 2 * Math.PI * radius;
 
         const segments = [
-            { label: 'Critical', count: critical, color: 'var(--danger)', pct: critical / total },
-            { label: 'High', count: high, color: 'var(--warning)', pct: high / total },
-            { label: 'Medium', count: medium, color: 'var(--sev-medium-text)', pct: medium / total },
-            { label: 'Low', count: low, color: 'var(--accent)', pct: low / total }
+            { label: 'Critical', count: critical, color: 'var(--danger)', colorClass: 'legend-bg-danger', pct: critical / total },
+            { label: 'High', count: high, color: 'var(--warning)', colorClass: 'legend-bg-warning', pct: high / total },
+            { label: 'Medium', count: medium, color: 'var(--sev-medium-text)', colorClass: 'legend-bg-medium', pct: medium / total },
+            { label: 'Low', count: low, color: 'var(--accent)', colorClass: 'legend-bg-accent', pct: low / total }
         ];
 
         let accumulatedOffset = 0;
@@ -1634,31 +1796,30 @@
             const strokeDashoffset = -accumulatedOffset;
             accumulatedOffset += seg.pct * circumference;
             return `
-                <circle cx="${size / 2}" cy="${size / 2}" r="${radius}"
+                <circle class="donut-segment" cx="${size / 2}" cy="${size / 2}" r="${radius}"
                     fill="none" stroke="${seg.color}" stroke-width="${strokeWidth}"
-                    stroke-dasharray="${strokeDasharray}" stroke-dashoffset="${strokeDashoffset}"
-                    style="transition: stroke-dasharray 0.4s ease;" />
+                    stroke-dasharray="${strokeDasharray}" stroke-dashoffset="${strokeDashoffset}" />
             `;
         }).join('');
 
         chartSeverityContainer.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: space-around; width: 100%;">
-                <div style="position: relative; width: ${size}px; height: ${size}px;">
+            <div class="u-flex-around">
+                <div class="donut-wrap">
                     <svg viewBox="0 0 ${size} ${size}" class="svg-chart">
                         <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="var(--bg-surface-hover)" stroke-width="${strokeWidth}" />
                         ${circleSvgSegments}
                     </svg>
-                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
-                        <span style="font-size: 20px; font-weight: 700; color: var(--text-primary); line-height: 1;">${data.length}</span>
-                        <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px;">Total</span>
+                    <div class="donut-center-overlay">
+                        <span class="donut-total-val">${data.length}</span>
+                        <span class="donut-total-sub">Total</span>
                     </div>
                 </div>
-                <div class="chart-legend" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                <div class="chart-legend chart-legend-col">
                     ${segments.map(s => `
                         <div class="legend-item">
-                            <span class="legend-color" style="background: ${s.color};"></span>
+                            <span class="legend-color ${s.colorClass}"></span>
                             <span>${s.label}:</span>
-                            <strong style="color: var(--text-primary); margin-left: 4px;">${s.count}</strong>
+                            <strong class="u-text-primary u-ml-4">${s.count}</strong>
                         </div>
                     `).join('')}
                 </div>
@@ -1669,92 +1830,69 @@
     function renderStatusBarChart(data) {
         if (!chartStatusContainer) return;
 
-        const remediated = data.filter(v => (v.Remediation_Status || '').toLowerCase() === 'remediated' || (v.Final_Validation_Status || '').toUpperCase() === 'PASS').length;
-        const approved = data.filter(v => (v.Remediation_Status || '').toLowerCase() === 'approved').length;
-        const review = data.filter(v => (v.Requires_Human_Review || '').toLowerCase() === 'true' || (v.Remediation_Status || '').toLowerCase().includes('review')).length;
-        const inProgress = data.filter(v => (v.Remediation_Status || '').toLowerCase().includes('progress')).length;
-        const pending = data.filter(v => (v.Remediation_Status || '').toLowerCase() === 'pending').length;
-
-        const maxVal = Math.max(remediated, approved, review, inProgress, pending, 1);
+        const breakdown = computeStatusBreakdown(data);
+        const maxVal = Math.max(breakdown.remediated, breakdown.approved, breakdown.review, breakdown.inProgress, breakdown.pending, 1);
 
         const items = [
-            { label: 'Remediated', count: remediated, color: 'var(--success)' },
-            { label: 'Approved', count: approved, color: 'var(--accent)' },
-            { label: 'Needs Review', count: review, color: 'var(--warning)' },
-            { label: 'In Progress', count: inProgress, color: 'var(--info)' },
-            { label: 'Pending', count: pending, color: 'var(--text-muted)' }
+            { label: 'Remediated', count: breakdown.remediated, colorClass: 'legend-bg-success' },
+            { label: 'Approved', count: breakdown.approved, colorClass: 'legend-bg-accent' },
+            { label: 'Needs Review', count: breakdown.review, colorClass: 'legend-bg-warning' },
+            { label: 'In Progress', count: breakdown.inProgress, colorClass: 'legend-bg-info' },
+            { label: 'Pending', count: breakdown.pending, colorClass: 'legend-bg-muted' }
         ];
 
         chartStatusContainer.innerHTML = `
-            <div style="display: flex; flex-direction: column; justify-content: center; width: 100%;">
+            <div class="u-flex-col-center">
                 ${items.map(it => `
                     <div class="chart-bar-row">
                         <span class="chart-bar-label">${it.label}</span>
                         <div class="chart-bar-track">
-                            <div class="chart-bar-fill" style="width: ${(it.count / maxVal) * 100}%; background: ${it.color};"></div>
+                            <div class="chart-bar-fill ${it.colorClass}" data-bar-width="${(it.count / maxVal) * 100}%"></div>
                         </div>
                         <span class="chart-bar-val">${it.count}</span>
                     </div>
                 `).join('')}
             </div>
         `;
+        applyDynamicStyles(chartStatusContainer);
     }
 
     function renderStageDurationChart() {
         if (!chartStageDurationContainer) return;
 
-        let totalRuns = 0;
-        let cDur = 0, aDur = 0, rDur = 0, hDur = 0, tDur = 0, fDur = 0, mDur = 0;
+        const { hasData, stages } = aggregateStageDurations(Array.from(detailsCache.values()));
 
-        detailsCache.forEach(det => {
-            if (det.timings && det.timings.totalDurationSec) {
-                totalRuns++;
-                if (det.timings.classificationDurationSec) cDur += det.timings.classificationDurationSec;
-                if (det.timings.analysisDurationSec) aDur += det.timings.analysisDurationSec;
-                if (det.timings.remediationDurationSec) rDur += det.timings.remediationDurationSec;
-                if (det.timings.approvalWaitDurationSec) hDur += det.timings.approvalWaitDurationSec;
-                if (det.timings.testDurationSec) tDur += det.timings.testDurationSec;
-                if (det.timings.validationDurationSec) fDur += det.timings.validationDurationSec;
-                if (det.timings.documentationDurationSec) mDur += det.timings.documentationDurationSec;
-            }
-        });
-
-        if (totalRuns === 0) {
+        if (!hasData) {
             chartStageDurationContainer.innerHTML = `
-                <div class="empty-state" style="padding: 24px; text-align: center; width: 100%;">
-                    <p style="font-weight: 500; color: var(--text-muted);">No stage duration telemetry available yet.</p>
-                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Durations are captured strictly during live execution.</p>
+                <div class="empty-state u-p-24 u-text-center u-w-full">
+                    <p class="u-fw-500 u-text-muted">No stage duration telemetry available yet.</p>
+                    <p class="u-font-11 u-text-muted u-mt-4">Durations are captured strictly during live execution.</p>
                 </div>
             `;
             return;
         }
 
-        const factor = totalRuns;
-        const stages = [
-            { label: '1. Classification', duration: parseFloat((cDur / factor).toFixed(2)), color: 'var(--accent)' },
-            { label: '2. Code Analysis', duration: parseFloat((aDur / factor).toFixed(2)), color: 'var(--info)' },
-            { label: '3. Remediation', duration: parseFloat((rDur / factor).toFixed(2)), color: 'var(--warning)' },
-            { label: '4. Human Gate', duration: parseFloat((hDur / factor).toFixed(2)), color: '#f97316' },
-            { label: '5. Bench Test', duration: parseFloat((tDur / factor).toFixed(2)), color: 'var(--success)' },
-            { label: '6. Final Gate', duration: parseFloat((fDur / factor).toFixed(2)), color: '#059669' },
-            { label: '7. Manual CI/CD', duration: parseFloat((mDur / factor).toFixed(2)), color: 'var(--text-muted)' }
-        ];
-
-        const maxDur = Math.max(...stages.map(s => s.duration), 1);
+        const numericDurations = stages.map(s => s.duration).filter(d => d !== null);
+        const maxDur = Math.max(...numericDurations, 1);
 
         chartStageDurationContainer.innerHTML = `
-            <div style="display: flex; flex-direction: column; justify-content: center; width: 100%;">
-                ${stages.map(s => `
+            <div class="u-flex-col-center">
+                ${stages.map(s => {
+                    const widthPct = s.duration !== null ? (s.duration / maxDur) * 100 : 0;
+                    const displayVal = s.duration !== null ? `${s.duration}s` : 'N/A';
+                    return `
                     <div class="chart-bar-row">
                         <span class="chart-bar-label">${s.label}</span>
                         <div class="chart-bar-track">
-                            <div class="chart-bar-fill" style="width: ${(s.duration / maxDur) * 100}%; background: ${s.color};"></div>
+                            <div class="chart-bar-fill ${s.colorClass}" data-bar-width="${widthPct}%"></div>
                         </div>
-                        <span class="chart-bar-val">${s.duration}s</span>
+                        <span class="chart-bar-val">${displayVal}</span>
                     </div>
-                `).join('')}
+                `;
+                }).join('')}
             </div>
         `;
+        applyDynamicStyles(chartStageDurationContainer);
     }
 
     // --------------------------------------------------------------------------
@@ -1884,10 +2022,10 @@
             const hasAny = allVulnerabilities.length > 0;
             vulnTableBody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="empty-state" style="padding: 36px 16px; text-align: center;">
-                        <p style="font-weight: 600; font-size: 13px; color: var(--text-primary);">${hasAny ? 'No vulnerabilities match your filter criteria.' : 'No vulnerabilities scanned yet.'}</p>
-                        <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${hasAny ? 'Try clearing filters or search query.' : 'Select files or a repository in Local Scanners and click Run Vulnerability Scan.'}</p>
-                        ${!hasAny ? '<button class="btn btn-primary btn-sm" id="btnTableGoToScans" style="margin-top: 12px;">Go to Local Scanners ➔</button>' : ''}
+                    <td colspan="9" class="empty-state u-empty-table-cell">
+                        <p class="u-fw-600 u-font-13 u-text-primary">${hasAny ? 'No vulnerabilities match your filter criteria.' : 'No vulnerabilities scanned yet.'}</p>
+                        <p class="u-font-11 u-text-muted u-mt-4">${hasAny ? 'Try clearing filters or search query.' : 'Select files or a repository in Local Scanners and click Run Vulnerability Scan.'}</p>
+                        ${!hasAny ? '<button class="btn btn-primary btn-sm u-mt-12" id="btnTableGoToScans">Go to Local Scanners ➔</button>' : ''}
                     </td>
                 </tr>
             `;
@@ -1917,8 +2055,8 @@
                     <span class="cve-text">${escapeHtml(v.CVE_ID || 'No CVE')}</span>
                 </td>
                 <td>
-                    <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(v.Title)}</div>
-                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(v.Detailed_Name || '')}</div>
+                    <div class="u-fw-600 u-text-primary">${escapeHtml(v.Title)}</div>
+                    <div class="u-font-11 u-text-muted u-mt-1">${escapeHtml(v.Detailed_Name || '')}</div>
                 </td>
                 <td>
                     <span class="badge ${sevClass}">${escapeHtml(v.Severity || 'Unknown')}</span>
@@ -1927,19 +2065,19 @@
                     <span class="badge ${sourceBadgeClass}">${escapeHtml(sourceLabel)}</span>
                 </td>
                 <td>
-                    <div style="font-weight: 500;">${escapeHtml(v.Application_Name || '')}</div>
-                    <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(v.Repository ? v.Repository.replace('sample-repos/', '') : '')}</div>
+                    <div class="u-fw-500">${escapeHtml(v.Application_Name || '')}</div>
+                    <div class="u-font-11 u-text-muted u-mono">${escapeHtml(v.Repository ? v.Repository.replace('sample-repos/', '') : '')}</div>
                 </td>
                 <td>
-                    <div class="font-mono" style="font-size: 11px; color: var(--text-secondary);">${escapeHtml(v.Location_Path || '')}${v.Line_Number ? `:${v.Line_Number}` : ''}</div>
+                    <div class="font-mono u-font-11 u-text-secondary">${escapeHtml(v.Location_Path || '')}${v.Line_Number ? `:${v.Line_Number}` : ''}</div>
                 </td>
                 <td>
                     <span class="badge ${statusClass}">${escapeHtml(v.Remediation_Status || 'Pending')}</span>
                 </td>
                 <td>
-                    <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(v.Finding_Date || 'Recent')}</span>
+                    <span class="u-font-11 u-text-muted">${escapeHtml(v.Finding_Date || 'Recent')}</span>
                 </td>
-                <td style="text-align: right;">
+                <td class="u-text-right">
                     <button class="btn btn-secondary btn-sm btn-inspect-row" data-id="${escapeHtml(v.Vulnerability_ID)}">
                         Inspect
                     </button>
@@ -2091,10 +2229,10 @@
                 humanGateCard.style.display = showGate4 ? 'flex' : 'none';
                 if (showGate4 && gate4PatchSummary) {
                     gate4PatchSummary.innerHTML = `
-                        <div style="font-size: 11px; color: var(--text-secondary); background: var(--bg-surface); padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-top: 6px;">
+                        <div class="gate4-patch-box">
                             <div><strong>Root Cause:</strong> ${escapeHtml(selectedVulnerability?.Agent_Code_Analysis_Output || 'Untrusted input parameter concatenated directly into raw query.')}</div>
-                            <div style="margin-top: 4px;"><strong>Proposed Fix:</strong> ${escapeHtml(selectedVulnerability?.Remediation_Guidance || 'Use parameterized query placeholder.')}</div>
-                            <div style="margin-top: 4px;"><strong>Target File:</strong> <code>${escapeHtml(selectedVulnerability?.Location_Path || 'Source.cs')}</code> (Line ${escapeHtml(selectedVulnerability?.Line_Number || '1')})</div>
+                            <div class="u-mt-4"><strong>Proposed Fix:</strong> ${escapeHtml(selectedVulnerability?.Remediation_Guidance || 'Use parameterized query placeholder.')}</div>
+                            <div class="u-mt-4"><strong>Target File:</strong> <code>${escapeHtml(selectedVulnerability?.Location_Path || 'Source.cs')}</code> (Line ${escapeHtml(selectedVulnerability?.Line_Number || '1')})</div>
                         </div>
                     `;
                 }
@@ -2162,23 +2300,25 @@
         const testsPassed = val?.testsPassed ?? 0;
         const testsFailed = val?.testsFailed ?? 0;
         const duration = val?.durationMs ? `${(val.durationMs / 1000).toFixed(2)}s` : 'N/A';
-        const score = sec?.score ?? (val?.confidenceScore ?? (buildPass ? 90 : (isNotExecuted ? 70 : 40)));
-        const statusColor = buildPass ? 'var(--success)' : (isNotExecuted ? 'var(--warning)' : 'var(--danger)');
+        const score = sec?.score ?? val?.confidenceScore ?? 0;
+        const statusColorClass = buildPass ? 'u-text-success' : (isNotExecuted ? 'u-text-warning' : 'u-text-danger');
+        const scoreTextClass = score >= 90 ? 'u-text-success' : (score >= 70 ? 'u-text-warning' : 'u-text-danger');
+        const scoreBgClass = score >= 90 ? 'legend-bg-success' : (score >= 70 ? 'legend-bg-warning' : 'legend-bg-danger');
 
         valContent.innerHTML = `
             <div class="evidence-dashboard">
                 <div class="test-metric-row">
                     <div class="test-metric-card">
                         <div class="test-metric-label">Execution Status</div>
-                        <div class="test-metric-val" style="color: ${statusColor}; font-size: 13px;">${escapeHtml(testStatus)}</div>
+                        <div class="test-metric-val u-font-13 ${statusColorClass}">${escapeHtml(testStatus)}</div>
                     </div>
                     <div class="test-metric-card">
                         <div class="test-metric-label">Tests Passed</div>
-                        <div class="test-metric-val" style="color: var(--success);">${isNotExecuted ? 'N/A' : testsPassed}</div>
+                        <div class="test-metric-val u-text-success">${isNotExecuted ? 'N/A' : testsPassed}</div>
                     </div>
                     <div class="test-metric-card">
                         <div class="test-metric-label">Tests Failed</div>
-                        <div class="test-metric-val" style="color: ${testsFailed > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${isNotExecuted ? 'N/A' : testsFailed}</div>
+                        <div class="test-metric-val ${testsFailed > 0 ? 'u-text-danger' : 'u-text-muted'}">${isNotExecuted ? 'N/A' : testsFailed}</div>
                     </div>
                     <div class="test-metric-card">
                         <div class="test-metric-label">Duration</div>
@@ -2188,22 +2328,23 @@
 
                 <div class="score-meter-wrap">
                     <div class="score-meter-label">
-                        <span style="font-weight: 600;">Autonomous Validation Confidence Score</span>
-                        <span style="font-weight: 700; color: ${score >= 90 ? 'var(--success)' : (score >= 70 ? 'var(--warning)' : 'var(--danger)')};">${score} / 100</span>
+                        <span class="u-fw-600">Autonomous Validation Confidence Score</span>
+                        <span class="u-fw-700 ${scoreTextClass}">${score} / 100</span>
                     </div>
                     <div class="score-bar-bg">
-                        <div class="score-bar-fill" style="width: ${score}%; background: ${score >= 90 ? 'var(--success)' : (score >= 70 ? 'var(--warning)' : 'var(--danger)')};"></div>
+                        <div class="score-bar-fill ${scoreBgClass}" data-bar-width="${score}%"></div>
                     </div>
                 </div>
 
                 ${val?.consoleOutput ? `
-                    <div style="margin-top: 8px;">
-                        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Runner Console Output</div>
-                        <pre style="max-height: 140px; white-space: pre-wrap; font-family: var(--font-mono); font-size: 11px;">${escapeHtml(val.consoleOutput)}</pre>
+                    <div class="u-mt-8">
+                        <div class="evidence-label-sm">Runner Console Output</div>
+                        <pre class="console-output-pre">${escapeHtml(val.consoleOutput)}</pre>
                     </div>
                 ` : ''}
             </div>
         `;
+        applyDynamicStyles(valContent);
     }
 
     function renderTraceLogView(trace) {
@@ -2256,9 +2397,9 @@
 
         if (queueItems.length === 0) {
             reviewQueueCardsList.innerHTML = `
-                <div class="empty-state" style="padding: 40px;">
-                    <p style="font-size: 15px; font-weight: 600; color: var(--text-primary);">All Governance Gates Cleared ✓</p>
-                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">No human review approvals or sign-offs are currently pending.</p>
+                <div class="empty-state u-p-40">
+                    <p class="u-font-15 u-fw-600 u-text-primary">All Governance Gates Cleared ✓</p>
+                    <p class="u-font-12 u-text-muted u-mt-4">No human review approvals or sign-offs are currently pending.</p>
                 </div>
             `;
             return;
@@ -2276,7 +2417,7 @@
 
                 <div class="review-card-body">
                     <p><strong>Root Cause:</strong> ${escapeHtml(item.Agent_Code_Analysis_Output || 'Identified untrusted data flow at ' + (item.Location_Path || 'target file') + ' (Line ' + (item.Line_Number || 1) + ').')}</p>
-                    <p style="margin-top: 6px;"><strong>Proposed Fix:</strong> ${escapeHtml(item.Remediation_Guidance || 'Apply secure parameterized modification.')}</p>
+                    <p class="u-mt-6"><strong>Proposed Fix:</strong> ${escapeHtml(item.Remediation_Guidance || 'Apply secure parameterized modification.')}</p>
                 </div>
 
                 <div class="review-card-actions">
@@ -2354,7 +2495,7 @@
         if (!targetPickerList) return;
         targetPickerList.innerHTML = '';
         if (!targets || targets.length === 0) {
-            targetPickerList.innerHTML = '<div class="empty-state" style="padding: 16px;">No targets discovered in workspace.</div>';
+            targetPickerList.innerHTML = '<div class="empty-state u-p-16">No targets discovered in workspace.</div>';
             return;
         }
 
@@ -2363,16 +2504,11 @@
 
         listToRender.forEach(t => {
             const item = document.createElement('div');
-            item.className = 'dash-list-item';
-            item.style.cursor = 'pointer';
-            item.style.padding = '8px 12px';
-            item.style.display = 'flex';
-            item.style.alignItems = 'center';
-            item.style.justifyContent = 'space-between';
+            item.className = 'dash-list-item target-picker-item';
             item.innerHTML = `
                 <div>
-                    <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${t.isFolder ? '📁' : '📄'} ${escapeHtml(t.name || t.path)}</div>
-                    <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(t.path)}</div>
+                    <div class="u-fw-600 u-text-primary u-font-13">${t.isFolder ? '📁' : '📄'} ${escapeHtml(t.name || t.path)}</div>
+                    <div class="u-font-11 u-text-muted u-mono">${escapeHtml(t.path)}</div>
                 </div>
                 <button class="btn btn-secondary btn-sm">Select</button>
             `;
@@ -2425,13 +2561,14 @@
     }
 
     function handleScanProgress(data) {
-        if (!data) return;
+        const normalized = normalizeScanProgressEvent(data);
+        if (!normalized) return;
         if (scanProgressCard) scanProgressCard.style.display = 'block';
-        if (data.percent !== undefined && scanProgressBarFill) {
-            scanProgressBarFill.style.width = `${Math.min(100, Math.max(5, data.percent))}%`;
+        if (normalized.percent !== undefined && scanProgressBarFill) {
+            scanProgressBarFill.style.width = `${normalized.percent}%`;
         }
-        if (data.message && scanProgressText) {
-            scanProgressText.textContent = data.message;
+        if (normalized.message && scanProgressText) {
+            scanProgressText.textContent = normalized.message;
         }
     }
 
@@ -2489,11 +2626,11 @@
             const metaRow = `<div class="scanner-meta-row">
                 <span class="scanner-meta-label">Rules:</span>
                 <span class="scanner-meta-val">${s.rulesCount || (s.rules ? s.rules.length : 'Configured')}</span>
-                <span class="scanner-meta-label" style="margin-left: 12px;">Targets:</span>
+                <span class="scanner-meta-label u-ml-12">Targets:</span>
                 <span class="scanner-meta-val font-mono">${escapeHtml((s.languages || ['csharp']).join(', '))}</span>
             </div>`;
             const codeqlWarning = isCodeql && isNotInstalled
-                ? `<div style="margin-top:6px; font-size:11px; color:var(--color-warning);">⚠ Run <code>node scripts/setup-codeql.js</code> to enable semantic analysis.</div>`
+                ? `<div class="u-mt-6 u-font-11 u-text-warning">⚠ Run <code>node scripts/setup-codeql.js</code> to enable semantic analysis.</div>`
                 : '';
 
             card.innerHTML = `
@@ -2548,29 +2685,26 @@
     function renderScanHistory(history) {
         if (!scanHistoryTableBody) return;
         if (!history || history.length === 0) {
-            scanHistoryTableBody.innerHTML = '<tr><td colspan="6" class="empty-cell" style="text-align: center; padding: 24px; color: var(--text-muted);">No scan history recorded yet. Run a scan to discover local vulnerabilities.</td></tr>';
+            scanHistoryTableBody.innerHTML = '<tr><td colspan="6" class="empty-cell u-empty-history-cell">No scan history recorded yet. Run a scan to discover local vulnerabilities.</td></tr>';
             return;
         }
 
         scanHistoryTableBody.innerHTML = '';
         history.forEach(item => {
             const tr = document.createElement('tr');
-            const statusClass = item.status === 'Completed' ? 'badge-success' : (item.status === 'Failed' ? 'badge-danger' : 'badge-warning');
-            const durationSec = item.durationMs ? `${(item.durationMs / 1000).toFixed(1)}s` : '--';
-            const dateStr = item.startTime ? new Date(item.startTime).toLocaleTimeString() : '--';
-            const targetBase = item.targetDir ? item.targetDir.split(/[/\\]/).filter(Boolean).pop() : 'workspace';
-            const counts = item.findingsSummary || { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+            const entry = formatScanHistoryEntry(item);
+            const statusClass = entry.status === 'Completed' ? 'badge-success' : (entry.status === 'Failed' ? 'badge-danger' : 'badge-warning');
 
             tr.innerHTML = `
-                <td><span class="font-mono" style="font-weight: 600; font-size: 11px;">${escapeHtml(item.scanId || '--')}</span></td>
-                <td><span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(dateStr)}</span></td>
-                <td><span class="font-mono" style="font-size: 11px;">${escapeHtml(targetBase)}</span></td>
-                <td><span style="font-size: 11px;">${durationSec}</span></td>
-                <td><span class="badge ${statusClass}">${escapeHtml(item.status || 'Completed')}</span></td>
+                <td><span class="font-mono u-fw-600 u-font-11">${escapeHtml(entry.scanId)}</span></td>
+                <td><span class="u-font-11 u-text-muted">${escapeHtml(entry.dateStr)}</span></td>
+                <td><span class="font-mono u-font-11">${escapeHtml(entry.targetBase)}</span></td>
+                <td><span class="u-font-11">${entry.durationSec}</span></td>
+                <td><span class="badge ${statusClass}">${escapeHtml(entry.status)}</span></td>
                 <td>
-                    <span style="font-weight: 600;">${counts.total || 0}</span>
-                    <span style="font-size: 11px; color: var(--text-muted); margin-left: 4px;">
-                        (${counts.critical || 0} crit / ${counts.high || 0} high / ${counts.medium || 0} med)
+                    <span class="u-fw-600">${entry.counts.total || 0}</span>
+                    <span class="u-font-11 u-text-muted u-ml-4">
+                        (${entry.counts.critical || 0} crit / ${entry.counts.high || 0} high / ${entry.counts.medium || 0} med)
                     </span>
                 </td>
             `;
@@ -2670,8 +2804,8 @@
         if (status === 'error') icon = '✕';
 
         toast.innerHTML = `
-            <span style="font-weight: 700;">${icon}</span>
-            <span style="flex: 1;">${escapeHtml(text)}</span>
+            <span class="u-fw-700">${icon}</span>
+            <span class="u-flex-1">${escapeHtml(text)}</span>
         `;
 
         toastContainer.appendChild(toast);
@@ -2854,7 +2988,7 @@
         return outputHtml;
     }
 
-    // Auto-initialize on load
+    // Auto-initialize on load when running in a browser/webview context
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

@@ -1,16 +1,13 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { loadVulnerabilities, updateVulnerabilityRow } = require('../extension/csvParser');
+const { loadVulnerabilities } = require('../extension/csvParser');
 const { loadVulnerabilityDetails, loadAllReports } = require('../extension/reportParser');
 const { RemediationEngine } = require('../extension/remediationEngine');
 const { ScanController } = require('../extension/scanning/scanController');
 const { FindingsStore } = require('../extension/scanning/findingsStore');
-const { DotnetSecurityScanner } = require('../extension/scanning/adapters/dotnetSecurityScanner');
-const { NugetAuditScanner } = require('../extension/scanning/adapters/nugetAuditScanner');
-const { SecretsConfigScanner } = require('../extension/scanning/adapters/secretsConfigScanner');
-const { CodeQLScanner } = require('../extension/scanning/adapters/codeqlScanner');
 const { ReScanVerifier } = require('../extension/scanning/reScanVerifier');
+const { assertPathWithinWorkspace } = require('../extension/pathUtils');
 
 let PORT = 3000;
 const workspaceRoot = path.resolve(__dirname, '..');
@@ -27,40 +24,57 @@ let hasUserInitiatedScan = false;
 let activeScanTarget = '';
 let activeCsv = null;
 
-/**
- * Validates path within workspaceRoot to prevent traversal
- */
-function assertPathWithinWorkspace(candidatePath, root = workspaceRoot) {
-    if (!candidatePath || typeof candidatePath !== 'string') return null;
-    const resolvedWs = path.resolve(root);
-    const resolved = path.isAbsolute(candidatePath) ? path.resolve(candidatePath) : path.resolve(resolvedWs, candidatePath);
-    const rel = path.relative(resolvedWs, resolved);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) return null;
-    return resolved;
+function isLoopbackHostHeader(hostHeader) {
+    if (!hostHeader || typeof hostHeader !== 'string') return true;
+    const hostname = hostHeader.split(':')[0].trim().toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
+function isAllowedOriginAndHost(req) {
+    if (!isLoopbackHostHeader(req.headers.host)) return false;
+    const origin = req.headers.origin;
+    if (!origin) return true;
+    try {
+        const parsed = new URL(origin);
+        const host = parsed.hostname.toLowerCase();
+        return host === 'localhost' || host === '127.0.0.1';
+    } catch {
+        return false;
+    }
+}
+
+function sendBlockedPreviewAction(res) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+        success: false,
+        error: 'POLICY_BLOCKED (Phase 1 P0-F): Browser preview server is read-only and cannot authorize remediation gates or mutate vulnerability records.'
+    }));
 }
 
 /**
- * Helper to locate source files in workspace
+ * Helper to locate source files strictly within workspaceRoot boundary
  */
 function resolveSourceFilePath(repository, targetPath) {
-    if (!targetPath) return null;
+    if (!targetPath || typeof targetPath !== 'string' || targetPath.includes('\0')) return null;
 
     // 1. Direct path
     const directRel = repository ? path.join(repository, targetPath) : targetPath;
-    const directAbs = path.isAbsolute(directRel) ? directRel : path.join(workspaceRoot, directRel);
-    if (fs.existsSync(directAbs) && fs.statSync(directAbs).isFile()) {
-        return directAbs;
+    const directCandidate = path.isAbsolute(directRel) ? directRel : path.join(workspaceRoot, directRel);
+    const safeDirect = assertPathWithinWorkspace(directCandidate, workspaceRoot);
+    if (safeDirect && fs.existsSync(safeDirect) && fs.statSync(safeDirect).isFile()) {
+        return safeDirect;
     }
 
     // 2. Relative to workspace
-    const wsRel = path.join(workspaceRoot, targetPath);
-    if (fs.existsSync(wsRel) && fs.statSync(wsRel).isFile()) {
-        return wsRel;
+    const safeWs = assertPathWithinWorkspace(path.join(workspaceRoot, targetPath), workspaceRoot);
+    if (safeWs && fs.existsSync(safeWs) && fs.statSync(safeWs).isFile()) {
+        return safeWs;
     }
 
     // 3. Search within repository folder for the base filename
-    const repoBase = repository ? path.join(workspaceRoot, repository) : workspaceRoot;
-    if (fs.existsSync(repoBase) && fs.statSync(repoBase).isDirectory()) {
+    const repoBaseCandidate = repository ? path.join(workspaceRoot, repository) : workspaceRoot;
+    const safeRepoBase = assertPathWithinWorkspace(repoBaseCandidate, workspaceRoot);
+    if (safeRepoBase && fs.existsSync(safeRepoBase) && fs.statSync(safeRepoBase).isDirectory()) {
         const targetFilename = path.basename(targetPath).toLowerCase();
         const findRecursive = (dir) => {
             try {
@@ -69,7 +83,7 @@ function resolveSourceFilePath(repository, targetPath) {
                     if (entry.name === 'bin' || entry.name === 'obj' || entry.name === 'node_modules' || entry.name === '.git') continue;
                     const full = path.join(dir, entry.name);
                     if (entry.isFile() && entry.name.toLowerCase() === targetFilename) {
-                        return full;
+                        return assertPathWithinWorkspace(full, workspaceRoot);
                     }
                     if (entry.isDirectory()) {
                         const res = findRecursive(full);
@@ -79,7 +93,7 @@ function resolveSourceFilePath(repository, targetPath) {
             } catch (e) { }
             return null;
         };
-        const found = findRecursive(repoBase);
+        const found = findRecursive(safeRepoBase);
         if (found) return found;
     }
 
@@ -87,22 +101,23 @@ function resolveSourceFilePath(repository, targetPath) {
 }
 
 const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, `http://localhost:${PORT}`);
+    const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
 
-    // Enable CORS for local testing
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (!isAllowedOriginAndHost(req)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Forbidden: cross-origin or non-loopback requests are blocked.' }));
+        return;
+    }
 
     if (req.method === 'OPTIONS') {
-        res.writeHead(204);
-        res.end();
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Cross-origin preflight disabled in preview server.' }));
         return;
     }
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
         let html = fs.readFileSync(path.join(mediaDir, 'dashboard.html'), 'utf-8');
-        const previewCsp = "default-src 'none'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self';";
+        const previewCsp = "default-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self';";
         html = html.replace('{{CSP_POLICY}}', previewCsp);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(html);
@@ -179,66 +194,23 @@ const server = http.createServer(async (req, res) => {
                             es.onerror = function() {
                                 es.close();
                             };
-                        } else if (msg.command === 'approveRemediation') {
-                            fetch('/api/approve', {
+                        } else if (msg.command === 'approveRemediation' || msg.command === 'rejectRemediation' || msg.command === 'approveFinalGate' || msg.command === 'rejectFinalGate') {
+                            const endpointMap = {
+                                approveRemediation: '/api/approve',
+                                rejectRemediation: '/api/reject',
+                                approveFinalGate: '/api/approve-final',
+                                rejectFinalGate: '/api/reject-final'
+                            };
+                            fetch(endpointMap[msg.command], {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ id: msg.vulnerabilityId })
                             }).then(r => r.json()).then(res => {
-                                window.postMessage({ type: 'ACTION_FEEDBACK', text: 'Stage 4 Gate Approved. Continuing Bench Tests...', status: 'success' }, '*');
-                                // Connect to live SSE stream to resume pipeline through Stage 5 & 6
-                                const es = new EventSource('/api/remediate-stream?id=' + encodeURIComponent(msg.vulnerabilityId) + '&approved=true');
-                                es.onmessage = function(e) {
-                                    try {
-                                        const event = JSON.parse(e.data);
-                                        window.postMessage({ type: 'REMEDIATION_PROGRESS', event: event }, '*');
-                                        if (event.type === 'FINAL_GATE_REQUIRED' || event.type === 'WORKFLOW_COMPLETE') {
-                                            es.close();
-                                        }
-                                    } catch (err) {}
-                                };
-                            });
-                        } else if (msg.command === 'rejectRemediation') {
-                            fetch('/api/reject', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: msg.vulnerabilityId })
-                            }).then(r => r.json()).then(res => {
-                                window.postMessage({ type: 'DATA_UPDATED', vulnerabilities: res.vulnerabilities }, '*');
-                                if (res.details) {
-                                    window.postMessage({ type: 'DETAILS_LOADED', details: res.details }, '*');
-                                }
-                                window.postMessage({ type: 'ACTION_FEEDBACK', text: 'Remediation Fix Rejected for ' + msg.vulnerabilityId, status: 'warning' }, '*');
-                            });
-                        } else if (msg.command === 'approveFinalGate') {
-                            fetch('/api/approve-final', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: msg.vulnerabilityId })
-                            }).then(r => r.json()).then(res => {
-                                window.postMessage({ type: 'ACTION_FEEDBACK', text: 'Stage 6 Final Gate Signed Off. Handing off...', status: 'success' }, '*');
-                                const es = new EventSource('/api/remediate-stream?id=' + encodeURIComponent(msg.vulnerabilityId) + '&approved=true&finalApproved=true');
-                                es.onmessage = function(e) {
-                                    try {
-                                        const event = JSON.parse(e.data);
-                                        window.postMessage({ type: 'REMEDIATION_PROGRESS', event: event }, '*');
-                                        if (event.type === 'WORKFLOW_COMPLETE') {
-                                            es.close();
-                                        }
-                                    } catch (err) {}
-                                };
-                            });
-                        } else if (msg.command === 'rejectFinalGate') {
-                            fetch('/api/reject-final', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: msg.vulnerabilityId })
-                            }).then(r => r.json()).then(res => {
-                                window.postMessage({ type: 'DATA_UPDATED', vulnerabilities: res.vulnerabilities }, '*');
-                                if (res.details) {
-                                    window.postMessage({ type: 'DETAILS_LOADED', details: res.details }, '*');
-                                }
-                                window.postMessage({ type: 'ACTION_FEEDBACK', text: 'Final sign-off rejected. Rework requested.', status: 'warning' }, '*');
+                                window.postMessage({
+                                    type: 'ACTION_FEEDBACK',
+                                    text: res.error || 'Gate operations require VS Code Extension Host authorization.',
+                                    status: res.success ? 'info' : 'error'
+                                }, '*');
                             });
                         } else if (msg.command === 'loadReports') {
                             fetch('/api/reports')
@@ -350,7 +322,9 @@ const server = http.createServer(async (req, res) => {
             activeRepo: activeScanTarget || workspaceRoot,
             activeCsv: activeCsv || '',
             availableCsvs: available,
-            hasScanned: hasUserInitiatedScan
+            hasScanned: hasUserInitiatedScan,
+            simulationMode: true,
+            securityNotice: 'Browser preview runs in read-only local mode; remediation approvals and CSV mutations are disabled.'
         }));
         return;
     }
@@ -397,13 +371,20 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const body = JSON.parse(bodyStr || '{}');
-                const targetDir = body.targetRepo || body.targetPath || activeScanTarget || workspaceRoot;
+                const rawTarget = body.targetRepo || body.targetPath || activeScanTarget || workspaceRoot;
+                const candidate = path.isAbsolute(rawTarget) ? rawTarget : path.resolve(workspaceRoot, rawTarget);
+                const safeTarget = assertPathWithinWorkspace(candidate, workspaceRoot);
+                if (!safeTarget) {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Access denied: scan target outside workspace boundary.' }));
+                    return;
+                }
                 const summary = await scanController.startScan({
                     scannerIds: body.scannerIds,
-                    targetDir: targetDir
+                    targetRepo: safeTarget
                 });
                 hasUserInitiatedScan = true;
-                activeScanTarget = targetDir;
+                activeScanTarget = safeTarget;
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(summary));
             } catch (err) {
@@ -431,12 +412,19 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = JSON.parse(bodyStr || '{}');
                 const rel = body.targetPath || '.';
-                activeScanTarget = rel;
-                const fullPath = path.isAbsolute(rel) ? rel : path.join(workspaceRoot, rel);
+                const candidate = path.isAbsolute(rel) ? rel : path.resolve(workspaceRoot, rel);
+                const fullPath = assertPathWithinWorkspace(candidate, workspaceRoot);
+                if (!fullPath) {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Access denied: scan target outside workspace boundary.' }));
+                    return;
+                }
+                const normalizedRel = path.relative(workspaceRoot, fullPath).replace(/\\/g, '/') || '.';
+                activeScanTarget = normalizedRel;
                 const isFolder = fs.existsSync(fullPath) ? fs.statSync(fullPath).isDirectory() : true;
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
-                    targetPath: rel,
+                    targetPath: normalizedRel,
                     isFolder: isFolder,
                     displayName: path.basename(fullPath) || 'Workspace'
                 }));
@@ -504,23 +492,27 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // Server-Sent Events endpoint for live real-time remediation tracking
+    // Server-Sent Events endpoint for read-only local analysis preview
     if (url.pathname === '/api/remediate-stream') {
         const id = url.searchParams.get('id');
         const isApproved = url.searchParams.get('approved') === 'true';
         const isFinalApproved = url.searchParams.get('finalApproved') === 'true';
 
+        if (isApproved || isFinalApproved) {
+            sendBlockedPreviewAction(res);
+            return;
+        }
+
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            'Access-Control-Allow-Origin': '*'
+            'Connection': 'keep-alive'
         });
 
         try {
             await engine.executePipeline(id, {
-                isHumanApproved: isApproved,
-                isFinalApproved: isFinalApproved,
+                isHumanApproved: false,
+                isFinalApproved: false,
                 onProgress: (evt) => {
                     res.write(`data: ${JSON.stringify(evt)}\n\n`);
                 }
@@ -539,6 +531,26 @@ const server = http.createServer(async (req, res) => {
         const targetPath = url.searchParams.get('path') || '';
         const line = parseInt(url.searchParams.get('line'), 10) || 1;
 
+        const rawDirect = repo ? path.join(repo, targetPath) : targetPath;
+        const candidateCheck = rawDirect
+            ? (path.isAbsolute(rawDirect) ? rawDirect : path.resolve(workspaceRoot, rawDirect))
+            : null;
+        const relTargetCheck = targetPath
+            ? (path.isAbsolute(targetPath) ? targetPath : path.resolve(workspaceRoot, targetPath))
+            : null;
+        if (
+            !targetPath ||
+            (candidateCheck && !assertPathWithinWorkspace(candidateCheck, workspaceRoot)) ||
+            (relTargetCheck && !assertPathWithinWorkspace(relTargetCheck, workspaceRoot))
+        ) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: false,
+                error: 'Access denied: source path outside active workspace boundary.'
+            }));
+            return;
+        }
+
         const fullPath = resolveSourceFilePath(repo, targetPath);
         if (fullPath && fs.existsSync(fullPath)) {
             const code = fs.readFileSync(fullPath, 'utf-8');
@@ -551,89 +563,23 @@ const server = http.createServer(async (req, res) => {
                 targetLine: line
             }));
         } else {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 success: false,
-                error: `File not found on disk: ${targetPath}`
+                error: `File not found within workspace: ${targetPath}`
             }));
         }
         return;
     }
 
-    if (url.pathname === '/api/approve' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => body += chunk);
-        req.on('end', () => {
-            const payload = JSON.parse(body || '{}');
-            if (payload.id) {
-                updateVulnerabilityRow(csvPath, payload.id, {
-                    Requires_Human_Review: 'false',
-                    Remediation_Status: 'Approved'
-                });
-            }
-            const data = loadVulnerabilities(csvPath);
-            const details = loadVulnerabilityDetails(workspaceRoot, payload.id);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, vulnerabilities: data, details }));
-        });
-        return;
-    }
-
-    if (url.pathname === '/api/reject' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => body += chunk);
-        req.on('end', () => {
-            const payload = JSON.parse(body || '{}');
-            if (payload.id) {
-                updateVulnerabilityRow(csvPath, payload.id, {
-                    Requires_Human_Review: 'false',
-                    Remediation_Status: 'Rejected'
-                });
-            }
-            const data = loadVulnerabilities(csvPath);
-            const details = loadVulnerabilityDetails(workspaceRoot, payload.id);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, vulnerabilities: data, details }));
-        });
-        return;
-    }
-
-    if (url.pathname === '/api/approve-final' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => body += chunk);
-        req.on('end', () => {
-            const payload = JSON.parse(body || '{}');
-            if (payload.id) {
-                updateVulnerabilityRow(csvPath, payload.id, {
-                    Requires_Human_Review: 'false',
-                    Remediation_Status: 'Remediated',
-                    Final_Validation_Status: 'PASS'
-                });
-            }
-            const data = loadVulnerabilities(csvPath);
-            const details = loadVulnerabilityDetails(workspaceRoot, payload.id);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, vulnerabilities: data, details }));
-        });
-        return;
-    }
-
-    if (url.pathname === '/api/reject-final' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => body += chunk);
-        req.on('end', () => {
-            const payload = JSON.parse(body || '{}');
-            if (payload.id) {
-                updateVulnerabilityRow(csvPath, payload.id, {
-                    Requires_Human_Review: 'false',
-                    Remediation_Status: 'Validation Failed'
-                });
-            }
-            const data = loadVulnerabilities(csvPath);
-            const details = loadVulnerabilityDetails(workspaceRoot, payload.id);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, vulnerabilities: data, details }));
-        });
+    if (
+        (url.pathname === '/api/approve' ||
+            url.pathname === '/api/reject' ||
+            url.pathname === '/api/approve-final' ||
+            url.pathname === '/api/reject-final') &&
+        req.method === 'POST'
+    ) {
+        sendBlockedPreviewAction(res);
         return;
     }
 
@@ -642,15 +588,15 @@ const server = http.createServer(async (req, res) => {
 });
 
 function startServer(port = PORT) {
-    server.listen(port, () => {
-        console.log(`GCAC WebView Dashboard preview running at: http://localhost:${port}`);
+    server.listen(port, '127.0.0.1', () => {
+        console.log(`GCAC WebView Dashboard preview running at: http://127.0.0.1:${port}`);
     });
 }
 
 server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
         const nextPort = server.address()?.port ? server.address().port + 1 : (PORT + 1);
-        console.log(`Port ${PORT} is in use. Attempting next available port: http://localhost:${nextPort}...`);
+        console.log(`Port ${PORT} is in use. Attempting next available port: http://127.0.0.1:${nextPort}...`);
         PORT = nextPort;
         setTimeout(() => startServer(PORT), 200);
     } else {
@@ -658,5 +604,15 @@ server.on('error', (err) => {
     }
 });
 
-startServer(PORT);
+if (require.main === module) {
+    startServer(PORT);
+}
+
+module.exports = {
+    server,
+    assertPathWithinWorkspace,
+    resolveSourceFilePath,
+    isAllowedOriginAndHost,
+    startServer
+};
 

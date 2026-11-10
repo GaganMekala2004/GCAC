@@ -6,6 +6,7 @@ try {
 }
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { loadVulnerabilities, updateVulnerabilityRow } = require('./csvParser');
 const { loadVulnerabilityDetails, loadAllReports } = require('./reportParser');
 const { RemediationEngine } = require('./remediationEngine');
@@ -82,6 +83,34 @@ function getCombinedFindings(csvPath, store) {
     } catch (e) {
         return csvList;
     }
+}
+
+/**
+ * Rolls back local edits and persists rejection/failure status across either CSV or LocalScanner findings.
+ * @param {string} vulnerabilityId
+ * @param {string} newStatus
+ * @returns {{ restored: boolean, list: object[] }}
+ */
+function persistRejectionAndRollback(vulnerabilityId, newStatus) {
+    const combined = getCombinedFindings(currentCsvPath, findingsStore);
+    const finding = combined.find(f => f.Vulnerability_ID === vulnerabilityId || f.Finding_Fingerprint === vulnerabilityId);
+    const sourceFilePath = finding ? resolveSourceFilePath(currentWorkspaceRoot, finding.Repository, finding.Location_Path) : null;
+    const restored = engine ? engine.rollbackFile(vulnerabilityId, sourceFilePath) : false;
+
+    const isScannerFinding = finding && finding.Source_Origin === 'LocalScanner';
+    if (isScannerFinding && findingsStore) {
+        findingsStore.updateFindingStatus(vulnerabilityId, newStatus);
+    } else if (currentCsvPath && fs.existsSync(currentCsvPath)) {
+        updateVulnerabilityRow(currentCsvPath, vulnerabilityId, {
+            Requires_Human_Review: 'false',
+            Remediation_Status: newStatus
+        });
+    }
+
+    return {
+        restored,
+        list: getCombinedFindings(currentCsvPath, findingsStore)
+    };
 }
 
 const VULN_ID_REGEX = /^[A-Za-z0-9_.-]{3,64}$/;
@@ -271,22 +300,30 @@ function activate(context) {
                         scanController.cancelScan();
                     });
                     try {
+                        const rawTarget = currentScanTarget
+                            ? path.resolve(currentWorkspaceRoot, currentScanTarget)
+                            : currentWorkspaceRoot;
+                        const safeTarget = assertPathWithinWorkspace(rawTarget, currentWorkspaceRoot) || currentWorkspaceRoot;
                         const summary = await scanController.startScan({
-                            targetDir: state.activeRepoPath || workspaceRoot,
+                            targetRepo: safeTarget,
                             onProgress: (p) => {
-                                if (currentPanel) currentPanel.webview.postMessage({ type: 'SCAN_PROGRESS', ...p });
+                                if (currentPanel) currentPanel.webview.postMessage({ type: 'SCAN_PROGRESS', event: p });
                             }
                         });
+                        hasUserInitiatedScan = true;
+                        currentScanTarget = path.relative(currentWorkspaceRoot, safeTarget).replace(/\\/g, '/') || '.';
                         vscode.window.showInformationMessage(`GCAC Scan Complete: ${summary.findingsSummary.total} finding(s) detected.`);
                         if (currentPanel) {
                             currentPanel.webview.postMessage({
                                 type: 'SCAN_COMPLETED',
+                                result: summary,
                                 scanId: summary.scanId,
                                 findingsCount: summary.findingsSummary.total,
+                                targetPath: safeTarget,
                                 summary
                             });
-                            const updatedFindings = await getCombinedFindings(state.activeCsvPath, findingsStore);
-                            currentPanel.webview.postMessage({ type: 'DATA_UPDATED', vulnerabilities: updatedFindings });
+                            const updatedFindings = getCombinedFindings(currentCsvPath, findingsStore);
+                            broadcast({ type: 'DATA_UPDATED', vulnerabilities: updatedFindings });
                         }
                     } catch (err) {
                         vscode.window.showErrorMessage(`GCAC Scan Error: ${err.message}`);
@@ -404,8 +441,8 @@ function activate(context) {
                             `*(Or click Approve in the GCAC Remediation Hub)*\n`);
                     } else if (result.isAwaitingFinalApproval) {
                         response.markdown(`\n\n---\n### 🛡️ Final Human Approval Gate (Stage 8)\n` +
-                            `- Post-Fix Test Result: **${result.validation ? result.validation.status : 'NOT EXECUTED'}**\n` +
-                            `- Independent Auditor Rating: **${result.securityReview ? result.securityReview.rating : 'PARTIAL'}** (Confidence Score: **${result.securityReview ? result.securityReview.score : 75}/100**)\n\n` +
+                            `- Post-Fix Test Result: **${result.validation ? (result.validation.outcome || result.validation.status) : 'NOT EXECUTED'}**\n` +
+                            `- Independent Auditor Rating: **${result.securityReview ? result.securityReview.rating : 'NOT_VERIFIED'}** (Confidence Score: **${result.securityReview ? result.securityReview.score : 0}/100**)\n\n` +
                             `**To sign off and finalize via Copilot Chat**, enter:\n` +
                             `> \`@vulnerability-orchestrator /final-approve ${vulnId}\`\n\n` +
                             `*(Or click Sign-off in the GCAC Remediation Hub)*\n`);
@@ -791,7 +828,19 @@ async function handleWebviewMessage(message, webview) {
                     status: 'info'
                 });
 
-                const targetPath = message.targetRepo || message.targetPath || currentScanTarget || currentWorkspaceRoot;
+                const requestedTarget = message.targetRepo || message.targetPath || currentScanTarget || currentWorkspaceRoot;
+                const resolvedTarget = path.isAbsolute(requestedTarget)
+                    ? requestedTarget
+                    : path.resolve(currentWorkspaceRoot, requestedTarget);
+                const targetPath = assertPathWithinWorkspace(resolvedTarget, currentWorkspaceRoot);
+                if (!targetPath) {
+                    webview.postMessage({
+                        type: 'ACTION_FEEDBACK',
+                        text: 'Security Warning: Scan target path must remain inside active workspace boundary.',
+                        status: 'error'
+                    });
+                    return;
+                }
                 const scanResult = await scanController.startScan({
                     scannerIds: message.scannerIds,
                     targetRepo: targetPath,
@@ -872,9 +921,28 @@ async function handleWebviewMessage(message, webview) {
         }
 
         case 'installCodeql': {
+            if (vscode && vscode.workspace && !vscode.workspace.isTrusted) {
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: 'Security Warning: CodeQL setup execution is blocked in Restricted Mode.',
+                    status: 'error'
+                });
+                return;
+            }
+            const setupScript = assertPathWithinWorkspace(
+                path.join(currentWorkspaceRoot, 'scripts', 'setup-codeql.js'),
+                currentWorkspaceRoot
+            );
+            if (!setupScript || !fs.existsSync(setupScript)) {
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: 'Security Warning: setup-codeql.js not found within active workspace.',
+                    status: 'error'
+                });
+                return;
+            }
             // Launch setup-codeql.js in VS Code terminal for visibility
             if (vscode && vscode.window) {
-                const setupScript = require('path').join(currentWorkspaceRoot, 'scripts', 'setup-codeql.js');
                 const terminal = vscode.window.createTerminal({ name: 'CodeQL Setup' });
                 terminal.show(true);
                 terminal.sendText(`node "${setupScript}"`);
@@ -939,7 +1007,7 @@ async function handleWebviewMessage(message, webview) {
                         webview.postMessage({ type: 'REMEDIATION_PROGRESS', event });
                     }
                 });
-                const list = loadVulnerabilities(currentCsvPath);
+                const list = getCombinedFindings(currentCsvPath, findingsStore);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
                 const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
                 webview.postMessage({ type: 'DETAILS_LOADED', details });
@@ -974,7 +1042,7 @@ async function handleWebviewMessage(message, webview) {
                         webview.postMessage({ type: 'REMEDIATION_PROGRESS', event });
                     }
                 });
-                const list = loadVulnerabilities(currentCsvPath);
+                const list = getCombinedFindings(currentCsvPath, findingsStore);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
                 const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
                 webview.postMessage({ type: 'DETAILS_LOADED', details });
@@ -996,18 +1064,9 @@ async function handleWebviewMessage(message, webview) {
 
         case 'rejectRemediation': {
             try {
-                // Roll back any file modifications made on disk
-                const finding = loadVulnerabilities(currentCsvPath).find(f => f.Vulnerability_ID === message.vulnerabilityId);
-                const sourceFilePath = finding ? resolveSourceFilePath(currentWorkspaceRoot, finding.Repository, finding.Location_Path) : null;
-                const restored = engine.rollbackFile(message.vulnerabilityId, sourceFilePath);
-
-                updateVulnerabilityRow(currentCsvPath, message.vulnerabilityId, {
-                    Requires_Human_Review: 'false',
-                    Remediation_Status: 'Rejected'
-                });
+                const { restored, list } = persistRejectionAndRollback(message.vulnerabilityId, 'Rejected');
 
                 vscode.window.showWarningMessage(`Remediation rejected for ${message.vulnerabilityId}.${restored ? ' Original source file restored.' : ''}`);
-                const list = loadVulnerabilities(currentCsvPath);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
                 const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
                 webview.postMessage({ type: 'DETAILS_LOADED', details });
@@ -1037,7 +1096,7 @@ async function handleWebviewMessage(message, webview) {
                         webview.postMessage({ type: 'REMEDIATION_PROGRESS', event });
                     }
                 });
-                const list = loadVulnerabilities(currentCsvPath);
+                const list = getCombinedFindings(currentCsvPath, findingsStore);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
                 const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
                 webview.postMessage({ type: 'DETAILS_LOADED', details });
@@ -1059,15 +1118,7 @@ async function handleWebviewMessage(message, webview) {
 
         case 'rejectFinalGate': {
             try {
-                const finding = loadVulnerabilities(currentCsvPath).find(f => f.Vulnerability_ID === message.vulnerabilityId);
-                const sourceFilePath = finding ? resolveSourceFilePath(currentWorkspaceRoot, finding.Repository, finding.Location_Path) : null;
-                const restored = engine.rollbackFile(message.vulnerabilityId, sourceFilePath);
-
-                updateVulnerabilityRow(currentCsvPath, message.vulnerabilityId, {
-                    Requires_Human_Review: 'false',
-                    Remediation_Status: 'Validation Failed'
-                });
-                const list = loadVulnerabilities(currentCsvPath);
+                const { restored, list } = persistRejectionAndRollback(message.vulnerabilityId, 'Validation Failed');
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
                 const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
                 webview.postMessage({ type: 'DETAILS_LOADED', details });
@@ -1259,12 +1310,7 @@ class GcacWebviewViewProvider {
  * Generates cryptographically secure nonce for CSP
  */
 function getNonce() {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
+    return crypto.randomBytes(24).toString('base64url');
 }
 
 /**
@@ -1281,9 +1327,9 @@ function getWebviewHtml(webview, extensionUri) {
 
     const csp = [
         "default-src 'none'",
-        `img-src ${webview.cspSource} data: https:`,
+        `img-src ${webview.cspSource} data:`,
         `script-src 'nonce-${nonce}' ${webview.cspSource}`,
-        `style-src ${webview.cspSource} 'unsafe-inline'`,
+        `style-src ${webview.cspSource}`,
         `font-src ${webview.cspSource}`,
         "connect-src 'none'"
     ].join('; ');

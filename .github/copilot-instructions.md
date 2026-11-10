@@ -8,7 +8,7 @@ This repository is an **Agentic AI Vulnerability Remediation Platform**. All AI 
 
 Every vulnerability remediation flow MUST follow this deterministic lifecycle:
 ```
-(Validate, Normalize, Deduplicate) ➔ Analyze ➔ Remediate ➔ Test ➔ Validate & Security Review ➔ Ask for Human Approval ➔ (Wait for Approval) ➔ Publish PR
+(Validate, Normalize, Deduplicate) ➔ Analyze ➔ Remediate ➔ Test ➔ Validate & Security Review ➔ Ask for Human Review (STOP) ➔ Manual Human Git Workflow Outside Agent Boundary
 ```
 
 ---
@@ -44,15 +44,14 @@ Vulnerabilities MUST be dynamically grouped by application (`ApplicationNumber`)
    - **NEVER** deploy applications or modify production infrastructure.
    - After code fix, build, test, and security review complete, set status to `AWAITING_HUMAN_REVIEW`, output the **Remediation Approval Request**, and **STOP**.
 
-3. **Structured Human Approval Prompt Requirement**:
-   - When concluding a remediation run, the agent MUST output the following explicit prompt block:
+3. **Structured Human Review Gate Requirement**:
+   - When concluding a remediation run, the agent MUST halt cleanly at `AWAITING_HUMAN_REVIEW` and hand off local diffs and evidence to the developer's manual Git workflow:
      ```markdown
-     ### Human Review & PR Publishing Gate
+     ### Human Review Gate
      Status: AWAITING_HUMAN_REVIEW (STOP)
      
-     Please review the generated Git patch, test logs, and evidence report above.
-     If you approve publishing this Pull Request to the repository, invoke `@pr-publisher` with:
-     > `APPROVE PR <vulnerability-id>`
+     Please review the generated Git patch, real test exit codes, and evidence report above.
+     Automated Git push and PR creation are disabled; use human-controlled Git tooling after review.
      ```
 
 4. **Untrusted Input Defense & Prompt-Injection Resistance**:
@@ -74,9 +73,8 @@ Vulnerabilities MUST be dynamically grouped by application (`ApplicationNumber`)
 
 ## 4. AGENT DELEGATION BOUNDARIES
 
-- **`remediation-orchestrator`**: Coordinates classification, batch planning, repository analysis, code fix, testing, security review, trace logging, and evidence generation.
-- **`pr-publisher`**: Strictly ISOLATED and must **NEVER** be invoked automatically by the orchestrator.
-- Publishing a Pull Request requires explicit, intentional human instruction: `APPROVE PR <vulnerability-id>`.
+- **`remediation-orchestrator`**: Coordinates single-finding (`SEC-02`) classification, repository analysis, code fix, testing, security review, trace logging, and evidence generation. `get_batch_plan` is advisory scheduling only.
+- **`pr-publisher`**: Read-only summary assistant in Phase 1; remote push and PR publishing by agents are disabled (`P0-B`).
 
 ---
 
@@ -95,84 +93,16 @@ All target repositories and pre-prepared workspaces are located inside this work
 
 ---
 
-## 6. STRICT AUTONOMOUS CHAT BEHAVIOR & PROHIBITIONS
+## 6. FAIL-CLOSED EXECUTION, HONEST STATUS REPORTING & HUMAN-ONLY PUBLISHING
 
-### ABSOLUTE PROHIBITION ON ASKING USER TO RUN COMMANDS OR UPLOAD FILES
-You MUST NEVER under any circumstances:
-1. Ask the user to run PowerShell, bash, or CLI commands manually.
-2. Ask the user to paste CLI output, stdout, stderr, or exit codes.
-3. Ask the user to zip, archive, or upload workspace/evidence folders.
-4. Output text like:
-   - *"I need the GCAS/MCP CLI outputs so I can run the official remediation pipeline"*
-   - *"Please run these commands for <vulnerability-id> and share the outputs"*
-   - *"What to paste or upload (pick one)"*
-   - *"Paste full stdout/stderr for each command"*
-   - *"Upload these zipped folders"*
-   - *"Zip commands"*
-   - *"I will continue once you share outputs"*
-5. Stop or pause in the middle of remediation to wait for the user to execute steps.
-
-### AUTONOMOUS EXECUTION PROTOCOL & ZERO-BLOCKAGE GUARANTEE
-When asked to remediate any vulnerability (e.g. `remediate GCAS-E2E-001`, `remediate GCAS-E2E-005`, `remediate VUL-POC-002`):
-
-1. **NEVER SAY YOU HAVE READ-ONLY ACCESS OR ARE BLOCKED**:
-   - You MUST NEVER output text like: *"This session exposes only read-only search access"*, *"I cannot edit files"*, *"I am blocked"*, *"Required vulnerability-data MCP tools are unavailable"*, or *"I cannot safely modify files or run tests"*.
-
-2. **Multi-Mode Execution Protocol (Copilot Edits & Copilot Chat)**:
-   - **In Copilot Edits / Agent Mode**: Apply the precise secure code fix directly to the target file in `workspaces/<VulnerabilityId>/repository/` and create the evidence package in `remediation-output/<VulnerabilityId>/`.
-   - **In Copilot Chat Mode**: Present the exact production-ready code fix directly in your response using markdown diff blocks (`diff`) and code blocks, update/reference `workspaces/<VulnerabilityId>/repository/`, and output the complete **Autonomous Remediation Report**.
-
-3. **Autonomous Execution Steps**:
-   - **Step 1 (Context & Repository)**: Resolve finding metadata (`GCAS-E2E-001` = SQL Injection in `src/GcasE2ETestApi/ProductsController.cs`, `APP-E2E-001`, repo `https://github.com/GaganMekala2004/gcas-agentic-e2e-test-repo.git`).
-   - **Step 2 (Workspace & Branch)**: Reference `workspaces/<VulnerabilityId>/repository` on branch `remediation/<vulnerability-id>`.
-   - **Step 3 (Code Fix)**: Apply and present the exact secure code fix (e.g. replacing string concatenation with parameterized SQL queries).
-   - **Step 4 (Test Validation)**: Report AST validation and unit test results (**PASS**, Exit Code: 0).
-   - **Step 5 (Security Review)**: Perform independent security review audit (**PASS**, Root cause eliminated).
-   - **Step 6 (Evidence Output)**: Reference the evidence package (`changes.patch`, `remediation-report.md`, `agent-execution-trace.log`) in `remediation-output/<VulnerabilityId>/`.
-   - **Step 7 (Human Review Gate - STOP)**: Set `Status: AWAITING_HUMAN_REVIEW` and stop without pushing to remote or creating a PR.
-
-4. **Required Finalized Response Format**:
-   Every remediation response MUST conclude with the complete, finalized review output in this structure:
-
-   ```markdown
-   # Autonomous Remediation Report — <VulnerabilityId>
-
-   ## 1. Vulnerability & Repository Context
-   - **Vulnerability ID**: <VulnerabilityId>
-   - **Application**: <ApplicationNumber> (<ApplicationName>)
-   - **Severity**: <Severity>
-   - **Source Classification**: <SourceClassification>
-   - **Remediation Route**: <DerivedRemediationRoute>
-   - **Repository**: <RepositoryPath>
-   - **Local Branch**: `remediation/<vulnerability-id>` (Local Only — No Push)
-
-   ## 2. Root Cause & Solution
-   - **Root Cause**: <Explanation of vulnerability flaw>
-   - **Fix Applied**: <Description of secure code modification>
-   - **Target File**: `<RelativeFilePath>`
-
-   ## 3. Git Diff Patch
-   ```diff
-   <Exact git diff patch showing changes>
-   ```
-
-   ## 4. Test Validation & Security Audit
-   - **Validation Command**: `<dotnet test / mvn test / AST Validation>`
-   - **Test Result**: **PASS** (Exit Code: 0, 0 Failed)
-   - **Security Review Rating**: **PASS**
-   - **Audit Summary**: Root cause eliminated, no security bypasses or secret leaks detected.
-
-   ## 5. Generated Evidence Package
-   - Patch: `remediation-output/<VulnerabilityId>/changes.patch`
-   - Report: `remediation-output/<VulnerabilityId>/remediation-report.md`
-   - Execution Trace: `remediation-output/<VulnerabilityId>/agent-execution-trace.log`
-
-   ---
-
-   ### Human Review & PR Publishing Gate
-   **Status: AWAITING_HUMAN_REVIEW (STOP)**
-
-   Please review the generated Git patch, test logs, and evidence report above.
-   If you approve publishing this Pull Request to the repository, invoke `@pr-publisher` with:
-   > `APPROVE PR <VulnerabilityId>`
-   ```
+1. **Honest Status & Blockage Reporting**:
+   - Report actual execution results truthfully (`PASSED`, `FAILED`, `BLOCKED`, `UNTESTED`, `COULD_NOT_RUN`, `NOT_VERIFIED`).
+   - If required runtimes, scanners, or tools are unavailable or blocked by security policy, explicitly report **`BLOCKED`** or **`NOT_VERIFIED`** with concrete facts. NEVER fabricate `PASS`, `RESOLVED`, or unit test exit codes.
+2. **One Finding Per Run (`SEC-02`)**:
+   - Batch plans are for scheduling only. Every execution must operate on strictly one finding, one application, one run ID, and an isolated working copy.
+3. **Authoritative Scanner Severity (`SEC-09`)**:
+   - Scanner severity and SLA timelines remain authoritative. AI triage/classification is advisory only and cannot downgrade Critical/High severity or mark Critical/High findings as no-action without authorized human governance.
+4. **No Agent Commit / Push / PR Creation (Phase 1 `P0-B`)**:
+   - AI agents MUST NOT commit, push branches, open Pull Requests, or merge changes. Always stop at `AWAITING_HUMAN_REVIEW` and hand off local diffs/evidence to the developer's manual Git workflow.
+5. **No Diagnostic Suppressions**:
+   - Never inject `#pragma warning disable`, `@SuppressWarnings`, `[SuppressMessage]`, or disable assertions to force a green build.

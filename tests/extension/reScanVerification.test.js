@@ -113,8 +113,9 @@ async function run() {
     console.log('  ✓ Missing scanner produces NOT VERIFIED without fabricated success');
 
     // 6. RemediationEngine Stage 6 & Markdown Evidence Generation
-    const engine = new RemediationEngine(workspaceRoot, store, verifier);
-    assert(typeof engine.reScanVerifier === 'object');
+    const engine = new RemediationEngine(workspaceRoot, null, { findingsStore: store, reScanVerifier: verifier });
+    assert.strictEqual(engine.reScanVerifier, verifier, 'RemediationEngine must wire reScanVerifier from options');
+    assert(engine.reScanVerifier instanceof ReScanVerifier);
     console.log('  ✓ RemediationEngine integrates ReScanVerifier in Stage 6 and documentation evidence');
 
     // Clean up temp test directory

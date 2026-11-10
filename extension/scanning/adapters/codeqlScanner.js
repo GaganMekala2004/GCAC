@@ -1,6 +1,6 @@
 'use strict';
 
-const { spawn, execSync } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
@@ -113,8 +113,13 @@ class CodeQLScanner extends ScannerAdapter {
 
         // 4. System PATH
         try {
-            const cmd = process.platform === 'win32' ? `where ${exeName}` : `which ${exeName}`;
-            const found = execSync(cmd, { stdio: 'pipe', timeout: 3000, encoding: 'utf-8' }).trim().split('\n')[0].trim();
+            const lookupTool = process.platform === 'win32' ? 'where' : 'which';
+            const found = execFileSync(lookupTool, [exeName], {
+                stdio: 'pipe',
+                timeout: 3000,
+                encoding: 'utf-8',
+                shell: false
+            }).trim().split(/\r?\n/)[0].trim();
             if (found && fs.existsSync(found)) return found;
         } catch { /* not on PATH */ }
 
@@ -147,10 +152,14 @@ class CodeQLScanner extends ScannerAdapter {
         }
 
         try {
-            const ver = execSync(`"${bin}" version --format=json`, {
+            if (typeof bin !== 'string' || bin.includes('\0')) {
+                throw new Error('Invalid CodeQL executable path');
+            }
+            const ver = execFileSync(bin, ['version', '--format=json'], {
                 timeout: 8000,
                 encoding: 'utf-8',
-                stdio: ['ignore', 'pipe', 'ignore']
+                stdio: ['ignore', 'pipe', 'ignore'],
+                shell: false
             }).trim();
             const parsed = JSON.parse(ver);
             this.status = SCANNER_STATUS.READY;
@@ -494,11 +503,21 @@ class CodeQLScanner extends ScannerAdapter {
      * Throws on non-zero exit code or timeout.
      */
     _execCodeql(bin, args, opts = {}) {
-        const cmd = `"${bin}" ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`;
-        execSync(cmd, {
+        if (typeof bin !== 'string' || !bin.trim() || bin.includes('\0')) {
+            throw new Error('Invalid CodeQL executable path.');
+        }
+        const safeArgs = (Array.isArray(args) ? args : []).map((arg) => {
+            const str = String(arg ?? '');
+            if (str.includes('\0')) {
+                throw new Error('CodeQL argument contains invalid null byte.');
+            }
+            return str;
+        });
+        execFileSync(bin, safeArgs, {
             timeout: opts.timeout || 180000,
             stdio: 'ignore',
-            windowsHide: true
+            windowsHide: true,
+            shell: false
         });
     }
 

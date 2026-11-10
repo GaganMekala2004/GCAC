@@ -2,5 +2,25 @@
   "github.copilot.chat.agent.enabled": true,
   "mcp.serverConfigurationFiles": [
     ".vscode/mcp.json"
-  ]
+  ],
+  "chat.tools.terminal.autoApprove": {
+    "git": false,
+    "gh": false,
+    "az": false,
+    "tf": false,
+    "terraform": false,
+    "curl": false,
+    "wget": false,
+    "ssh": false,
+    "scp": false,
+    "Invoke-WebRequest": false,
+    "Invoke-RestMethod": false,
+    "Connect-AzAccount": false,
+    "Invoke-AzRestMethod": false,
+    "Start-Process": false,
+    "Start-BitsTransfer": false,
+    "dotnet nuget push": false,
+    "npm publish": false,
+    "mvn deploy": false
+  }
 }

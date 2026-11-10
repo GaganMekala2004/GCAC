@@ -1,4 +1,4 @@
-const { spawn, execSync } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { ScannerAdapter } = require('../scannerAdapter');
@@ -86,7 +86,11 @@ class DotnetSecurityScanner extends ScannerAdapter {
         }
 
         try {
-            const ver = execSync('dotnet --version', { timeout: 4000, encoding: 'utf-8' }).trim();
+            const ver = execFileSync('dotnet', ['--version'], {
+                timeout: 4000,
+                encoding: 'utf-8',
+                shell: false
+            }).trim();
             return {
                 available: true,
                 version: ver
@@ -248,7 +252,11 @@ class DotnetSecurityScanner extends ScannerAdapter {
             let stderr = '';
 
             try {
-                const child = spawn('dotnet', args, { cwd, env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1' } });
+                const child = spawn('dotnet', args, {
+                    cwd,
+                    shell: false,
+                    env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1' }
+                });
                 this.activeProcess = child;
 
                 const timer = setTimeout(() => {
