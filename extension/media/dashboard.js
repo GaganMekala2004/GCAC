@@ -106,7 +106,7 @@
     const dashFilterSeverity = document.getElementById('dashFilterSeverity');
     const dashFilterStatus = document.getElementById('dashFilterStatus');
     const btnResetDashFilters = document.getElementById('btnResetDashFilters');
-    
+
     const dashKpiTotal = document.getElementById('dashKpiTotal');
     const dashKpiCritical = document.getElementById('dashKpiCritical');
     const dashKpiInProgress = document.getElementById('dashKpiInProgress');
@@ -251,6 +251,33 @@
     let scanTimerInterval = null;
     let scanStartTime = 0;
 
+    // DOM Elements - CodeQL Status Panel
+    const codeqlStatusBadge    = document.getElementById('codeqlStatusBadge');
+    const codeqlStatusText     = document.getElementById('codeqlStatusText');
+    const codeqlInstallGuide   = document.getElementById('codeqlInstallGuide');
+    const codeqlInstalledInfo  = document.getElementById('codeqlInstalledInfo');
+    const codeqlVersionDisplay = document.getElementById('codeqlVersionDisplay');
+    const codeqlBinaryDisplay  = document.getElementById('codeqlBinaryDisplay');
+    const codeqlInstallCmd     = document.getElementById('codeqlInstallCmd');
+    const btnRefreshCodeqlStatus   = document.getElementById('btnRefreshCodeqlStatus');
+    const btnInstallCodeql         = document.getElementById('btnInstallCodeql');
+    const btnCopyCodeqlInstallCmd  = document.getElementById('btnCopyCodeqlInstallCmd');
+
+    // DOM Elements - Target Selection & Scan Chooser
+    const dashZeroStateBanner = document.getElementById('dashZeroStateBanner');
+    const btnDashScanNow = document.getElementById('btnDashScanNow');
+    const selectScanPreset = document.getElementById('selectScanPreset');
+    const btnChooseFolder = document.getElementById('btnChooseFolder');
+    const btnChooseFile = document.getElementById('btnChooseFile');
+    const inputScanTargetPath = document.getElementById('inputScanTargetPath');
+    const btnClearScanTarget = document.getElementById('btnClearScanTarget');
+    const selectedTargetBadge = document.getElementById('selectedTargetBadge');
+    const btnResetScanToZero = document.getElementById('btnResetScanToZero');
+    const targetPickerModal = document.getElementById('targetPickerModal');
+    const btnTargetPickerClose = document.getElementById('btnTargetPickerClose');
+    const targetPickerSearch = document.getElementById('targetPickerSearch');
+    const targetPickerList = document.getElementById('targetPickerList');
+
     // DOM Elements - Settings View
     const settingsRepoVal = document.getElementById('settingsRepoVal');
     const settingsCsvVal = document.getElementById('settingsCsvVal');
@@ -388,6 +415,7 @@
         } else if (viewId === 'scans') {
             postToHost({ command: 'getScanners' });
             postToHost({ command: 'getScanHistory' });
+            postToHost({ command: 'getCodeqlStatus' });
         }
     }
 
@@ -488,6 +516,77 @@
             });
         }
 
+        // Dashboard Zero State Call-to-Action
+        if (btnDashScanNow) {
+            btnDashScanNow.addEventListener('click', () => {
+                switchView('scans');
+            });
+        }
+
+        // Target Selection & File Chooser Controls
+        if (selectScanPreset) {
+            selectScanPreset.addEventListener('change', () => {
+                const val = selectScanPreset.value;
+                if (inputScanTargetPath) inputScanTargetPath.value = val;
+                updateSelectedTargetDisplay(val, true);
+                postToHost({ command: 'selectScanTarget', targetPath: val });
+            });
+        }
+
+        if (btnChooseFolder) {
+            btnChooseFolder.addEventListener('click', () => {
+                postToHost({ command: 'selectRepo' });
+            });
+        }
+
+        if (btnChooseFile) {
+            btnChooseFile.addEventListener('click', () => {
+                postToHost({ command: 'selectFile' });
+            });
+        }
+
+        if (btnClearScanTarget) {
+            btnClearScanTarget.addEventListener('click', () => {
+                if (inputScanTargetPath) inputScanTargetPath.value = '';
+                if (selectScanPreset) selectScanPreset.value = '';
+                updateSelectedTargetDisplay('', false);
+                postToHost({ command: 'selectScanTarget', targetPath: '' });
+                showToast('Target cleared. Will scan workspace root if run.', 'info');
+            });
+        }
+
+        if (inputScanTargetPath) {
+            inputScanTargetPath.addEventListener('change', () => {
+                const val = inputScanTargetPath.value.trim();
+                updateSelectedTargetDisplay(val, false);
+                postToHost({ command: 'selectScanTarget', targetPath: val });
+            });
+        }
+
+        if (btnResetScanToZero) {
+            btnResetScanToZero.addEventListener('click', () => {
+                postToHost({ command: 'clearScanResults' });
+            });
+        }
+
+        if (btnTargetPickerClose) {
+            btnTargetPickerClose.addEventListener('click', () => {
+                closeTargetPickerModal();
+            });
+        }
+
+        if (targetPickerSearch) {
+            targetPickerSearch.addEventListener('input', () => {
+                const q = targetPickerSearch.value.toLowerCase().trim();
+                if (targetPickerList) {
+                    targetPickerList.querySelectorAll('.dash-list-item').forEach(el => {
+                        const txt = el.textContent.toLowerCase();
+                        el.style.display = txt.includes(q) ? 'flex' : 'none';
+                    });
+                }
+            });
+        }
+
         // Scans View Execution Controls
         if (btnStartScan) {
             btnStartScan.addEventListener('click', () => {
@@ -499,6 +598,29 @@
             btnCancelScan.addEventListener('click', () => {
                 postToHost({ command: 'cancelScan' });
                 showToast('Cancelling vulnerability scan...', 'warning');
+            });
+        }
+
+        // ── CodeQL Status Panel ──────────────────────────────────────────────
+        if (btnRefreshCodeqlStatus) {
+            btnRefreshCodeqlStatus.addEventListener('click', () => {
+                if (codeqlStatusBadge) { codeqlStatusBadge.className = 'badge badge-secondary'; codeqlStatusBadge.textContent = 'Checking...'; }
+                if (codeqlStatusText) codeqlStatusText.textContent = 'Re-checking CodeQL CLI status...';
+                postToHost({ command: 'getCodeqlStatus' });
+            });
+        }
+        if (btnInstallCodeql) {
+            btnInstallCodeql.addEventListener('click', () => {
+                postToHost({ command: 'installCodeql' });
+                showToast('CodeQL install initiated — check the terminal for progress.', 'info');
+            });
+        }
+        if (btnCopyCodeqlInstallCmd) {
+            btnCopyCodeqlInstallCmd.addEventListener('click', () => {
+                const cmd = codeqlInstallCmd ? codeqlInstallCmd.textContent : 'node scripts/setup-codeql.js';
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(cmd).then(() => showToast('Install command copied to clipboard', 'success'));
+                }
             });
         }
 
@@ -908,8 +1030,24 @@
                     showToast(message.error || 'Remediation pipeline error', 'error');
                     break;
 
+                case 'TARGET_SELECTED':
+                    if (inputScanTargetPath) inputScanTargetPath.value = message.targetPath || '';
+                    if (selectScanPreset && message.targetPath) {
+                        selectScanPreset.value = message.targetPath;
+                    }
+                    updateSelectedTargetDisplay(message.targetPath, message.isFolder);
+                    break;
+
+                case 'SHOW_TARGET_PICKER':
+                    openTargetPickerModal(message.targets, message.mode);
+                    break;
+
                 case 'SCANNERS_LOADED':
                     renderScannersCards(message.scanners);
+                    break;
+
+                case 'CODEQL_STATUS':
+                    handleCodeqlStatus(message);
                     break;
 
                 case 'SCAN_HISTORY_LOADED':
@@ -975,7 +1113,7 @@
     // --------------------------------------------------------------------------
     function startRemediation(vulnerabilityId) {
         isRemediating = true;
-        
+
         // Update header & buttons
         if (headerRunIndicator) headerRunIndicator.style.display = 'flex';
         if (headerRunText) headerRunText.textContent = `Remediating ${vulnerabilityId}...`;
@@ -1147,7 +1285,7 @@
             const rate = Math.round((remediated / completedRuns) * 100);
             if (dashKpiSuccessRate) dashKpiSuccessRate.textContent = `${rate}%`;
         } else {
-            if (dashKpiSuccessRate) dashKpiSuccessRate.textContent = 'N/A';
+            if (dashKpiSuccessRate) dashKpiSuccessRate.textContent = total === 0 ? '0%' : 'N/A';
         }
 
         // Timing metrics from detailsCache or reports
@@ -1188,14 +1326,18 @@
             }
         });
 
-        if (dashKpiAvgDuration) dashKpiAvgDuration.textContent = totalDurationCount > 0 ? `${(totalDurationSum / totalDurationCount).toFixed(1)}s` : 'N/A';
-        if (timeMetricAnalysis) timeMetricAnalysis.textContent = analysisDurationCount > 0 ? `${(analysisDurationSum / analysisDurationCount).toFixed(1)}s` : 'N/A';
-        if (timeMetricRemediation) timeMetricRemediation.textContent = remediationDurationCount > 0 ? `${(remediationDurationSum / remediationDurationCount).toFixed(1)}s` : 'N/A';
-        if (timeMetricTest) timeMetricTest.textContent = testDurationCount > 0 ? `${(testDurationSum / testDurationCount).toFixed(1)}s` : 'N/A';
-        if (timeMetricApproval) timeMetricApproval.textContent = approvalWaitCount > 0 ? `${(approvalWaitSum / approvalWaitCount).toFixed(1)}s` : 'N/A';
+        if (dashKpiAvgDuration) dashKpiAvgDuration.textContent = totalDurationCount > 0 ? `${(totalDurationSum / totalDurationCount).toFixed(1)}s` : (total === 0 ? '0s' : 'N/A');
+        if (timeMetricAnalysis) timeMetricAnalysis.textContent = analysisDurationCount > 0 ? `${(analysisDurationSum / analysisDurationCount).toFixed(1)}s` : (total === 0 ? '0s' : 'N/A');
+        if (timeMetricRemediation) timeMetricRemediation.textContent = remediationDurationCount > 0 ? `${(remediationDurationSum / remediationDurationCount).toFixed(1)}s` : (total === 0 ? '0s' : 'N/A');
+        if (timeMetricTest) timeMetricTest.textContent = testDurationCount > 0 ? `${(testDurationSum / testDurationCount).toFixed(1)}s` : (total === 0 ? '0s' : 'N/A');
+        if (timeMetricApproval) timeMetricApproval.textContent = approvalWaitCount > 0 ? `${(approvalWaitSum / approvalWaitCount).toFixed(1)}s` : (total === 0 ? '0s' : 'N/A');
 
         // Quality Metrics
-        if (qualityMetricFirstPass) qualityMetricFirstPass.textContent = completedRuns > 0 ? `${Math.round((remediated / completedRuns) * 100)}%` : 'N/A';
+        if (qualityMetricFirstPass) qualityMetricFirstPass.textContent = completedRuns > 0 ? `${Math.round((remediated / completedRuns) * 100)}%` : (total === 0 ? '0%' : 'N/A');
+
+        if (dashZeroStateBanner) {
+            dashZeroStateBanner.style.display = total === 0 ? 'flex' : 'none';
+        }
 
         // Calculate genuine test pass rate from detailsCache
         let genuineTestsPassed = 0;
@@ -1348,9 +1490,19 @@
     function renderActivityTrendChart(data) {
         if (!chartCategoryContainer) return;
 
+        if (!data || data.length === 0) {
+            chartCategoryContainer.innerHTML = `
+                <div class="empty-state" style="padding: 30px; text-align: center; width: 100%;">
+                    <p style="font-weight: 500; color: var(--text-muted); font-size: 13px;">No scan activity recorded yet.</p>
+                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Run a vulnerability scan to populate trend data.</p>
+                </div>
+            `;
+            return;
+        }
+
         // Group data by chronological buckets based on finding dates
         const months = ['Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'];
-        const totalCounts = [2, 5, 8, 12, data.length || 17, data.length || 17];
+        const totalCounts = [2, 5, 8, 12, data.length, data.length];
         const remediatedCounts = [0, 1, 2, 4, 7, 7];
 
         const width = 460;
@@ -1410,9 +1562,9 @@
 
                     <!-- X-Axis Labels -->
                     ${months.map((m, i) => {
-                        const x = padX + (i / (months.length - 1)) * graphW;
-                        return `<text x="${x}" y="${height - 6}" font-size="10" fill="var(--text-muted)" text-anchor="middle" font-family="var(--font-sans)">${m}</text>`;
-                    }).join('')}
+            const x = padX + (i / (months.length - 1)) * graphW;
+            return `<text x="${x}" y="${height - 6}" font-size="10" fill="var(--text-muted)" text-anchor="middle" font-family="var(--font-sans)">${m}</text>`;
+        }).join('')}
                 </svg>
 
                 <div class="chart-legend" style="justify-content: center; margin-top: 8px;">
@@ -1431,6 +1583,32 @@
 
     function renderSeverityDonutChart(data) {
         if (!chartSeverityContainer) return;
+
+        if (!data || data.length === 0) {
+            const size = 150;
+            const strokeWidth = 18;
+            const radius = (size - strokeWidth) / 2;
+            chartSeverityContainer.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-around; width: 100%;">
+                    <div style="position: relative; width: ${size}px; height: ${size}px;">
+                        <svg viewBox="0 0 ${size} ${size}" class="svg-chart">
+                            <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="var(--bg-surface-hover)" stroke-width="${strokeWidth}" />
+                        </svg>
+                        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
+                            <span style="font-size: 20px; font-weight: 700; color: var(--text-primary); line-height: 1;">0</span>
+                            <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px;">Total</span>
+                        </div>
+                    </div>
+                    <div class="chart-legend" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                        <div class="legend-item"><span class="legend-color" style="background: var(--danger);"></span><span>Critical:</span><strong style="color: var(--text-primary); margin-left: 4px;">0</strong></div>
+                        <div class="legend-item"><span class="legend-color" style="background: var(--warning);"></span><span>High:</span><strong style="color: var(--text-primary); margin-left: 4px;">0</strong></div>
+                        <div class="legend-item"><span class="legend-color" style="background: var(--sev-medium-text);"></span><span>Medium:</span><strong style="color: var(--text-primary); margin-left: 4px;">0</strong></div>
+                        <div class="legend-item"><span class="legend-color" style="background: var(--accent);"></span><span>Low:</span><strong style="color: var(--text-primary); margin-left: 4px;">0</strong></div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
 
         const critical = data.filter(v => (v.Severity || '').toUpperCase() === 'CRITICAL').length;
         const high = data.filter(v => (v.Severity || '').toUpperCase() === 'HIGH').length;
@@ -1703,14 +1881,20 @@
         vulnTableBody.innerHTML = '';
 
         if (list.length === 0) {
+            const hasAny = allVulnerabilities.length > 0;
             vulnTableBody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="empty-state">
-                        <p style="font-weight: 600;">No vulnerabilities match your filter criteria.</p>
-                        <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Try clearing filters or search query.</p>
+                    <td colspan="9" class="empty-state" style="padding: 36px 16px; text-align: center;">
+                        <p style="font-weight: 600; font-size: 13px; color: var(--text-primary);">${hasAny ? 'No vulnerabilities match your filter criteria.' : 'No vulnerabilities scanned yet.'}</p>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${hasAny ? 'Try clearing filters or search query.' : 'Select files or a repository in Local Scanners and click Run Vulnerability Scan.'}</p>
+                        ${!hasAny ? '<button class="btn btn-primary btn-sm" id="btnTableGoToScans" style="margin-top: 12px;">Go to Local Scanners ➔</button>' : ''}
                     </td>
                 </tr>
             `;
+            const btnScans = vulnTableBody.querySelector('#btnTableGoToScans');
+            if (btnScans) {
+                btnScans.addEventListener('click', () => switchView('scans'));
+            }
             return;
         }
 
@@ -1946,7 +2130,7 @@
 
         if (patch && patch.trim().length > 0) {
             if (diffSummaryBar) diffSummaryBar.style.display = 'flex';
-            
+
             const lines = patch.split('\n');
             const adds = lines.filter(l => l.startsWith('+') && !l.startsWith('+++')).length;
             const dels = lines.filter(l => l.startsWith('-') && !l.startsWith('---')).length;
@@ -2135,6 +2319,74 @@
         });
     }
 
+    function updateSelectedTargetDisplay(targetPath, isFolder) {
+        if (!selectedTargetBadge) return;
+        if (!targetPath || targetPath === '.') {
+            selectedTargetBadge.textContent = targetPath === '.' ? 'Entire Workspace' : 'No Target Selected';
+            selectedTargetBadge.className = 'badge ' + (targetPath === '.' ? 'badge-primary' : 'badge-secondary');
+        } else {
+            const cleanPath = targetPath.replace(/\\/g, '/');
+            const fileName = cleanPath.split('/').filter(Boolean).pop() || cleanPath;
+            const typeLabel = isFolder ? 'Folder' : (cleanPath.includes('.') ? 'File' : 'Target');
+            selectedTargetBadge.textContent = `${typeLabel}: ${fileName}`;
+            selectedTargetBadge.className = 'badge badge-success';
+            selectedTargetBadge.title = targetPath;
+        }
+        if (displayRepoName && targetPath) {
+            displayRepoName.textContent = targetPath.split(/[/\\]/).filter(Boolean).pop() || targetPath;
+            displayRepoName.title = targetPath;
+        }
+    }
+
+    function openTargetPickerModal(targets, mode) {
+        if (!targetPickerModal) return;
+        targetPickerModal.style.display = 'flex';
+        const titleEl = document.getElementById('targetPickerTitle');
+        if (titleEl) titleEl.textContent = mode === 'file' ? 'Select File to Scan' : 'Select Folder / Repository to Scan';
+        renderTargetPickerList(targets || [], mode);
+    }
+
+    function closeTargetPickerModal() {
+        if (targetPickerModal) targetPickerModal.style.display = 'none';
+    }
+
+    function renderTargetPickerList(targets, mode) {
+        if (!targetPickerList) return;
+        targetPickerList.innerHTML = '';
+        if (!targets || targets.length === 0) {
+            targetPickerList.innerHTML = '<div class="empty-state" style="padding: 16px;">No targets discovered in workspace.</div>';
+            return;
+        }
+
+        const filtered = targets.filter(t => mode === 'file' ? !t.isFolder : t.isFolder);
+        const listToRender = filtered.length > 0 ? filtered : targets;
+
+        listToRender.forEach(t => {
+            const item = document.createElement('div');
+            item.className = 'dash-list-item';
+            item.style.cursor = 'pointer';
+            item.style.padding = '8px 12px';
+            item.style.display = 'flex';
+            item.style.alignItems = 'center';
+            item.style.justifyContent = 'space-between';
+            item.innerHTML = `
+                <div>
+                    <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${t.isFolder ? '📁' : '📄'} ${escapeHtml(t.name || t.path)}</div>
+                    <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(t.path)}</div>
+                </div>
+                <button class="btn btn-secondary btn-sm">Select</button>
+            `;
+            item.addEventListener('click', () => {
+                if (inputScanTargetPath) inputScanTargetPath.value = t.path;
+                updateSelectedTargetDisplay(t.path, t.isFolder);
+                postToHost({ command: 'selectScanTarget', targetPath: t.path });
+                closeTargetPickerModal();
+                showToast(`Target selected: ${t.path}`, 'info');
+            });
+            targetPickerList.appendChild(item);
+        });
+    }
+
     // --------------------------------------------------------------------------
     // Vulnerability Scanning & Adapter Management
     // --------------------------------------------------------------------------
@@ -2150,11 +2402,13 @@
             return;
         }
 
+        const chosenTarget = (inputScanTargetPath ? inputScanTargetPath.value.trim() : '') || currentConfig.activeRepo;
+
         if (btnStartScan) btnStartScan.disabled = true;
         if (btnCancelScan) btnCancelScan.style.display = 'inline-flex';
         if (scanProgressCard) scanProgressCard.style.display = 'block';
         if (scanProgressBarFill) scanProgressBarFill.style.width = '5%';
-        if (scanProgressText) scanProgressText.textContent = 'Starting selected scanner adapters...';
+        if (scanProgressText) scanProgressText.textContent = `Starting scan on ${chosenTarget || 'workspace'}...`;
 
         scanStartTime = Date.now();
         if (scanTimerInterval) clearInterval(scanTimerInterval);
@@ -2166,7 +2420,7 @@
         postToHost({
             command: 'scanRepository',
             scannerIds: scannerIds,
-            targetRepo: currentConfig.activeRepo
+            targetRepo: chosenTarget
         });
     }
 
@@ -2189,13 +2443,14 @@
         if (btnStartScan) btnStartScan.disabled = false;
         if (btnCancelScan) btnCancelScan.style.display = 'none';
         if (scanProgressBarFill) scanProgressBarFill.style.width = '100%';
-        if (scanProgressText) scanProgressText.textContent = `Scan complete: ${data.findingsCount || 0} finding(s) discovered`;
+        const count = data.findingsCount !== undefined ? data.findingsCount : (data.result?.findingsSummary?.total || 0);
+        if (scanProgressText) scanProgressText.textContent = `Scan complete: ${count} finding(s) discovered`;
 
         setTimeout(() => {
             if (scanProgressCard) scanProgressCard.style.display = 'none';
         }, 3000);
 
-        showToast(`Scan completed: ${data.findingsCount || 0} findings discovered`, 'success');
+        showToast(`Scan completed: ${count} findings discovered`, 'success');
         postToHost({ command: 'getScanHistory' });
         postToHost({ command: 'requestData' });
     }
@@ -2222,7 +2477,24 @@
         scanners.forEach(s => {
             const card = document.createElement('div');
             card.className = 'scanner-card';
-            const statusClass = s.status === 'Ready' ? 'badge-success' : (s.status === 'Running' ? 'badge-info' : 'badge-secondary');
+            // CodeQL gets special treatment: show NOT_INSTALLED distinctly vs. Ready
+            const isCodeql = s.id === 'codeql';
+            const isReady  = s.available !== false && (s.status === 'Ready' || s.status === 'Completed');
+            const isNotInstalled = s.available === false || s.status === 'Not Installed';
+            const statusClass = isReady ? 'badge-success'
+                : (s.status === 'Running' ? 'badge-info'
+                : (isNotInstalled ? 'badge-warning' : 'badge-secondary'));
+            const statusLabel = isNotInstalled ? 'Not Installed' : (s.status || 'Ready');
+
+            const metaRow = `<div class="scanner-meta-row">
+                <span class="scanner-meta-label">Rules:</span>
+                <span class="scanner-meta-val">${s.rulesCount || (s.rules ? s.rules.length : 'Configured')}</span>
+                <span class="scanner-meta-label" style="margin-left: 12px;">Targets:</span>
+                <span class="scanner-meta-val font-mono">${escapeHtml((s.languages || ['csharp']).join(', '))}</span>
+            </div>`;
+            const codeqlWarning = isCodeql && isNotInstalled
+                ? `<div style="margin-top:6px; font-size:11px; color:var(--color-warning);">⚠ Run <code>node scripts/setup-codeql.js</code> to enable semantic analysis.</div>`
+                : '';
 
             card.innerHTML = `
                 <div class="scanner-card-header">
@@ -2230,20 +2502,47 @@
                         <div class="scanner-card-title">${escapeHtml(s.name)}</div>
                         <div class="scanner-card-id">${escapeHtml(s.id)} v${escapeHtml(s.version || '1.0')}</div>
                     </div>
-                    <span class="badge ${statusClass}">${escapeHtml(s.status || 'Ready')}</span>
+                    <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
                 </div>
                 <div class="scanner-card-body">
                     <p class="scanner-card-desc">${escapeHtml(s.description || 'Static analysis and security verification module.')}</p>
-                    <div class="scanner-meta-row">
-                        <span class="scanner-meta-label">Rules:</span>
-                        <span class="scanner-meta-val">${s.rulesCount || (s.rules ? s.rules.length : 'Configured')}</span>
-                        <span class="scanner-meta-label" style="margin-left: 12px;">Targets:</span>
-                        <span class="scanner-meta-val font-mono">${escapeHtml((s.languages || ['csharp']).join(', '))}</span>
-                    </div>
+                    ${codeqlWarning}
+                    ${isCodeql && isNotInstalled ? '' : metaRow}
                 </div>
             `;
             scannersCardsGrid.appendChild(card);
         });
+    }
+
+    /**
+     * Handles the CODEQL_STATUS message from the extension host.
+     * Updates the CodeQL status panel in the Local Scanners view.
+     */
+    function handleCodeqlStatus(data) {
+        if (!codeqlStatusBadge) return;
+
+        if (data.available) {
+            codeqlStatusBadge.className = 'badge badge-success';
+            codeqlStatusBadge.textContent = 'Installed';
+            if (codeqlStatusText) codeqlStatusText.textContent = `GitHub CodeQL CLI v${data.version || 'unknown'} detected and ready.`;
+            if (codeqlInstallGuide)  codeqlInstallGuide.style.display  = 'none';
+            if (codeqlInstalledInfo) codeqlInstalledInfo.style.display = 'block';
+            if (codeqlVersionDisplay) codeqlVersionDisplay.textContent = data.version || 'unknown';
+            if (codeqlBinaryDisplay)  codeqlBinaryDisplay.textContent  = data.binaryPath || 'system PATH';
+        } else {
+            codeqlStatusBadge.className = 'badge badge-warning';
+            codeqlStatusBadge.textContent = 'Not Installed';
+            if (codeqlStatusText) codeqlStatusText.textContent = 'CodeQL CLI is not installed. Semantic data-flow analysis is unavailable.';
+            if (codeqlInstallGuide)  codeqlInstallGuide.style.display  = 'block';
+            if (codeqlInstalledInfo) codeqlInstalledInfo.style.display = 'none';
+            if (codeqlInstallCmd) {
+                const localPath = data.localBinPath || '';
+                const installNote = localPath
+                    ? `node scripts/setup-codeql.js  # installs to tools/codeql/`
+                    : 'node scripts/setup-codeql.js';
+                codeqlInstallCmd.textContent = installNote;
+            }
+        }
     }
 
     function renderScanHistory(history) {
