@@ -716,6 +716,7 @@
                                         <p>Root Cause Analysis and proposed patch generated. Authorize code change to
                                             proceed to Bench Testing.</p>
                                         <div id="gate4PatchSummary" class="u-mt-6"></div>
+                                        <div id="gate4TrustMeta" class="gate4-trust-meta u-mt-6 u-hidden"></div>
                                     </div>
                                     <div class="gate-card-actions">
                                         <button class="btn btn-success btn-sm" id="btnApprove">✓ Authorize Fix</button>
@@ -770,6 +771,7 @@
                                 </div>
 
                                 <!-- Evidence Tabs -->
+                                <div class="evidence-integrity-banner u-hidden" id="evidenceIntegrityBanner"></div>
                                 <div class="evidence-tabs-header">
                                     <button class="tab-btn active" data-tab="report">Audit Report</button>
                                     <button class="tab-btn" data-tab="diff">Patch Diff</button>

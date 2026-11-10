@@ -1,0 +1,154 @@
+{
+  "bundleVersion": "2.0.0",
+  "toolPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "sharedInstructionPath": ".github/copilot-instructions.md",
+  "sharedInstructionHash": "0b22def04798a5ba50fb59b9c5502764d04f601a79ee560ff8a9a98146d75447",
+  "forbiddenTools": [
+    "vulnerability-data/approve_pr",
+    "vulnerability-data/approve_remediation_pr",
+    "vulnerability-data/publish_remediation_pr",
+    "vulnerability-data/execute_batch_remediation",
+    "run_in_terminal",
+    "web_fetch"
+  ],
+  "trustModel": {
+    "distribution": "EXTENSION_DISTRIBUTED_BASELINE",
+    "enterpriseSignedBundleSupported": true,
+    "adminRepoTarget": ".github-private/agents",
+    "signatureStatus": "UNSIGNED_LOCAL_BASELINE",
+    "note": "Extension-distributed baseline detects local workspace tampering; enterprise cryptographic non-repudiation requires Phase 4 admin-signed bundle PKI."
+  },
+  "agents": [
+    {
+      "agentName": "dependency-fix",
+      "agentRole": "3PP Dependency Remediation Specialist",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/dependency-fix.agent.md",
+      "configurationHash": "b723e2529c657d369a821bd55d242d4ac87d35974ba245fc616ef368af12cd98",
+      "allowedTools": []
+    },
+    {
+      "agentName": "dotnet-fix",
+      "agentRole": ".NET Source Remediation Specialist",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/dotnet-fix.agent.md",
+      "configurationHash": "a840cce8833f90541f126dc3c0047f9aaa71c8063de90324b3b129693ba384ac",
+      "allowedTools": []
+    },
+    {
+      "agentName": "java-spring-fix",
+      "agentRole": "Java Spring Remediation Specialist",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/java-spring-fix.agent.md",
+      "configurationHash": "47c928bfb2641fde703333fe6246603a15e832c6e8b5852c44cb25582f5635ac",
+      "allowedTools": []
+    },
+    {
+      "agentName": "large-refactor-planner",
+      "agentRole": "Architectural Migration Plan-Only Specialist",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/large-refactor-planner.agent.md",
+      "configurationHash": "8e8268110d6f81df680a896fefbbeef1d7fd3c6478667ec44e9e72bf04c0d655",
+      "allowedTools": []
+    },
+    {
+      "agentName": "pr-publisher",
+      "agentRole": "Read-Only PR Summary Assistant",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/pr-publisher.agent.md",
+      "configurationHash": "3cbb855b41611583ab55a35b9c7dbe167b9f5bf184049a35208a2b4db746f315",
+      "allowedTools": [
+        "vulnerability-data/get_remediation_context",
+        "vulnerability-data/get_evidence_report",
+        "vulnerability-data/get_vulnerability_diff"
+      ]
+    },
+    {
+      "agentName": "remediation-orchestrator",
+      "agentRole": "Primary Remediation Orchestrator",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/remediation-orchestrator.agent.md",
+      "configurationHash": "06badf7e24e9491df40ce4c82bdbc246a5bb764c9ac8607f89ee5dc5ec68d8f6",
+      "allowedTools": [
+        "vulnerability-data/get_vulnerability",
+        "vulnerability-data/get_vulnerability_context",
+        "vulnerability-data/get_remediation_context",
+        "vulnerability-data/get_application_vulnerabilities",
+        "vulnerability-data/get_vulnerabilities_by_classification",
+        "vulnerability-data/get_vulnerabilities_by_severity",
+        "vulnerability-data/get_out_of_sla_vulnerabilities",
+        "vulnerability-data/get_internet_facing_vulnerabilities",
+        "vulnerability-data/get_repository_mapping",
+        "vulnerability-data/get_vulnerability_status",
+        "vulnerability-data/get_remediation_status",
+        "vulnerability-data/get_batch_plan",
+        "vulnerability-data/prepare_workspace",
+        "vulnerability-data/prepare_remediation_workspace",
+        "vulnerability-data/execute_remediation",
+        "vulnerability-data/run_tests",
+        "vulnerability-data/run_validation_tests",
+        "vulnerability-data/run_security_review",
+        "vulnerability-data/generate_evidence",
+        "vulnerability-data/get_vulnerability_diff",
+        "vulnerability-data/get_evidence_report",
+        "vulnerability-data/get_execution_trace_log",
+        "vulnerability-data/import_vulnerabilities",
+        "vulnerability-data/validate_vulnerability",
+        "vulnerability-data/validate_database"
+      ]
+    },
+    {
+      "agentName": "repository-context",
+      "agentRole": "Read-Only Repository Inspector",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/repository-context.agent.md",
+      "configurationHash": "1f74d5a9df5fcc60826a2993ddd25b8d82332dd6f17915a03692362754febdae",
+      "allowedTools": [
+        "vulnerability-data/get_repository_mapping"
+      ]
+    },
+    {
+      "agentName": "security-review",
+      "agentRole": "Read-Only Diff Security Auditor",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/security-review.agent.md",
+      "configurationHash": "3d30d61fa7c7d901086f8f5c4119084721d4bb7b491cabd35c27c69a571e8151",
+      "allowedTools": [],
+      "skills": [
+        "security-validation"
+      ]
+    },
+    {
+      "agentName": "specialized-action-analyzer",
+      "agentRole": "Read-Only Specialized Action Analyzer",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/specialized-action-analyzer.agent.md",
+      "configurationHash": "5f606ef1c30d8662801d31f99c45791fdaf73446076f8b1ae77a92c026af5902",
+      "allowedTools": [
+        "vulnerability-data/get_remediation_context"
+      ]
+    },
+    {
+      "agentName": "test-validation",
+      "agentRole": "Deterministic Test Execution Validator",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/test-validation.agent.md",
+      "configurationHash": "7d2d781f747901570c7b34bf0af834e3965469f2076bba6c7ca189fa4a7aa640",
+      "allowedTools": [],
+      "skills": [
+        "remediation-testing"
+      ]
+    },
+    {
+      "agentName": "vulnerability-classifier",
+      "agentRole": "Read-Only Advisory Classifier",
+      "approvedVersion": "1.0.0",
+      "filePath": ".github/agents/vulnerability-classifier.agent.md",
+      "configurationHash": "31651a93bc50efaacb2a63aecba8bdf73200ccbc5f429637b986ccb6e78747ce",
+      "allowedTools": [
+        "vulnerability-data/get_vulnerability",
+        "vulnerability-data/get_remediation_context"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const {
+    ContentInjectionScreen,
+    TRUST_CLASSES,
+    SCREEN_OUTCOME
+} = require('./contentInjectionScreen');
+const { verifyEvidencePackage } = require('./evidenceLedger');
 
 /**
  * Normalizes a vulnerability ID or filename token for safe, deterministic matching.
@@ -50,6 +56,12 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
         validation: null,
         securityReview: null,
         traceLog: '',
+        evidenceRecord: null,
+        integrityVerification: null,
+        approvalRecord: null,
+        remediationDecision: null,
+        sourceToSinkEvidence: null,
+        injectionScreening: null,
         stages: [
             {
                 id: 'classification',
@@ -191,7 +203,46 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
             if (fs.existsSync(tracePath) && !details.traceLog) {
                 try { details.traceLog = fs.readFileSync(tracePath, 'utf-8'); } catch (e) {}
             }
+
+            const evidenceRecPath = path.join(dir, 'evidence-record.json');
+            if (fs.existsSync(evidenceRecPath) && !details.evidenceRecord) {
+                try { details.evidenceRecord = JSON.parse(fs.readFileSync(evidenceRecPath, 'utf-8')); } catch (e) {}
+            }
+
+            const approvalRecPath = path.join(dir, 'approval-record.json');
+            if (fs.existsSync(approvalRecPath) && !details.approvalRecord) {
+                try { details.approvalRecord = JSON.parse(fs.readFileSync(approvalRecPath, 'utf-8')); } catch (e) {}
+            }
+
+            const decisionPath = path.join(dir, 'remediation-decision.json');
+            if (fs.existsSync(decisionPath) && !details.remediationDecision) {
+                try { details.remediationDecision = JSON.parse(fs.readFileSync(decisionPath, 'utf-8')); } catch (e) {}
+            }
+
+            const s2sPath = path.join(dir, 'source-to-sink.json');
+            if (fs.existsSync(s2sPath) && !details.sourceToSinkEvidence) {
+                try { details.sourceToSinkEvidence = JSON.parse(fs.readFileSync(s2sPath, 'utf-8')); } catch (e) {}
+            }
+
+            const manifestPath = path.join(dir, 'integrity-manifest.json');
+            if (fs.existsSync(manifestPath) || !details.integrityVerification) {
+                const verification = verifyEvidencePackage(dir, details.evidenceRecord?.runId || null);
+                if (!details.integrityVerification || verification.hasManifest) {
+                    details.integrityVerification = verification;
+                }
+            }
         }
+    }
+
+    if (!details.integrityVerification && details.hasEvidence) {
+        details.integrityVerification = {
+            hasManifest: false,
+            verified: false,
+            status: 'LEGACY_NO_MANIFEST',
+            mismatches: [],
+            chainErrors: [],
+            warning: 'Historical/legacy evidence package has no Phase 2 SHA-256 integrity manifest.'
+        };
     }
 
     // Check output/ directory for shared markdown report (e.g. output/VUL-POC-007_....md or output/<title>_<id>.md)
@@ -211,6 +262,18 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
         }
     }
 
+    // Screen untrusted Markdown & trace log before machine parsing
+    const screen = new ContentInjectionScreen();
+    if (details.reportMarkdown) {
+        details.injectionScreening = screen.screen({
+            text: details.reportMarkdown,
+            contentSource: `report:${vulnerabilityId}`,
+            trustClass: TRUST_CLASSES.UNTRUSTED_MARKDOWN_REPORT,
+            runId: vulnerabilityId,
+            filePath: `remediation-report:${vulnerabilityId}`
+        });
+    }
+
     // Fallback parser: extract patch diff, trace log, and test evidence directly from Markdown if not found on disk
     if (details.reportMarkdown) {
         extractEvidenceFromMarkdown(details);
@@ -218,6 +281,27 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
 
     // Infer stages status from evidence and report content
     inferStageStatuses(details);
+
+    // Fail-closed: tampered evidence packages cannot present trusted PASS indicators
+    if (details.integrityVerification && details.integrityVerification.status === 'TAMPERING_DETECTED') {
+        if (details.validation) {
+            details.validation = {
+                ...details.validation,
+                isValidationPassed: false,
+                status: 'TAMPERING_DETECTED',
+                buildResult: 'TAMPERING_DETECTED',
+                integrityWarning: details.integrityVerification.warning
+            };
+        }
+        if (details.securityReview) {
+            details.securityReview = {
+                ...details.securityReview,
+                rating: 'TAMPERING_DETECTED',
+                status: 'TAMPERING_DETECTED',
+                summary: details.integrityVerification.warning
+            };
+        }
+    }
 
     // Extract detailed timing metrics from trace logs
     details.timings = extractTimingsFromTrace(details.traceLog);
@@ -294,19 +378,24 @@ function extractEvidenceFromMarkdown(details) {
         }
     }
 
-    // 3. Extract Test Evidence / Validation from Markdown
+    // 3. Extract Test Evidence / Validation from Markdown (strictly non-authoritative, never fabricate missing counts)
+    const markdownBlocked = details.injectionScreening && details.injectionScreening.outcome !== SCREEN_OUTCOME.ALLOW_UNTRUSTED_DATA;
     if (!details.validation) {
-        const hasPassedPostFix = /Post-Fix Result\*\*: \*\*PASS\*\*/i.test(md) || /Baseline Result\*\*: \*\*PASS/i.test(md) || /Security Review Rating\s*:\s*\*\*PASS\*\*/i.test(md);
+        const hasPassedPostFix = !markdownBlocked && (
+            /Post-Fix Result\*\*: \*\*PASS\*\*/i.test(md) ||
+            /Baseline Result\*\*: \*\*PASS/i.test(md) ||
+            /Security Review Rating\s*:\s*\*\*PASS\*\*/i.test(md)
+        );
         const exitCodeMatch = md.match(/Exit Code\*\*:\s*(\d+)/i);
-        const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : (hasPassedPostFix ? 0 : 1);
+        const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : null;
 
         const countsMatch = md.match(/Total:\s*(\d+),\s*Passed:\s*(\d+),\s*Failed:\s*(\d+)/i);
-        const totalTests = countsMatch ? parseInt(countsMatch[1], 10) : (hasPassedPostFix ? 1 : 0);
-        const passedTests = countsMatch ? parseInt(countsMatch[2], 10) : (hasPassedPostFix ? 1 : 0);
-        const failedTests = countsMatch ? parseInt(countsMatch[3], 10) : (hasPassedPostFix ? 0 : 1);
+        const totalTests = countsMatch ? parseInt(countsMatch[1], 10) : 0;
+        const passedTests = countsMatch ? parseInt(countsMatch[2], 10) : 0;
+        const failedTests = countsMatch ? parseInt(countsMatch[3], 10) : 0;
 
         const scoreMatch = md.match(/Confidence Score\*\*:\s*\*\*?(\d+)(?:\/100)?/i) || md.match(/Score:\s*(\d+)\/100/i);
-        const score = scoreMatch ? parseInt(scoreMatch[1], 10) : (hasPassedPostFix ? 95 : 60);
+        const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 0;
 
         // Extract console output block
         let consoleOutput = '';
@@ -316,32 +405,59 @@ function extractEvidenceFromMarkdown(details) {
             consoleOutput = consoleMatch[1].trim();
         }
 
-        if (hasPassedPostFix || exitCodeMatch || countsMatch || scoreMatch || consoleOutput) {
+        if (markdownBlocked) {
             details.validation = {
-                isValidationPassed: hasPassedPostFix || exitCode === 0,
-                buildResult: (exitCode === 0 || hasPassedPostFix) ? 'PASS' : 'FAIL',
-                buildSuccessful: exitCode === 0 || hasPassedPostFix,
+                isValidationPassed: false,
+                buildResult: 'BLOCKED',
+                status: 'BLOCKED',
+                buildSuccessful: false,
+                exitCode: exitCode ?? -1,
+                testsPassed: 0,
+                testsFailed: 0,
+                totalTests: 0,
+                confidenceScore: 0,
+                consoleOutput: 'BLOCKED — Untrusted Markdown report contained suspicious injection/forged markers.'
+            };
+        } else if (hasPassedPostFix || exitCodeMatch || countsMatch || scoreMatch || consoleOutput) {
+            const genuinePass = hasPassedPostFix && totalTests > 0 && failedTests === 0 && (exitCode === null || exitCode === 0);
+            details.validation = {
+                isValidationPassed: genuinePass,
+                buildResult: genuinePass ? 'PASS' : (totalTests === 0 ? 'UNTESTED' : 'FAIL'),
+                status: genuinePass ? 'PASS' : (totalTests === 0 ? 'NOT EXECUTED' : 'FAIL'),
+                buildSuccessful: genuinePass,
                 exitCode: exitCode,
                 testsPassed: passedTests,
                 testsFailed: failedTests,
                 totalTests: totalTests,
-                confidenceScore: score,
-                consoleOutput: consoleOutput || `Validation completed. Test suite passed ${passedTests}/${totalTests} tests.`
+                confidenceScore: genuinePass ? score : Math.min(score, 40),
+                consoleOutput: consoleOutput || (totalTests > 0 ? `Validation completed. Test suite passed ${passedTests}/${totalTests} tests.` : 'No real test execution counts found in report.')
             };
         }
     }
 
     // 4. Extract Security Review from Markdown
     if (!details.securityReview) {
-        const ratingMatch = md.match(/Security Audit Rating\*\*:\s*\*\*([^\*]+)\*\*/i) || md.match(/Security Review Rating\s*:\s*\*\*([^\*]+)\*\*/i);
-        const scoreMatch = md.match(/Final Confidence Score\*\*:\s*\*\*?(\d+)/i);
-        if (ratingMatch || scoreMatch) {
+        if (markdownBlocked) {
             details.securityReview = {
-                rating: ratingMatch ? ratingMatch[1].trim() : 'PASS',
-                score: scoreMatch ? parseInt(scoreMatch[1], 10) : 95,
-                status: ratingMatch ? ratingMatch[1].trim() : 'PASS',
-                summary: 'Autonomous security review verified fix and compliance.'
+                rating: 'BLOCKED',
+                score: 0,
+                status: 'BLOCKED',
+                summary: `Markdown report failed untrusted content screening (${details.injectionScreening.ruleId}).`
             };
+        } else {
+            const ratingMatch = md.match(/Security Audit Rating\*\*:\s*\*\*([^\*]+)\*\*/i) || md.match(/Security Review Rating\s*:\s*\*\*([^\*]+)\*\*/i);
+            const scoreMatch = md.match(/Final Confidence Score\*\*:\s*\*\*?(\d+)/i);
+            if (ratingMatch || scoreMatch) {
+                const rawRating = ratingMatch ? ratingMatch[1].trim() : 'NOT_VERIFIED';
+                const hasRealTests = details.validation && details.validation.totalTests > 0 && details.validation.isValidationPassed;
+                const safeRating = (rawRating.toUpperCase() === 'PASS' && !hasRealTests) ? 'NOT_VERIFIED' : rawRating;
+                details.securityReview = {
+                    rating: safeRating,
+                    score: scoreMatch ? parseInt(scoreMatch[1], 10) : 0,
+                    status: safeRating,
+                    summary: 'Extracted from Markdown report.'
+                };
+            }
         }
     }
 
@@ -443,8 +559,16 @@ function inferStageStatuses(details) {
     // Stage 6: Final Human Approval Gate
     const hasFinalDoc = report.includes('## Documentation Agent') || report.includes('Final Status') || trace.includes('[DOCUMENTATION]') || trace.includes('[FINAL_GATE]');
     const isFinalPass = securityReview?.rating === 'PASS' || (validation?.isValidationPassed === true && benchPassed);
+    const hasIntegrityTampering = details.integrityVerification?.status === 'TAMPERING_DETECTED';
+    const hasBlockedInjection = details.injectionScreening?.outcome === SCREEN_OUTCOME.BLOCK ||
+        details.injectionScreening?.outcome === SCREEN_OUTCOME.QUARANTINE;
 
-    if (hasFinalDoc && isFinalPass) {
+    if (hasIntegrityTampering || hasBlockedInjection) {
+        stages[5].status = 'failed';
+        stages[5].summary = hasIntegrityTampering
+            ? 'Evidence Integrity Mismatch Detected — manual audit required before exit.'
+            : 'Blocked untrusted content injection detected in evidence report.';
+    } else if (hasFinalDoc && isFinalPass) {
         stages[5].status = 'completed';
         stages[5].summary = 'Final governance approval granted. Ready for workflow exit.';
     } else if (stages[4].status === 'completed') {

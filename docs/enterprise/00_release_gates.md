@@ -92,3 +92,13 @@ Before declaring Phase 1 complete and advancing to Phase 2, **100%** of the foll
    * `@vulnerability-orchestrator` chat participant commands (`/remediate-vulnerability`, `/approve`, `/final-approve`) and `launchCopilot` (`workbench.action.chat.open`) pass contract verification cleanly.
    * Webview renders accurate KPIs/trend charts/`SCAN_PROGRESS` events/`scan-history` metrics with `crypto.randomBytes` nonce and zero `'unsafe-inline'` style directive.
 
+---
+
+## 6. Phase 2 Exit Gate (`G2`) Status Update (2026-11-10)
+
+- **Gate `G2` Local Codebase & Governance Decision:** **PASSED Locally** (`11/11` JS suites, `55/55` .NET tests, `0` build warnings/errors). See [`02_phase2_implementation_report.md`](./02_phase2_implementation_report.md), [`02_phase2_security_verification.md`](./02_phase2_security_verification.md), [`02_phase2_test_results.md`](./02_phase2_test_results.md), and [`02_phase2_readiness_audit.md`](./02_phase2_readiness_audit.md).
+- **Phase 3 Entry Criteria (`SEC-07` Execution Isolation):**
+  1. Provision credential-free, non-root container / CI sandbox consuming GCAC isolated worktree patches.
+  2. Enforce network egress blocking outside approved internal package registries (`--network=none` for test verification).
+  3. Complete live interactive VS Code Extension Development Host smoke test prior to release packaging.
+

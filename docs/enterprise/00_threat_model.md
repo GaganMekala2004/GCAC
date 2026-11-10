@@ -90,6 +90,8 @@ All 10 original trust-based HLD assumptions remain unmitigated or broken in the 
 
 ## 5. Residual Threat Posture After Local Phase 1–2 Controls
 
+> **Phase 2 Mitigation Update (2026-11-10):** Local Phase 2 controls now mitigate `TM-02` (untrusted-content screening via `ContentInjectionScreen` across comments, findings, CSV/Excel, logs, Markdown, READMEs, and model outputs), `TM-06` / `TM-09` locally via SHA-256 diff-bound approvals (`approvalGovernance.js`, recording `AUTHENTICATION_NOT_VERIFIED` until Phase 4 Entra SSO), `TM-08` via 4-tier ownership & pre/post FS+Git scope checks (`remediationScopeGate.js`, `.NET` `SecurityReviewAgent.cs`), and `TM-12` locally via SHA-256 evidence manifests + hash-chained event logs (`evidenceLedger.js`, `EvidenceGeneratorService.cs`) alongside detached Git worktrees (`isolatedWorkspaceManager.js`).
+
 Even after completing **local** Phase 1–2 containment inside `extension/`, `src/`, and `mcp/`, the following threats **cannot be closed solely in client repository code** and MUST remain flagged until external enterprise infrastructure is operational:
 1. **Copilot Chat Native Egress Bypassing `llmClient.js`**: Any prompt typed directly into VS Code Copilot Chat still traverses GitHub Copilot servers using Microsoft/GitHub client transport — requires **Corporate Proxy / SWG + DLP** inspection and **Enterprise Copilot Policy**.
 2. **Workstation OS / Host Credential Access Outside Extension Subprocesses**: Because local processes execute under the developer user account on a corporate laptop, true credential isolation for untrusted build hooks requires **ephemeral credential-free containers or CI build runners** (`SEC-07`).

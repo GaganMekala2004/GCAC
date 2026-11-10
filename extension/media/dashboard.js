@@ -342,6 +342,8 @@
     const btnReject = document.getElementById('btnReject');
     const btnRejectFinalSubtle = document.getElementById('btnRejectFinalSubtle');
     const gate4PatchSummary = document.getElementById('gate4PatchSummary');
+    const gate4TrustMeta = document.getElementById('gate4TrustMeta');
+    const evidenceIntegrityBanner = document.getElementById('evidenceIntegrityBanner');
 
     const finalGateCard = document.getElementById('finalGateCard');
     const btnFinalApprove = document.getElementById('btnFinalApprove');
@@ -970,7 +972,12 @@
         if (btnRetryStage) {
             btnRetryStage.addEventListener('click', () => {
                 if (!selectedVulnerability) return;
-                startRemediation(selectedVulnerability.Vulnerability_ID);
+                isRemediating = true;
+                postToHost({
+                    command: 'retryStage',
+                    vulnerabilityId: selectedVulnerability.Vulnerability_ID,
+                    fromStage: 5
+                });
             });
         }
 
@@ -1326,6 +1333,15 @@
                 if (activeRunSummaryStage) activeRunSummaryStage.textContent = 'Stage 4 (Human Review Gate)';
                 setStageStatus(3, 'awaiting_review', 'Paused at Stage 4: Human Review & Proposed Fix Authorization.');
                 if (humanGateCard) humanGateCard.style.display = 'flex';
+                if (gate4TrustMeta) {
+                    const hashTxt = evt.proposedDiffSha256 ? escapeHtml(evt.proposedDiffSha256) : 'Pending SHA-256 calculation';
+                    gate4TrustMeta.className = 'gate4-trust-meta u-mt-6';
+                    gate4TrustMeta.innerHTML = `
+                        <div><strong>Diff SHA-256:</strong> <code>${hashTxt}</code></div>
+                        <div><strong>Reviewer Identity:</strong> <code>AUTHENTICATION_NOT_VERIFIED</code> (Local PoC Mode)</div>
+                        <div><strong>Control Boundary:</strong> Applies to app-controlled patch path; cannot intercept native Copilot agent edits.</div>
+                    `;
+                }
                 showToast(`Stage 4 Governance Gate: Authorization required for ${evt.vulnerabilityId}`, 'warning');
                 break;
 
@@ -2235,6 +2251,31 @@
                             <div class="u-mt-4"><strong>Target File:</strong> <code>${escapeHtml(selectedVulnerability?.Location_Path || 'Source.cs')}</code> (Line ${escapeHtml(selectedVulnerability?.Line_Number || '1')})</div>
                         </div>
                     `;
+                    if (gate4TrustMeta) {
+                        const diffHash = details.approvalRecord?.proposedDiffSha256 || 'Diff-bound upon Stage 4 pause';
+                        const authState = details.approvalRecord?.reviewerAuthorizationStatus || 'AUTHENTICATION_NOT_VERIFIED';
+                        gate4TrustMeta.className = 'gate4-trust-meta u-mt-6';
+                        gate4TrustMeta.innerHTML = `
+                            <div><strong>Diff SHA-256:</strong> <code>${escapeHtml(diffHash)}</code></div>
+                            <div><strong>Reviewer Identity:</strong> <code>${escapeHtml(authState)}</code> (Local PoC Mode)</div>
+                            <div><strong>Control Boundary:</strong> Extension approval enforces app-controlled patch apply only; native Copilot tool calls are not intercepted.</div>
+                        `;
+                    }
+                }
+            }
+
+            if (evidenceIntegrityBanner) {
+                const integ = details.integrityVerification;
+                if (integ && integ.status === 'TAMPERING_DETECTED') {
+                    const firstIssue = (integ.mismatches?.[0] || integ.chainErrors?.[0] || integ.warning || 'Integrity check failed');
+                    evidenceIntegrityBanner.className = 'evidence-integrity-banner tampered';
+                    evidenceIntegrityBanner.textContent = `Evidence Integrity Mismatch Detected: ${firstIssue}`;
+                } else if (integ && integ.verified) {
+                    evidenceIntegrityBanner.className = 'evidence-integrity-banner verified';
+                    evidenceIntegrityBanner.textContent = 'Evidence Integrity Verified (Local SHA-256 + Hash Chain — tamper-detectable only, not WORM-immutable)';
+                } else {
+                    evidenceIntegrityBanner.className = 'evidence-integrity-banner u-hidden';
+                    evidenceIntegrityBanner.textContent = '';
                 }
             }
 
@@ -2335,6 +2376,20 @@
                         <div class="score-bar-fill ${scoreBgClass}" data-bar-width="${score}%"></div>
                     </div>
                 </div>
+
+                ${(details.remediationDecision || details.sourceToSinkEvidence || details.integrityVerification?.status === 'TAMPERING_DETECTED') ? `
+                    <div class="s2s-decision-box">
+                        ${details.integrityVerification?.status === 'TAMPERING_DETECTED'
+                            ? `<div class="u-text-danger u-fw-700">Evidence Integrity Mismatch Detected: ${escapeHtml(details.integrityVerification.warning || 'Hash/chain mismatch')}</div>`
+                            : ''}
+                        ${details.remediationDecision
+                            ? `<div><strong>Remediation Ladder Tier:</strong> <code>${escapeHtml(details.remediationDecision.selectedTier)}</code> (${escapeHtml(details.remediationDecision.disposition)})</div>`
+                            : ''}
+                        ${details.sourceToSinkEvidence
+                            ? `<div><strong>Source-to-Sink Evidence:</strong> Source=${escapeHtml(details.sourceToSinkEvidence.untrustedSource?.symbol || 'N/A')} -> SinkLine=${escapeHtml(String(details.sourceToSinkEvidence.dangerousSink?.line || 'N/A'))} | Analysis=${escapeHtml(details.sourceToSinkEvidence.analysisMethod || 'Heuristic')} | FormalTaintProof=${escapeHtml(String(!!details.sourceToSinkEvidence.formalTaintProofSupplied))}</div>`
+                            : ''}
+                    </div>
+                ` : ''}
 
                 ${val?.consoleOutput ? `
                     <div class="u-mt-8">

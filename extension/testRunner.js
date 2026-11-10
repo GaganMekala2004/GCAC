@@ -2,6 +2,11 @@ const { spawn, execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { OUTCOME_STATUS } = require('./outcomeContract');
+const {
+    ContentInjectionScreen,
+    TRUST_CLASSES,
+    SCREEN_OUTCOME
+} = require('./contentInjectionScreen');
 
 /**
  * Deterministic Test Runner for GCAC Vulnerability Remediation
@@ -428,6 +433,42 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
 
             const cleanOut = redactSensitiveOutput(stdout);
             const cleanErr = redactSensitiveOutput(stderr);
+            const combinedClean = (cleanOut + (cleanErr ? '\n' + cleanErr : '')).trim();
+
+            const injectionScreen = options.injectionScreen || new ContentInjectionScreen();
+            const screenOutputRes = injectionScreen.screen({
+                text: combinedClean,
+                contentSource: `testRunner:${executable}`,
+                trustClass: TRUST_CLASSES.UNTRUSTED_BUILD_TEST_OUTPUT,
+                runId: options.runId || 'test-runner',
+                filePath: cwd
+            });
+
+            if (screenOutputRes.outcome === SCREEN_OUTCOME.BLOCK || screenOutputRes.outcome === SCREEN_OUTCOME.QUARANTINE) {
+                resolve({
+                    executed: true,
+                    passed: false,
+                    status: 'BLOCKED',
+                    machineStatus: OUTCOME_STATUS.BLOCKED,
+                    reason: `Untrusted test output blocked by ContentInjectionScreen (${screenOutputRes.ruleId}): ${screenOutputRes.reason}`,
+                    injectionScreening: screenOutputRes.record,
+                    executable,
+                    command: `${executable} ${args.join(' ')}`,
+                    workingDirectory: cwd,
+                    startTime: startTimeIso,
+                    endTime: endTime.toISOString(),
+                    durationMs,
+                    exitCode: code,
+                    testsTotal: 0,
+                    testsPassed: 0,
+                    testsFailed: 0,
+                    stdout: cleanOut,
+                    stderr: cleanErr,
+                    consoleOutput: combinedClean,
+                    summary: `BLOCKED — Malicious instruction/marker detected in test output (${screenOutputRes.ruleId})`
+                });
+                return;
+            }
 
             let summary;
             let reason;
@@ -448,6 +489,7 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
                 status: parsed.status,
                 machineStatus: parsed.machineStatus,
                 reason,
+                injectionScreening: screenOutputRes.record,
                 executable,
                 command: `${executable} ${args.join(' ')}`,
                 workingDirectory: cwd,
@@ -460,7 +502,7 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
                 testsFailed: parsed.testsFailed,
                 stdout: cleanOut,
                 stderr: cleanErr,
-                consoleOutput: (cleanOut + (cleanErr ? '\n' + cleanErr : '')).trim(),
+                consoleOutput: combinedClean,
                 summary
             });
         });
@@ -473,9 +515,9 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
  * @param {string} workspaceRoot Workspace root directory
  * @returns {Promise<object>} Baseline test results
  */
-async function runBaselineTests(finding, workspaceRoot) {
+async function runBaselineTests(finding, workspaceRoot, options = {}) {
     const repoRel = finding.Repository || '';
-    const repoFull = repoRel ? path.join(workspaceRoot, repoRel) : workspaceRoot;
+    const repoFull = options.workingDirectory || (repoRel ? path.join(workspaceRoot, repoRel) : workspaceRoot);
     const runner = detectRunner(finding, repoFull);
 
     if (!runner) {
@@ -489,7 +531,7 @@ async function runBaselineTests(finding, workspaceRoot) {
         };
     }
 
-    return await executeRealTestRunner(runner.tool, runner.args, repoFull);
+    return await executeRealTestRunner(runner.tool, runner.args, repoFull, options);
 }
 
 /**
@@ -498,9 +540,9 @@ async function runBaselineTests(finding, workspaceRoot) {
  * @param {string} workspaceRoot Workspace root directory
  * @returns {Promise<object>} Post-fix test results
  */
-async function runPostFixTests(finding, workspaceRoot) {
+async function runPostFixTests(finding, workspaceRoot, options = {}) {
     const repoRel = finding.Repository || '';
-    const repoFull = repoRel ? path.join(workspaceRoot, repoRel) : workspaceRoot;
+    const repoFull = options.workingDirectory || (repoRel ? path.join(workspaceRoot, repoRel) : workspaceRoot);
     const runner = detectRunner(finding, repoFull);
 
     if (!runner) {
@@ -514,7 +556,21 @@ async function runPostFixTests(finding, workspaceRoot) {
         };
     }
 
-    return await executeRealTestRunner(runner.tool, runner.args, repoFull);
+    return await executeRealTestRunner(runner.tool, runner.args, repoFull, options);
+}
+
+/**
+ * Screens untrusted test output or test names via ContentInjectionScreen.
+ */
+function screenTestOutput(text, options = {}) {
+    const screen = options.injectionScreen || new ContentInjectionScreen();
+    return screen.screen({
+        text: typeof text === 'string' ? text : '',
+        contentSource: options.contentSource || 'testRunner:output',
+        trustClass: options.trustClass || TRUST_CLASSES.UNTRUSTED_BUILD_TEST_OUTPUT,
+        runId: options.runId || 'test-runner',
+        filePath: options.filePath || 'test-output'
+    });
 }
 
 module.exports = {
@@ -525,5 +581,6 @@ module.exports = {
     parseNpmOutput,
     executeRealTestRunner,
     runBaselineTests,
-    runPostFixTests
+    runPostFixTests,
+    screenTestOutput
 };

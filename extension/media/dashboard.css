@@ -3480,3 +3480,40 @@ body.theme-dark .nav-item.active svg {
     font-family: var(--font-mono);
     font-size: 11px;
 }
+.evidence-integrity-banner {
+    font-size: 11px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    margin: 8px 0;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface-subtle);
+    color: var(--text-secondary);
+}
+.evidence-integrity-banner.tampered {
+    border-color: var(--danger);
+    background: rgba(220, 38, 38, 0.12);
+    color: var(--danger);
+    font-weight: 600;
+}
+.evidence-integrity-banner.verified {
+    border-color: var(--success);
+    background: rgba(5, 150, 105, 0.08);
+    color: var(--success);
+}
+.gate4-trust-meta {
+    font-size: 11px;
+    padding: 7px 9px;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--border-card);
+    background: var(--bg-surface-subtle);
+    color: var(--text-secondary);
+}
+.s2s-decision-box {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    font-size: 11px;
+    color: var(--text-secondary);
+}

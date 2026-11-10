@@ -2,6 +2,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+    ContentInjectionScreen,
+    TRUST_CLASSES,
+    SCREEN_OUTCOME
+} = require('./contentInjectionScreen');
 
 const POLICY_VERSION = 'GCAC-P0D-1.0';
 
@@ -114,34 +119,6 @@ const PII_RULES = [
     }
 ];
 
-const INJECTION_RULES = [
-    {
-        id: 'INJ-OVERRIDE-DIRECTIVE',
-        reason: 'Prompt-injection instruction override phrase detected in untrusted context',
-        regex: /\b(?:ignore\s+(?:all\s+)?(?:previous|prior|system|above)\s+instructions?|disregard\s+(?:all\s+)?(?:security|safety|system)\s+rules?|override\s+security\s+policy|bypass\s+(?:all\s+)?approval\s+gates?)\b/i
-    },
-    {
-        id: 'INJ-ZERO-WIDTH',
-        reason: 'Hidden zero-width or bidirectional control characters detected',
-        regex: /[\u200B-\u200D\uFEFF\u202A-\u202E\u2066-\u2069]/
-    },
-    {
-        id: 'INJ-HIDDEN-HTML',
-        reason: 'Hidden HTML comment containing directive tokens detected',
-        regex: /<!--[\s\S]*?(?:ignore|override|bypass|approve|RESULT\s*:|assistant|system)[\s\S]*?-->/i
-    },
-    {
-        id: 'INJ-RESULT-SMUGGLING',
-        reason: 'Control-flow RESULT: token smuggling detected in untrusted input',
-        regex: /^\s*RESULT\s*:\s*(?:PASS|PASSED|SUCCESS|RESOLVED|APPROVED)\b/im
-    },
-    {
-        id: 'INJ-ROLE-TAG-SMUGGLING',
-        reason: 'Role/channel delimiter tag smuggling detected in untrusted context',
-        regex: /<\/?(?:system|assistant|tool_call|function_call)\b[^>]*>/i
-    }
-];
-
 class OutboundContextGate {
     constructor(policyOverrides = {}) {
         this.policy = {
@@ -149,6 +126,7 @@ class OutboundContextGate {
             ...policyOverrides,
             blockedPathPatterns: policyOverrides.blockedPathPatterns || DEFAULT_POLICY.blockedPathPatterns
         };
+        this.injectionScreen = policyOverrides.injectionScreen || new ContentInjectionScreen();
         this.auditEvents = [];
     }
 
@@ -307,19 +285,42 @@ class OutboundContextGate {
             }
         }
 
-        // 9. Inspect untrusted content & prompt for instruction injection / smuggling
-        const untrustedToCheck = typeof request.untrustedContent === 'string'
-            ? `${request.untrustedContent}\n${promptText}`
-            : promptText;
-        for (const rule of INJECTION_RULES) {
-            const match = rule.regex.exec(untrustedToCheck);
-            if (match) {
-                const lineNum = this._findLineNumber(untrustedToCheck, match.index);
+        // 9. Reuse unified ContentInjectionScreen for untrusted content, source comments, & prompt injection screening
+        const screeningCandidates = [];
+        if (typeof request.untrustedContent === 'string' && request.untrustedContent.length > 0) {
+            screeningCandidates.push({
+                text: request.untrustedContent,
+                contentSource: 'outbound:untrustedContent',
+                trustClass: request.trustClass || TRUST_CLASSES.UNTRUSTED_SCANNER_FINDING,
+                runId,
+                filePath: targetPaths[0] || 'untrusted'
+            });
+        }
+        if (sourceCodeText.length > 0) {
+            screeningCandidates.push({
+                text: sourceCodeText,
+                contentSource: 'outbound:sourceCode',
+                trustClass: TRUST_CLASSES.UNTRUSTED_SOURCE_CODE,
+                runId,
+                filePath: targetPaths[0] || 'source'
+            });
+        }
+        screeningCandidates.push({
+            text: promptText,
+            contentSource: 'outbound:prompt',
+            trustClass: request.trustClass || TRUST_CLASSES.UNTRUSTED_SCANNER_FINDING,
+            runId,
+            filePath: targetPaths[0] || 'prompt'
+        });
+
+        for (const candidate of screeningCandidates) {
+            const screenRes = this.injectionScreen.screen(candidate);
+            if (screenRes.outcome !== SCREEN_OUTCOME.ALLOW_UNTRUSTED_DATA) {
                 return recordDecision(
                     'BLOCK',
-                    rule.id,
-                    rule.reason,
-                    `${this._redactPath(targetPaths[0] || 'untrusted')}:line=${lineNum}`,
+                    screenRes.ruleId,
+                    `${screenRes.reason} (${screenRes.outcome})`,
+                    screenRes.record.redactedLocation,
                     payloadBytes
                 );
             }

@@ -138,17 +138,18 @@ class ReScanVerifier {
             };
         }
 
-        // Resolve scan target: specific remediated file or repository folder
+        // Resolve scan target: specific remediated file or repository folder (supporting isolated worktree root override)
+        const effectiveRoot = params.workspaceRoot || this.workspaceRoot;
         const relLocPath = originalFinding.filePath || originalFinding.Location_Path || '';
         const scanTarget = targetFilePath && fs.existsSync(targetFilePath)
             ? targetFilePath
-            : (relLocPath ? path.join(this.workspaceRoot, relLocPath) : this.workspaceRoot);
+            : (relLocPath ? path.join(effectiveRoot, relLocPath) : effectiveRoot);
 
         const startTime = Date.now();
         let reScanResult;
 
         try {
-            reScanResult = await scanner.scan(this.workspaceRoot, scanTarget, {
+            reScanResult = await scanner.scan(effectiveRoot, scanTarget, {
                 scanId: `rescan-${Date.now()}`
             });
         } catch (e) {
@@ -243,7 +244,7 @@ class ReScanVerifier {
             `- **Scanner**: \`${scanner.name}\` (ID: \`${scanner.id}\`, Version: \`${scanner.version}\`)`,
             `- **Verification Status**: **\`${finalStatus}\`** (\`${machineStatus}\`)`,
             `- **Post-Fix Validation Outcome**: \`${testOutcome}\``,
-            `- **Target Path**: \`${path.relative(this.workspaceRoot, scanTarget) || '.'}\``,
+            `- **Target Path**: \`${path.relative(effectiveRoot, scanTarget) || '.'}\``,
             `- **Original Rule ID**: \`${ruleId || 'N/A'}\``,
             `- **Baseline Fingerprint**: \`${baselineFp || 'N/A'}\``,
             `- **Re-Scan Duration**: \`${(durationMs / 1000).toFixed(2)}s\``,

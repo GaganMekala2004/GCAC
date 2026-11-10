@@ -7,6 +7,11 @@ const { CodeQLScanner } = require('./adapters/codeqlScanner');
 const { FindingsStore } = require('./findingsStore');
 const { SCANNER_STATUS } = require('./findingModel');
 const { assertPathWithinWorkspace } = require('../pathUtils');
+const {
+    ContentInjectionScreen,
+    TRUST_CLASSES,
+    SCREEN_OUTCOME
+} = require('../contentInjectionScreen');
 
 /**
  * Scan Controller for GCAC Vulnerability Remediation Hub
@@ -203,6 +208,28 @@ class ScanController {
 
                 scannerResults.push(result);
                 if (result.findings && result.findings.length > 0) {
+                    const screen = new ContentInjectionScreen();
+                    for (const f of result.findings) {
+                        const untrustedText = [f.title, f.description, f.evidence, f.remediationGuidance].filter(Boolean).join('\n');
+                        const screenRes = screen.screen({
+                            text: untrustedText,
+                            contentSource: `scanner:${scanner.id}:${f.findingId || f.ruleId}`,
+                            trustClass: TRUST_CLASSES.UNTRUSTED_SCANNER_FINDING,
+                            runId: scanId,
+                            filePath: f.filePath || scanner.id
+                        });
+                        f.injectionScreening = screenRes.record;
+                        // Scanner findings are always untrusted data and can never alter workflow closure/status
+                        if (f.status !== 'Detected') {
+                            f.status = 'Detected';
+                        }
+                        if (screenRes.outcome !== SCREEN_OUTCOME.ALLOW_UNTRUSTED_DATA) {
+                            f.classificationType = 'POTENTIAL_INJECTION_HOLD_FOR_REVIEW';
+                            f.description = `[SCREENED:${screenRes.outcome}:${screenRes.ruleId}] Untrusted scanner text quarantined; inspect raw source manually.`;
+                            f.remediationGuidance = '[QUARANTINED_SCANNER_GUIDANCE] Verify vulnerability directly in source code.';
+                            f.evidence = '[QUARANTINED_UNTRUSTED_EVIDENCE]';
+                        }
+                    }
                     allDiscoveredFindings.push(...result.findings);
                 }
                 if (result.errors && result.errors.length > 0) {
