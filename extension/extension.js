@@ -23,6 +23,8 @@ let scanController = null;
 let reScanVerifier = null;
 let currentWorkspaceRoot = '';
 let currentCsvPath = '';
+let hasUserInitiatedScan = false;
+let currentScanTarget = '';
 
 /**
  * Validates IPC messages sent from Webview to Extension Host
@@ -31,6 +33,9 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'getConfig',
     'selectCsv',
     'selectRepo',
+    'selectFile',
+    'selectScanTarget',
+    'clearScanResults',
     'setCsvPath',
     'requestData',
     'refresh',
@@ -51,7 +56,9 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'getScanHistory',
     'scanRepository',
     'cancelScan',
-    'reScanFinding'
+    'reScanFinding',
+    'getCodeqlStatus',
+    'installCodeql'
 ]);
 
 /**
@@ -61,7 +68,7 @@ const ALLOWED_IPC_COMMANDS = new Set([
  * @returns {object[]}
  */
 function getCombinedFindings(csvPath, store) {
-    const csvList = loadVulnerabilities(csvPath);
+    const csvList = (csvPath && fs.existsSync(csvPath)) ? loadVulnerabilities(csvPath) : [];
     for (const r of csvList) {
         if (!r.Source_Origin) r.Source_Origin = 'CSV';
     }
@@ -112,7 +119,7 @@ async function getAvailableCsvFiles(workspaceRoot) {
                 name: path.basename(uri.fsPath)
             });
         }
-    } catch (e) {}
+    } catch (e) { }
 
     // Ensure current CSV is represented
     if (currentCsvPath && fs.existsSync(currentCsvPath) && !list.some(item => item.fsPath === currentCsvPath)) {
@@ -147,14 +154,10 @@ function activate(context) {
         ? vscode.workspace.workspaceFolders[0].uri.fsPath
         : context.extensionUri.fsPath;
 
-    currentCsvPath = path.join(currentWorkspaceRoot, 'vulnerability', 'vulnerabilities.csv');
-    if (!fs.existsSync(currentCsvPath)) {
-        const fallbackCsv = path.join(context.extensionUri.fsPath, 'vulnerability', 'vulnerabilities.csv');
-        if (fs.existsSync(fallbackCsv)) {
-            currentWorkspaceRoot = context.extensionUri.fsPath;
-            currentCsvPath = fallbackCsv;
-        }
-    }
+    // Do NOT auto-load pre-existing sample CSV on startup so dashboard starts at 0
+    currentCsvPath = '';
+    hasUserInitiatedScan = false;
+    currentScanTarget = '';
 
     // Initialize local findings store and modular scanning subsystem
     findingsStore = new FindingsStore(currentWorkspaceRoot);
@@ -318,7 +321,7 @@ function activate(context) {
 
         if (uri && uri.fsPath) {
             const match = path.basename(uri.fsPath).match(/(?:GCAS-E2E-\d+|VUL-POC-\d+)/i) ||
-                          path.dirname(uri.fsPath).match(/(?:GCAS-E2E-\d+|VUL-POC-\d+)/i);
+                path.dirname(uri.fsPath).match(/(?:GCAS-E2E-\d+|VUL-POC-\d+)/i);
             if (match) {
                 const freshDetails = loadVulnerabilityDetails(currentWorkspaceRoot, match[0].toUpperCase());
                 broadcast({ type: 'DETAILS_LOADED', details: freshDetails });
@@ -372,8 +375,8 @@ function activate(context) {
                 const isHumanApproved = isApproveCmd || isFinalApproveCmd;
                 const isFinalApproved = isFinalApproveCmd;
 
-                const runModeDesc = isFinalApproved 
-                    ? 'Final Sign-off & Completion' 
+                const runModeDesc = isFinalApproved
+                    ? 'Final Sign-off & Completion'
                     : (isHumanApproved ? 'Authorizing Patch & Executing Genuine Tests' : 'Initiating Multi-Stage Pipeline (Classification, RCA, Baseline Testing)');
 
                 response.markdown(`### 🛡️ GCAC Orchestrator: \`${vulnId}\`\n\n**Action**: ${runModeDesc}\n\n`);
@@ -441,7 +444,7 @@ function getPreloadedDetails(workspaceRoot, vulnerabilities) {
                 if (det && det.hasEvidence) {
                     detailsList.push(det);
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
     }
     return detailsList;
@@ -487,7 +490,7 @@ function resolveSourceFilePath(workspaceRoot, repository, targetPath) {
                         if (res) return res;
                     }
                 }
-            } catch (e) {}
+            } catch (e) { }
             return null;
         };
         const found = findRecursive(safeRepoBase);
@@ -568,23 +571,84 @@ async function handleWebviewMessage(message, webview) {
                 title: 'Select Target Application Repository Folder'
             });
             if (uris && uris.length > 0) {
-                currentWorkspaceRoot = uris[0].fsPath;
-                const repoCsv = path.join(currentWorkspaceRoot, 'vulnerability', 'vulnerabilities.csv');
-                if (fs.existsSync(repoCsv)) {
-                    currentCsvPath = repoCsv;
+                const safeDir = assertPathWithinWorkspace(uris[0].fsPath, currentWorkspaceRoot);
+                if (safeDir) {
+                    const rel = path.relative(currentWorkspaceRoot, safeDir).replace(/\\/g, '/') || '.';
+                    currentScanTarget = rel;
+                    broadcast({
+                        type: 'TARGET_SELECTED',
+                        targetPath: rel,
+                        isFolder: true,
+                        displayName: path.basename(safeDir) || 'Workspace'
+                    });
+                    vscode.window.showInformationMessage(`Active target folder selected: ${rel}`);
+                } else {
+                    vscode.window.showErrorMessage('Security Warning: Selected folder must reside within the workspace boundary.');
                 }
-                engine.updatePaths(currentWorkspaceRoot, currentCsvPath);
-                const list = loadVulnerabilities(currentCsvPath);
-                const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
-                broadcast({
-                    type: 'CONFIG_UPDATED',
-                    activeRepo: currentWorkspaceRoot,
-                    activeCsv: currentCsvPath,
-                    availableCsvs: availableCsvs
-                });
-                broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
-                vscode.window.showInformationMessage(`Active Repository switched to: ${path.basename(currentWorkspaceRoot)}`);
             }
+            break;
+        }
+
+        case 'selectFile': {
+            const uris = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                title: 'Select File to Scan for Vulnerabilities',
+                filters: {
+                    'All Files': ['*']
+                }
+            });
+            if (uris && uris.length > 0) {
+                const safeFile = assertPathWithinWorkspace(uris[0].fsPath, currentWorkspaceRoot);
+                if (safeFile) {
+                    const rel = path.relative(currentWorkspaceRoot, safeFile).replace(/\\/g, '/');
+                    currentScanTarget = rel;
+                    broadcast({
+                        type: 'TARGET_SELECTED',
+                        targetPath: rel,
+                        isFolder: false,
+                        displayName: path.basename(safeFile)
+                    });
+                    vscode.window.showInformationMessage(`Target file selected: ${rel}`);
+                } else {
+                    vscode.window.showErrorMessage('Security Warning: Selected file must reside within the workspace boundary.');
+                }
+            }
+            break;
+        }
+
+        case 'selectScanTarget': {
+            if (message.targetPath !== undefined) {
+                const target = message.targetPath ? path.resolve(currentWorkspaceRoot, message.targetPath) : currentWorkspaceRoot;
+                const safeTarget = assertPathWithinWorkspace(target, currentWorkspaceRoot);
+                if (safeTarget) {
+                    const rel = path.relative(currentWorkspaceRoot, safeTarget).replace(/\\/g, '/') || '.';
+                    currentScanTarget = rel;
+                    broadcast({
+                        type: 'TARGET_SELECTED',
+                        targetPath: rel,
+                        isFolder: fs.existsSync(safeTarget) && fs.statSync(safeTarget).isDirectory(),
+                        displayName: path.basename(safeTarget) || 'Workspace'
+                    });
+                }
+            }
+            break;
+        }
+
+        case 'clearScanResults': {
+            hasUserInitiatedScan = false;
+            currentCsvPath = '';
+            currentScanTarget = '';
+            if (findingsStore) {
+                findingsStore.clearFindings();
+            }
+            broadcast({ type: 'DATA_UPDATED', vulnerabilities: [] });
+            webview.postMessage({
+                type: 'ACTION_FEEDBACK',
+                text: 'Scan results cleared. Dashboard reset to 0.',
+                status: 'info'
+            });
             break;
         }
 
@@ -615,14 +679,17 @@ async function handleWebviewMessage(message, webview) {
 
         case 'requestData':
         case 'refresh': {
-            const list = getCombinedFindings(currentCsvPath, findingsStore);
+            const list = hasUserInitiatedScan || (currentCsvPath && fs.existsSync(currentCsvPath))
+                ? getCombinedFindings(currentCsvPath, findingsStore)
+                : [];
             const preloaded = getPreloadedDetails(currentWorkspaceRoot, list);
             const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
             webview.postMessage({
                 type: 'CONFIG_UPDATED',
-                activeRepo: currentWorkspaceRoot,
-                activeCsv: currentCsvPath,
-                availableCsvs: availableCsvs
+                activeRepo: currentScanTarget || currentWorkspaceRoot,
+                activeCsv: currentCsvPath || '',
+                availableCsvs: availableCsvs,
+                hasScanned: hasUserInitiatedScan
             });
             webview.postMessage({ type: 'INIT_DATA', vulnerabilities: list, preloadedDetails: preloaded });
             break;
@@ -724,15 +791,24 @@ async function handleWebviewMessage(message, webview) {
                     status: 'info'
                 });
 
+                const targetPath = message.targetRepo || message.targetPath || currentScanTarget || currentWorkspaceRoot;
                 const scanResult = await scanController.startScan({
                     scannerIds: message.scannerIds,
-                    targetRepo: message.targetRepo,
+                    targetRepo: targetPath,
                     onProgress: (evt) => {
                         webview.postMessage({ type: 'SCAN_PROGRESS', event: evt });
                     }
                 });
 
-                webview.postMessage({ type: 'SCAN_COMPLETED', result: scanResult });
+                hasUserInitiatedScan = true;
+                currentScanTarget = targetPath;
+                webview.postMessage({
+                    type: 'SCAN_COMPLETED',
+                    result: scanResult,
+                    scanId: scanResult.scanId,
+                    findingsCount: scanResult.findingsSummary.total,
+                    targetPath: targetPath
+                });
                 const combined = getCombinedFindings(currentCsvPath, findingsStore);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: combined });
                 webview.postMessage({
@@ -758,6 +834,60 @@ async function handleWebviewMessage(message, webview) {
                     type: 'ACTION_FEEDBACK',
                     text: 'Scan cancelled by user.',
                     status: 'warning'
+                });
+            }
+            break;
+        }
+
+        case 'getCodeqlStatus': {
+            // Report CodeQL CLI availability and installation path details
+            try {
+                const { CodeQLScanner } = require('./scanning/adapters/codeqlScanner');
+                const codeqlScanner = new CodeQLScanner();
+                const avail = await codeqlScanner.isAvailable(currentWorkspaceRoot);
+                const localBinPath = require('path').join(currentWorkspaceRoot, 'tools', 'codeql',
+                    process.platform === 'win32' ? 'codeql.exe' : 'codeql');
+                const setupScriptPath = require('path').join(currentWorkspaceRoot, 'scripts', 'setup-codeql.js');
+                webview.postMessage({
+                    type: 'CODEQL_STATUS',
+                    available: avail.available,
+                    version: avail.version || '',
+                    binaryPath: avail.binaryPath || '',
+                    reason: avail.reason || '',
+                    localBinPath,
+                    setupScriptPath
+                });
+            } catch (err) {
+                webview.postMessage({
+                    type: 'CODEQL_STATUS',
+                    available: false,
+                    version: '',
+                    binaryPath: '',
+                    reason: `Status check failed: ${err.message}`,
+                    localBinPath: '',
+                    setupScriptPath: ''
+                });
+            }
+            break;
+        }
+
+        case 'installCodeql': {
+            // Launch setup-codeql.js in VS Code terminal for visibility
+            if (vscode && vscode.window) {
+                const setupScript = require('path').join(currentWorkspaceRoot, 'scripts', 'setup-codeql.js');
+                const terminal = vscode.window.createTerminal({ name: 'CodeQL Setup' });
+                terminal.show(true);
+                terminal.sendText(`node "${setupScript}"`);
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: 'CodeQL setup started in terminal. Check the "CodeQL Setup" terminal tab for progress.',
+                    status: 'info'
+                });
+            } else {
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: 'Run: node scripts/setup-codeql.js  in your terminal to install CodeQL CLI.',
+                    status: 'info'
                 });
             }
             break;
@@ -875,7 +1005,7 @@ async function handleWebviewMessage(message, webview) {
                     Requires_Human_Review: 'false',
                     Remediation_Status: 'Rejected'
                 });
-                
+
                 vscode.window.showWarningMessage(`Remediation rejected for ${message.vulnerabilityId}.${restored ? ' Original source file restored.' : ''}`);
                 const list = loadVulnerabilities(currentCsvPath);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });

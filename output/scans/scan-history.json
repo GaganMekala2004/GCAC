@@ -1,10 +1,33 @@
 [
   {
-    "scanId": "SCAN-1793161128645",
-    "timestamp": "2026-10-28T04:19:49.257Z",
-    "targetPath": "sample-repos/payments-api",
-    "durationMs": 60612,
-    "status": "Partial",
+    "scanId": "SCAN-1793786583915",
+    "timestamp": "2026-11-04T10:04:12.475Z",
+    "targetPath": "sample-repos\\customer-service",
+    "durationMs": 68560,
+    "status": "Failed",
+    "scannersCount": 4,
+    "findingsSummary": {
+      "total": 0,
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "informational": 0
+    },
+    "ingestStats": {
+      "added": 0,
+      "updated": 0,
+      "total": 5,
+      "newCount": 0,
+      "updatedCount": 0
+    }
+  },
+  {
+    "scanId": "SCAN-1793691017655",
+    "timestamp": "2026-11-03T07:31:55.490Z",
+    "targetPath": "sample-repos\\payments-api",
+    "durationMs": 97835,
+    "status": "Completed",
     "scannersCount": 4,
     "findingsSummary": {
       "total": 5,
@@ -15,56 +38,10 @@
       "informational": 0
     },
     "ingestStats": {
-      "added": 0,
-      "updated": 5,
-      "total": 17,
-      "newCount": 0,
-      "updatedCount": 5
-    }
-  },
-  {
-    "scanId": "SCAN-1793159254477",
-    "timestamp": "2026-10-28T03:47:34.531Z",
-    "targetPath": ".",
-    "durationMs": 54,
-    "status": "Partial",
-    "scannersCount": 3,
-    "findingsSummary": {
-      "total": 17,
-      "critical": 6,
-      "high": 11,
-      "medium": 0,
-      "low": 0,
-      "informational": 0
-    },
-    "ingestStats": {
-      "added": 0,
-      "updated": 17,
-      "total": 17,
-      "newCount": 0,
-      "updatedCount": 17
-    }
-  },
-  {
-    "scanId": "SCAN-1793159220513",
-    "timestamp": "2026-10-28T03:47:00.596Z",
-    "targetPath": ".",
-    "durationMs": 83,
-    "status": "Partial",
-    "scannersCount": 3,
-    "findingsSummary": {
-      "total": 17,
-      "critical": 6,
-      "high": 11,
-      "medium": 0,
-      "low": 0,
-      "informational": 0
-    },
-    "ingestStats": {
-      "added": 17,
+      "added": 5,
       "updated": 0,
-      "total": 17,
-      "newCount": 17,
+      "total": 5,
+      "newCount": 5,
       "updatedCount": 0
     }
   }

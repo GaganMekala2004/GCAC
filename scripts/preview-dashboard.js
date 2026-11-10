@@ -21,7 +21,11 @@ const findingsStore = new FindingsStore(workspaceRoot);
 const scanController = new ScanController(workspaceRoot, { findingsStore });
 
 const reScanVerifier = new ReScanVerifier(workspaceRoot, scanController);
-const engine = new RemediationEngine(workspaceRoot, findingsStore, reScanVerifier);
+const engine = new RemediationEngine(workspaceRoot, null, { findingsStore, reScanVerifier });
+
+let hasUserInitiatedScan = false;
+let activeScanTarget = '';
+let activeCsv = null;
 
 /**
  * Validates path within workspaceRoot to prevent traversal
@@ -72,7 +76,7 @@ function resolveSourceFilePath(repository, targetPath) {
                         if (res) return res;
                     }
                 }
-            } catch (e) {}
+            } catch (e) { }
             return null;
         };
         const found = findRecursive(repoBase);
@@ -279,6 +283,36 @@ const server = http.createServer(async (req, res) => {
                                 .then(history => {
                                     window.postMessage({ type: 'SCAN_HISTORY_LOADED', history: history }, '*');
                                 });
+                        } else if (msg.command === 'selectRepo' || msg.command === 'selectFile') {
+                            fetch('/api/workspace-targets')
+                                .then(r => r.json())
+                                .then(targets => {
+                                    window.postMessage({
+                                        type: 'SHOW_TARGET_PICKER',
+                                        targets: targets,
+                                        mode: msg.command === 'selectFile' ? 'file' : 'folder'
+                                    }, '*');
+                                });
+                        } else if (msg.command === 'selectScanTarget') {
+                            fetch('/api/scan/target', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ targetPath: msg.targetPath })
+                            }).then(r => r.json()).then(res => {
+                                window.postMessage({
+                                    type: 'TARGET_SELECTED',
+                                    targetPath: res.targetPath,
+                                    isFolder: res.isFolder,
+                                    displayName: res.displayName
+                                }, '*');
+                            });
+                        } else if (msg.command === 'clearScanResults') {
+                            fetch('/api/scan/clear', { method: 'POST' })
+                                .then(r => r.json())
+                                .then(() => {
+                                    window.postMessage({ type: 'DATA_UPDATED', vulnerabilities: [] }, '*');
+                                    window.postMessage({ type: 'ACTION_FEEDBACK', text: 'Scan results cleared. Dashboard reset to 0.', status: 'info' }, '*');
+                                });
                         } else if (msg.command === 'scanRepository') {
                             fetch('/api/scan', {
                                 method: 'POST',
@@ -288,7 +322,7 @@ const server = http.createServer(async (req, res) => {
                                 window.postMessage({
                                     type: 'SCAN_COMPLETED',
                                     scanId: summary.scanId,
-                                    findingsCount: summary.findingsCount,
+                                    findingsCount: summary.findingsSummary ? summary.findingsSummary.total : (summary.findingsCount || 0),
                                     summary: summary
                                 }, '*');
                             }).catch(err => {
@@ -313,10 +347,33 @@ const server = http.createServer(async (req, res) => {
         ];
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            activeRepo: workspaceRoot,
-            activeCsv: csvPath,
-            availableCsvs: available
+            activeRepo: activeScanTarget || workspaceRoot,
+            activeCsv: activeCsv || '',
+            availableCsvs: available,
+            hasScanned: hasUserInitiatedScan
         }));
+        return;
+    }
+
+    if (url.pathname === '/api/workspace-targets') {
+        const targets = [
+            { path: '.', name: 'Entire Workspace', isFolder: true },
+            { path: 'sample-repos/payments-api', name: 'payments-api (Payments API)', isFolder: true },
+            { path: 'sample-repos/customer-service', name: 'customer-service (Customer Service)', isFolder: true },
+            { path: 'sample-repos/inventory-manager', name: 'inventory-manager (Inventory Manager)', isFolder: true },
+            { path: 'sample-repos/identity-provider', name: 'identity-provider (Identity Provider)', isFolder: true },
+            { path: 'sample-repos/storefront-api', name: 'storefront-api (Storefront API)', isFolder: true },
+            { path: 'sample-repos/gcas-agentic-e2e-test-repo', name: 'gcas-agentic-e2e-test-repo (Agentic E2E Test API)', isFolder: true },
+            { path: 'sample-repos/payments-api/src/PaymentsAPI/Controllers/PaymentController.cs', name: 'PaymentController.cs (SQL Injection)', isFolder: false },
+            { path: 'sample-repos/payments-api/src/PaymentsAPI/Controllers/ReceiptController.cs', name: 'ReceiptController.cs (Command Injection)', isFolder: false },
+            { path: 'sample-repos/payments-api/src/PaymentsAPI/LegacyCrypto.cs', name: 'LegacyCrypto.cs (DES Crypto)', isFolder: false },
+            { path: 'sample-repos/payments-api/src/PaymentsAPI/appsettings.json', name: 'appsettings.json (Hardcoded API Key)', isFolder: false },
+            { path: 'sample-repos/customer-service/src/main/java/com/example/customer/config/SecurityConfig.java', name: 'SecurityConfig.java (Auth Bypass)', isFolder: false },
+            { path: 'sample-repos/customer-service/src/main/java/com/example/customer/controller/DocumentDownloadController.java', name: 'DocumentDownloadController.java (Path Traversal)', isFolder: false },
+            { path: 'sample-repos/gcas-agentic-e2e-test-repo/src/GcasE2ETestApi/SecretService.cs', name: 'SecretService.cs (Hardcoded Secret)', isFolder: false }
+        ];
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(targets));
         return;
     }
 
@@ -340,13 +397,49 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const body = JSON.parse(bodyStr || '{}');
-                const targetDir = body.targetRepo || workspaceRoot;
+                const targetDir = body.targetRepo || body.targetPath || activeScanTarget || workspaceRoot;
                 const summary = await scanController.startScan({
                     scannerIds: body.scannerIds,
                     targetDir: targetDir
                 });
+                hasUserInitiatedScan = true;
+                activeScanTarget = targetDir;
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(summary));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    if (url.pathname === '/api/scan/clear' && req.method === 'POST') {
+        hasUserInitiatedScan = false;
+        activeScanTarget = '';
+        activeCsv = null;
+        findingsStore.clearFindings();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+        return;
+    }
+
+    if (url.pathname === '/api/scan/target' && req.method === 'POST') {
+        let bodyStr = '';
+        req.on('data', chunk => { bodyStr += chunk; });
+        req.on('end', () => {
+            try {
+                const body = JSON.parse(bodyStr || '{}');
+                const rel = body.targetPath || '.';
+                activeScanTarget = rel;
+                const fullPath = path.isAbsolute(rel) ? rel : path.join(workspaceRoot, rel);
+                const isFolder = fs.existsSync(fullPath) ? fs.statSync(fullPath).isDirectory() : true;
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    targetPath: rel,
+                    isFolder: isFolder,
+                    displayName: path.basename(fullPath) || 'Workspace'
+                }));
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: err.message }));
@@ -363,7 +456,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/api/vulnerabilities') {
-        const csvData = loadVulnerabilities(csvPath);
+        if (!hasUserInitiatedScan && !activeCsv) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify([]));
+            return;
+        }
+        const csvData = (activeCsv && fs.existsSync(activeCsv)) ? loadVulnerabilities(activeCsv) : [];
         const scanned = findingsStore.getFindings();
         const adapted = scanned.map(f => f.toCsvCompatibleRecord ? f.toCsvCompatibleRecord() : f);
         const combined = [...csvData, ...adapted];

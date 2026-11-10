@@ -215,6 +215,18 @@ class FindingsStore {
         const findings = this.loadFindings();
         return findings.map(f => f.toCsvCompatibleRecord());
     }
+
+    /**
+     * Clears all stored findings and resets scan history
+     */
+    clearFindings() {
+        this.saveFindings([]);
+        try {
+            if (fs.existsSync(this.historyFile)) {
+                fs.writeFileSync(this.historyFile, '[]', 'utf-8');
+            }
+        } catch (e) {}
+    }
 }
 
 module.exports = {
