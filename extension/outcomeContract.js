@@ -21,6 +21,8 @@ const OUTCOME_STATUS = Object.freeze({
     UNTESTED: 'UNTESTED',
     COULD_NOT_RUN: 'COULD_NOT_RUN',
     NOT_VERIFIED: 'NOT_VERIFIED',
+    CANCELLED: 'CANCELLED',
+    TIMED_OUT: 'TIMED_OUT',
     PARTIAL: 'PARTIAL',
     RESOLVED: 'RESOLVED',
     STILL_PRESENT: 'STILL_PRESENT',
@@ -37,6 +39,8 @@ const LEGACY_VERIFICATION_DISPLAY = Object.freeze({
     [OUTCOME_STATUS.BLOCKED]: 'BLOCKED',
     [OUTCOME_STATUS.UNTESTED]: 'UNTESTED',
     [OUTCOME_STATUS.COULD_NOT_RUN]: 'COULD NOT RUN',
+    [OUTCOME_STATUS.CANCELLED]: 'CANCELLED',
+    [OUTCOME_STATUS.TIMED_OUT]: 'TIMED OUT',
     [OUTCOME_STATUS.FAILED]: 'FAILED',
     [OUTCOME_STATUS.PARTIAL]: 'PARTIAL',
     [OUTCOME_STATUS.PASSED]: 'PASSED'
@@ -91,7 +95,14 @@ function normalizeMachineOutcome(rawStatus) {
             return OUTCOME_STATUS.FAILED;
         case 'BLOCKED':
         case 'POLICY_BLOCKED':
+        case 'SANDBOX_UNAVAILABLE':
             return OUTCOME_STATUS.BLOCKED;
+        case 'CANCELLED':
+        case 'CANCELED':
+            return OUTCOME_STATUS.CANCELLED;
+        case 'TIMED_OUT':
+        case 'TIMEOUT':
+            return OUTCOME_STATUS.TIMED_OUT;
         case 'UNTESTED':
         case 'NOT_EXECUTED':
         case 'SKIPPED':
@@ -140,6 +151,8 @@ function toLegacyCsvTestDisplay(machineTestOutcome) {
     if (norm === OUTCOME_STATUS.PASSED) return 'PASS';
     if (norm === OUTCOME_STATUS.FAILED || norm === OUTCOME_STATUS.REGRESSION_DETECTED) return 'FAIL';
     if (norm === OUTCOME_STATUS.BLOCKED) return 'BLOCKED';
+    if (norm === OUTCOME_STATUS.CANCELLED) return 'CANCELLED';
+    if (norm === OUTCOME_STATUS.TIMED_OUT) return 'TIMED OUT';
     if (norm === OUTCOME_STATUS.COULD_NOT_RUN || norm === OUTCOME_STATUS.UNTESTED) return 'NOT EXECUTED';
     if (norm === OUTCOME_STATUS.PARTIAL) return 'PARTIAL';
     return 'NOT VERIFIED';
@@ -200,14 +213,24 @@ function classifyTestOutcome(testResult, opts = {}) {
 
     if (testResult.machineStatus) {
         const explicit = normalizeMachineOutcome(testResult.machineStatus);
-        if (explicit === OUTCOME_STATUS.BLOCKED || explicit === OUTCOME_STATUS.COULD_NOT_RUN) {
+        if (explicit === OUTCOME_STATUS.BLOCKED ||
+            explicit === OUTCOME_STATUS.COULD_NOT_RUN ||
+            explicit === OUTCOME_STATUS.CANCELLED ||
+            explicit === OUTCOME_STATUS.TIMED_OUT) {
             return explicit;
         }
     }
 
+    if (testResult.cancelled === true) {
+        return OUTCOME_STATUS.CANCELLED;
+    }
+    if (testResult.timedOut === true) {
+        return OUTCOME_STATUS.TIMED_OUT;
+    }
+
     if (testResult.executed === false) {
         const reason = (testResult.reason || '').toLowerCase();
-        if (reason.includes('unauthorized') || reason.includes('blocked')) {
+        if (reason.includes('unauthorized') || reason.includes('blocked') || reason.includes('sandbox_unavailable')) {
             return OUTCOME_STATUS.BLOCKED;
         }
         return OUTCOME_STATUS.COULD_NOT_RUN;
@@ -216,6 +239,15 @@ function classifyTestOutcome(testResult, opts = {}) {
     const rawStatus = (testResult.status || '').toString().toUpperCase();
     if (rawStatus === 'NOT EXECUTED') {
         return OUTCOME_STATUS.COULD_NOT_RUN;
+    }
+    if (rawStatus === 'SANDBOX_UNAVAILABLE') {
+        return OUTCOME_STATUS.BLOCKED;
+    }
+    if (rawStatus === 'CANCELLED' || rawStatus === 'CANCELED') {
+        return OUTCOME_STATUS.CANCELLED;
+    }
+    if (rawStatus === 'TIMED_OUT' || rawStatus === 'TIMED OUT') {
+        return OUTCOME_STATUS.TIMED_OUT;
     }
     if (rawStatus === 'BLOCKED') {
         return OUTCOME_STATUS.BLOCKED;
@@ -314,9 +346,14 @@ function evaluateFinalRemediationOutcome(params = {}) {
         if (rawReviewRating === 'FAIL') {
             blockingReasons.push('Independent security review rated FAIL.');
         }
-    } else if (isManualActionRequired || rawReviewRating === 'NEEDS_HUMAN_REVIEW' || rawReviewRating === 'BLOCKED') {
+    } else if (isManualActionRequired || rawReviewRating === 'NEEDS_HUMAN_REVIEW' || rawReviewRating === 'BLOCKED' || testOutcome === OUTCOME_STATUS.BLOCKED) {
         finalValidationOutcome = OUTCOME_STATUS.BLOCKED;
-        blockingReasons.push('Finding requires manual remediation / governance review; cannot auto-resolve.');
+        blockingReasons.push(testOutcome === OUTCOME_STATUS.BLOCKED
+            ? 'Test/build execution was blocked by security or sandbox availability policy.'
+            : 'Finding requires manual remediation / governance review; cannot auto-resolve.');
+    } else if (testOutcome === OUTCOME_STATUS.CANCELLED || testOutcome === OUTCOME_STATUS.TIMED_OUT) {
+        finalValidationOutcome = testOutcome;
+        blockingReasons.push(`Test execution ended in ${testOutcome}; cannot auto-resolve.`);
     } else if (testOutcome !== OUTCOME_STATUS.PASSED) {
         finalValidationOutcome = testOutcome === OUTCOME_STATUS.COULD_NOT_RUN
             ? OUTCOME_STATUS.COULD_NOT_RUN

@@ -9,6 +9,7 @@ const findingsStoreTests = require('./findingsStore.test');
 const reScanVerificationTests = require('./reScanVerification.test');
 const phase1SecurityTests = require('./phase1Security.test');
 const phase2SecurityTests = require('./phase2Security.test');
+const { runPhase3SandboxSecurityTests } = require('./phase3SandboxSecurity.test');
 
 async function main() {
     console.log('===============================================================');
@@ -27,7 +28,8 @@ async function main() {
         { name: 'Normalized Findings Model & Storage', fn: findingsStoreTests.run },
         { name: 'Post-Remediation Re-Scanning & Verification', fn: reScanVerificationTests.run },
         { name: 'Phase 1 P0 Security Containment & Core Integrity', fn: phase1SecurityTests.run },
-        { name: 'Phase 2 Trust Controls & Secure Remediation Governance', fn: phase2SecurityTests.run }
+        { name: 'Phase 2 Trust Controls & Secure Remediation Governance', fn: phase2SecurityTests.run },
+        { name: 'Phase 3 Execution Isolation, Approved Toolchains & Supply Chain Security', fn: runPhase3SandboxSecurityTests }
     ];
 
     let passedSuites = 0;

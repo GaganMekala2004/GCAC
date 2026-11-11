@@ -1,9 +1,12 @@
-const { spawn, execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { ScannerAdapter } = require('../scannerAdapter');
 const { NormalizedFinding, SCANNER_STATUS, SEVERITY_LEVELS } = require('../findingModel');
-const { isExecutableAvailable } = require('../../testRunner');
+const { OUTCOME_STATUS } = require('../../outcomeContract');
+const { SANDBOX_READINESS, discoverEnvironment } = require('../../sandbox/environmentDiscovery');
+const { EXECUTION_POLICY_VERSION, OPERATION_TYPES, TrustedExecutionGateway } = require('../../sandbox/trustedExecutionGateway');
+const { resolveProfileForRepository } = require('../../sandbox/toolchainProfiles');
+const { resolveDotnetProjectFile } = require('../dotnetProjectLocator');
 
 /**
  * NuGet Dependency Auditing Scanner Adapter
@@ -21,32 +24,33 @@ class NuGetAuditScanner extends ScannerAdapter {
         });
     }
 
-    async isAvailable() {
-        if (!isExecutableAvailable('dotnet')) {
+    async isAvailable(options = {}) {
+        if (options && (options.sandboxBackend || options.executionGateway || options.envReport?.sandboxAvailable)) {
             return {
-                available: false,
-                version: '',
-                reason: "Required runtime unavailable: 'dotnet' not found in PATH."
+                available: true,
+                version: options.envReport?.selectedRuntime || 'sandbox',
+                mode: 'SANDBOX',
+                reason: ''
             };
         }
 
-        try {
-            const ver = execFileSync('dotnet', ['--version'], {
-                timeout: 4000,
-                encoding: 'utf-8',
-                shell: false
-            }).trim();
+        const envReport = discoverEnvironment(options?.workspaceRoot || process.cwd());
+        if (envReport.sandboxAvailable) {
             return {
                 available: true,
-                version: ver
-            };
-        } catch (e) {
-            return {
-                available: false,
-                version: '',
-                reason: `Failed to query dotnet version: ${e.message}`
+                version: envReport.selectedRuntime || 'sandbox',
+                mode: 'SANDBOX',
+                reason: ''
             };
         }
+
+        const hostVer = envReport.toolchains?.dotnet?.activeVersion;
+        return {
+            available: false,
+            version: hostVer || '',
+            mode: 'SANDBOX_REQUIRED',
+            reason: 'SANDBOX_UNAVAILABLE: NuGet vulnerability auditing requires an approved container runtime (Docker Linux mode or Podman); host-shell fallback is disabled.'
+        };
     }
 
     /**
@@ -175,40 +179,14 @@ class NuGetAuditScanner extends ScannerAdapter {
         const scanId = options.scanId || `scan-${Date.now()}`;
         const startTime = Date.now();
 
-        const avail = await this.isAvailable();
-        if (!avail.available) {
-            this.status = SCANNER_STATUS.NOT_INSTALLED;
-            this.statusReason = avail.reason;
-            return {
-                scannerId: this.id,
-                status: SCANNER_STATUS.NOT_INSTALLED,
-                findings: [],
-                durationMs: Date.now() - startTime,
-                errors: [avail.reason],
-                warnings: [],
-                coverage: '0% (Runtime not installed)'
-            };
-        }
-
         const projectDir = targetPath || workspaceRoot;
-        let projectFile = null;
-        if (fs.existsSync(projectDir)) {
-            if (fs.statSync(projectDir).isFile() && (projectDir.endsWith('.csproj') || projectDir.endsWith('.sln'))) {
-                projectFile = projectDir;
-            } else {
-                try {
-                    const files = fs.readdirSync(projectDir);
-                    const sln = files.find(f => f.endsWith('.sln'));
-                    const csproj = files.find(f => f.endsWith('.csproj'));
-                    projectFile = sln ? path.join(projectDir, sln) : (csproj ? path.join(projectDir, csproj) : null);
-                } catch (e) {}
-            }
-        }
+        const projectFile = resolveDotnetProjectFile(workspaceRoot, projectDir);
 
         if (!projectFile) {
             return {
                 scannerId: this.id,
                 status: SCANNER_STATUS.COMPLETED,
+                executionPolicy: 'SANDBOX_GATEWAY',
                 findings: [],
                 durationMs: Date.now() - startTime,
                 errors: [],
@@ -217,93 +195,116 @@ class NuGetAuditScanner extends ScannerAdapter {
             };
         }
 
-        return new Promise((resolve) => {
-            const cwd = path.dirname(projectFile);
-            // Execute non-mutating vulnerable package list with transitive auditing
-            const args = ['list', path.basename(projectFile), 'package', '--vulnerable', '--include-transitive'];
-            let stdout = '';
-            let stderr = '';
-
-            try {
-                const child = spawn('dotnet', args, {
-                    cwd,
-                    shell: false,
-                    env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1' }
-                });
-                this.activeProcess = child;
-
-                const timer = setTimeout(() => {
-                    if (!child.killed) {
-                        child.kill('SIGTERM');
-                        resolve({
-                            scannerId: this.id,
-                            status: SCANNER_STATUS.FAILED,
-                            findings: [],
-                            durationMs: Date.now() - startTime,
-                            errors: ['NuGet dependency audit timed out after 60000ms'],
-                            warnings: [],
-                            coverage: '0% (Timed out)'
-                        });
-                    }
-                }, options.timeoutMs || 60000);
-
-                child.stdout.on('data', d => stdout += d.toString());
-                child.stderr.on('data', d => stderr += d.toString());
-
-                child.on('close', (code) => {
-                    clearTimeout(timer);
-                    this.activeProcess = null;
-                    const parsed = this.parseAuditOutput(stdout, stderr, projectFile, workspaceRoot, scanId);
-
-                    if (parsed.inaccessible) {
-                        resolve({
-                            scannerId: this.id,
-                            status: SCANNER_STATUS.FAILED,
-                            findings: [],
-                            durationMs: Date.now() - startTime,
-                            errors: [parsed.error],
-                            warnings: ['Vulnerability audit feed inaccessible; cannot guarantee zero findings.'],
-                            coverage: '0% (Audit source inaccessible)'
-                        });
-                        return;
-                    }
-
-                    resolve({
-                        scannerId: this.id,
-                        status: SCANNER_STATUS.COMPLETED,
-                        findings: parsed.findings,
-                        durationMs: Date.now() - startTime,
-                        errors: [],
-                        warnings: [],
-                        coverage: '100% (Direct and transitive dependencies checked)'
-                    });
-                });
-
-                child.on('error', (err) => {
-                    clearTimeout(timer);
-                    this.activeProcess = null;
-                    resolve({
-                        scannerId: this.id,
-                        status: SCANNER_STATUS.FAILED,
-                        findings: [],
-                        durationMs: Date.now() - startTime,
-                        errors: [err.message],
-                        warnings: [],
-                        coverage: '0% (Spawn error)'
-                    });
-                });
-            } catch (err) {
-                resolve({
-                    scannerId: this.id,
-                    status: SCANNER_STATUS.FAILED,
-                    findings: [],
-                    durationMs: Date.now() - startTime,
-                    errors: [err.message],
-                    warnings: [],
-                    coverage: '0% (Exception)'
-                });
-            }
+        const projectDirRoot = path.dirname(projectFile);
+        const gateway = options.executionGateway || new TrustedExecutionGateway({
+            workspaceRoot,
+            backend: options.sandboxBackend || null,
+            envReport: options.envReport || null,
+            profilesPath: options.profilesPath
         });
+
+        let profile;
+        try {
+            profile = resolveProfileForRepository(projectDirRoot, { Technology: 'dotnet' }, options.profilesPath);
+        } catch (err) {
+            return {
+                scannerId: this.id,
+                status: SCANNER_STATUS.FAILED,
+                sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
+                executionPolicy: 'SANDBOX_GATEWAY',
+                findings: [],
+                durationMs: Date.now() - startTime,
+                errors: [err.message],
+                warnings: [],
+                coverage: '0% (Toolchain profile blocked)'
+            };
+        }
+
+        const req = {
+            runId: options.runId || scanId,
+            applicationId: options.applicationId || 'APP-NUGET',
+            vulnerabilityId: options.vulnerabilityId || 'VUL-NUGET',
+            workspaceRef: projectDirRoot,
+            operation: OPERATION_TYPES.NUGET_AUDIT,
+            toolchainProfileId: profile.profileId,
+            requestedExecutable: 'dotnet',
+            inputs: [path.basename(projectFile)],
+            expectedOutputPaths: profile.outputArtifactPaths || [],
+            extraArgs: [],
+            policyVersion: EXECUTION_POLICY_VERSION,
+            networkPolicy: options.networkPolicy || profile.networkPolicy || 'NO_NETWORK',
+            isControlledRestoreOperation: options.isControlledRestoreOperation === true,
+            requestedFeeds: options.requestedFeeds || [],
+            resourcePolicy: {
+                ...profile.runtimeLimits,
+                timeoutMs: options.timeoutMs || profile.runtimeLimits.timeoutMs
+            }
+        };
+
+        const gwRes = await gateway.executeOperation(req, {
+            ...options,
+            originalWorkspaceRoot: workspaceRoot
+        });
+
+        if (!gwRes.executed || gwRes.machineStatus === OUTCOME_STATUS.BLOCKED || gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
+            return {
+                scannerId: this.id,
+                status: SCANNER_STATUS.FAILED,
+                sandboxStatus: gwRes.sandboxStatus || SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
+                executionPolicy: 'SANDBOX_GATEWAY',
+                networkPolicy: gwRes.networkPolicy || 'NO_NETWORK',
+                findings: [],
+                durationMs: Date.now() - startTime,
+                errors: [gwRes.reason || gwRes.summary || 'AUDIT UNAVAILABLE — Sandbox required for NuGet dependency audit.'],
+                warnings: gwRes.prerequisites || ['Vulnerability audit requires approved sandbox & offline/internal feed cache; host fallback blocked.'],
+                coverage: '0% (Sandbox unavailable — NuGet audit blocked)'
+            };
+        }
+
+        const parsed = this.parseAuditOutput(gwRes.stdout || '', gwRes.stderr || '', projectFile, workspaceRoot, scanId);
+        if (parsed.inaccessible) {
+            return {
+                scannerId: this.id,
+                status: SCANNER_STATUS.FAILED,
+                sandboxStatus: gwRes.sandboxStatus,
+                executionPolicy: 'SANDBOX_GATEWAY',
+                findings: [],
+                durationMs: Date.now() - startTime,
+                errors: [parsed.error],
+                warnings: ['Vulnerability audit feed inaccessible; cannot guarantee zero findings.'],
+                coverage: '0% (Audit source inaccessible)'
+            };
+        }
+
+        if ((gwRes.exitCode ?? 0) !== 0 && parsed.findings.length === 0) {
+            return {
+                scannerId: this.id,
+                status: SCANNER_STATUS.FAILED,
+                sandboxStatus: gwRes.sandboxStatus,
+                executionPolicy: 'SANDBOX_GATEWAY',
+                backendType: gwRes.backendType,
+                networkPolicy: gwRes.networkPolicy,
+                findings: [],
+                durationMs: Date.now() - startTime,
+                errors: [`AUDIT UNAVAILABLE — NuGet audit command exited with code ${gwRes.exitCode}: ${(gwRes.stderr || gwRes.stdout || 'Unknown error').slice(0, 300)}`],
+                warnings: ['NuGet dependency audit failed to complete cleanly; zero findings cannot be claimed.'],
+                coverage: '0% (NuGet audit command failed)'
+            };
+        }
+
+        return {
+            scannerId: this.id,
+            status: SCANNER_STATUS.COMPLETED,
+            sandboxStatus: gwRes.sandboxStatus,
+            executionPolicy: 'SANDBOX_GATEWAY',
+            backendType: gwRes.backendType,
+            networkPolicy: gwRes.networkPolicy,
+            findings: parsed.findings,
+            durationMs: Date.now() - startTime,
+            errors: [],
+            warnings: [],
+            coverage: '100% (Sandboxed direct and transitive dependencies checked)'
+        };
     }
 }
 

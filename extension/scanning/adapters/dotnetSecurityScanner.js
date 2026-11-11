@@ -1,9 +1,12 @@
-const { spawn, execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { ScannerAdapter } = require('../scannerAdapter');
 const { NormalizedFinding, SCANNER_STATUS, SEVERITY_LEVELS } = require('../findingModel');
-const { isExecutableAvailable } = require('../../testRunner');
+const { OUTCOME_STATUS } = require('../../outcomeContract');
+const { SANDBOX_READINESS, discoverEnvironment } = require('../../sandbox/environmentDiscovery');
+const { EXECUTION_POLICY_VERSION, OPERATION_TYPES, TrustedExecutionGateway } = require('../../sandbox/trustedExecutionGateway');
+const { resolveProfileForRepository } = require('../../sandbox/toolchainProfiles');
+const { resolveDotnetProjectFile } = require('../dotnetProjectLocator');
 
 /**
  * Known Roslyn Security Diagnostic Rules mapping to CWE and Severity
@@ -76,32 +79,33 @@ class DotnetSecurityScanner extends ScannerAdapter {
         });
     }
 
-    async isAvailable() {
-        if (!isExecutableAvailable('dotnet')) {
+    async isAvailable(options = {}) {
+        if (options && (options.sandboxBackend || options.executionGateway || options.envReport?.sandboxAvailable)) {
             return {
-                available: false,
-                version: '',
-                reason: "Required runtime unavailable: 'dotnet' not found in PATH."
+                available: true,
+                version: options.envReport?.selectedRuntime || 'sandbox',
+                mode: 'SANDBOX',
+                reason: ''
             };
         }
 
-        try {
-            const ver = execFileSync('dotnet', ['--version'], {
-                timeout: 4000,
-                encoding: 'utf-8',
-                shell: false
-            }).trim();
+        const envReport = discoverEnvironment(options?.workspaceRoot || process.cwd());
+        if (envReport.sandboxAvailable) {
             return {
                 available: true,
-                version: ver
-            };
-        } catch (e) {
-            return {
-                available: false,
-                version: '',
-                reason: `Failed to query dotnet version: ${e.message}`
+                version: envReport.selectedRuntime || 'sandbox',
+                mode: 'SANDBOX',
+                reason: ''
             };
         }
+
+        const hostVer = envReport.toolchains?.dotnet?.activeVersion;
+        return {
+            available: false,
+            version: hostVer || '',
+            mode: 'SANDBOX_REQUIRED',
+            reason: `SANDBOX_UNAVAILABLE: Build-backed .NET security scanning requires an approved container runtime (Docker Linux mode or Podman); host-shell fallback is disabled.`
+        };
     }
 
     /**
@@ -202,41 +206,14 @@ class DotnetSecurityScanner extends ScannerAdapter {
         const scanId = options.scanId || `scan-${Date.now()}`;
         const startTime = Date.now();
 
-        const avail = await this.isAvailable();
-        if (!avail.available) {
-            this.status = SCANNER_STATUS.NOT_INSTALLED;
-            this.statusReason = avail.reason;
-            return {
-                scannerId: this.id,
-                status: SCANNER_STATUS.NOT_INSTALLED,
-                findings: [],
-                durationMs: Date.now() - startTime,
-                errors: [avail.reason],
-                warnings: [],
-                coverage: '0% (Runtime not installed)'
-            };
-        }
-
         const projectDir = targetPath || workspaceRoot;
-        // Locate .sln or .csproj
-        let projectFile = null;
-        if (fs.existsSync(projectDir)) {
-            if (fs.statSync(projectDir).isFile() && (projectDir.endsWith('.csproj') || projectDir.endsWith('.sln'))) {
-                projectFile = projectDir;
-            } else {
-                try {
-                    const files = fs.readdirSync(projectDir);
-                    const sln = files.find(f => f.endsWith('.sln'));
-                    const csproj = files.find(f => f.endsWith('.csproj'));
-                    projectFile = sln ? path.join(projectDir, sln) : (csproj ? path.join(projectDir, csproj) : null);
-                } catch (e) {}
-            }
-        }
+        const projectFile = resolveDotnetProjectFile(workspaceRoot, projectDir);
 
         if (!projectFile) {
             return {
                 scannerId: this.id,
                 status: SCANNER_STATUS.COMPLETED,
+                executionPolicy: 'SANDBOX_GATEWAY',
                 findings: [],
                 durationMs: Date.now() - startTime,
                 errors: [],
@@ -245,79 +222,87 @@ class DotnetSecurityScanner extends ScannerAdapter {
             };
         }
 
-        return new Promise((resolve) => {
-            const cwd = path.dirname(projectFile);
-            const args = ['build', path.basename(projectFile), '--nologo', '/p:EnableNETAnalyzers=true', '/p:AnalysisLevel=latest'];
-            let stdout = '';
-            let stderr = '';
-
-            try {
-                const child = spawn('dotnet', args, {
-                    cwd,
-                    shell: false,
-                    env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1' }
-                });
-                this.activeProcess = child;
-
-                const timer = setTimeout(() => {
-                    if (!child.killed) {
-                        child.kill('SIGTERM');
-                        resolve({
-                            scannerId: this.id,
-                            status: SCANNER_STATUS.FAILED,
-                            findings: [],
-                            durationMs: Date.now() - startTime,
-                            errors: ['Execution timed out after 60000ms'],
-                            warnings: [],
-                            coverage: '0% (Timed out)'
-                        });
-                    }
-                }, options.timeoutMs || 60000);
-
-                child.stdout.on('data', d => stdout += d.toString());
-                child.stderr.on('data', d => stderr += d.toString());
-
-                child.on('close', (code) => {
-                    clearTimeout(timer);
-                    this.activeProcess = null;
-                    const findings = this.parseRoslynDiagnostics(stdout + '\n' + stderr, workspaceRoot, scanId);
-
-                    resolve({
-                        scannerId: this.id,
-                        status: SCANNER_STATUS.COMPLETED,
-                        findings,
-                        durationMs: Date.now() - startTime,
-                        errors: [],
-                        warnings: code !== 0 ? [`Build completed with compilation diagnostics (exit code ${code})`] : [],
-                        coverage: code === 0 ? '100% (Analyzers active)' : 'Coverage active (Diagnostics encountered)'
-                    });
-                });
-
-                child.on('error', (err) => {
-                    clearTimeout(timer);
-                    this.activeProcess = null;
-                    resolve({
-                        scannerId: this.id,
-                        status: SCANNER_STATUS.FAILED,
-                        findings: [],
-                        durationMs: Date.now() - startTime,
-                        errors: [err.message],
-                        warnings: [],
-                        coverage: '0% (Process spawn error)'
-                    });
-                });
-            } catch (err) {
-                resolve({
-                    scannerId: this.id,
-                    status: SCANNER_STATUS.FAILED,
-                    findings: [],
-                    durationMs: Date.now() - startTime,
-                    errors: [err.message],
-                    warnings: [],
-                    coverage: '0% (Exception)'
-                });
-            }
+        const projectDirRoot = path.dirname(projectFile);
+        const gateway = options.executionGateway || new TrustedExecutionGateway({
+            workspaceRoot,
+            backend: options.sandboxBackend || null,
+            envReport: options.envReport || null,
+            profilesPath: options.profilesPath
         });
+
+        let profile;
+        try {
+            profile = resolveProfileForRepository(projectDirRoot, { Technology: 'dotnet' }, options.profilesPath);
+        } catch (err) {
+            return {
+                scannerId: this.id,
+                status: SCANNER_STATUS.FAILED,
+                sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
+                executionPolicy: 'SANDBOX_GATEWAY',
+                findings: [],
+                durationMs: Date.now() - startTime,
+                errors: [err.message],
+                warnings: [],
+                coverage: '0% (Toolchain profile blocked)'
+            };
+        }
+
+        const operation = options.isRescan ? OPERATION_TYPES.TARGETED_RESCAN : OPERATION_TYPES.SECURITY_SCAN;
+        const req = {
+            runId: options.runId || scanId,
+            applicationId: options.applicationId || 'APP-SCAN',
+            vulnerabilityId: options.vulnerabilityId || 'VUL-SCAN',
+            workspaceRef: projectDirRoot,
+            operation,
+            toolchainProfileId: profile.profileId,
+            requestedExecutable: 'dotnet',
+            inputs: [path.basename(projectFile)],
+            expectedOutputPaths: profile.outputArtifactPaths || [],
+            extraArgs: [],
+            policyVersion: EXECUTION_POLICY_VERSION,
+            networkPolicy: profile.networkPolicy || 'NO_NETWORK',
+            resourcePolicy: {
+                ...profile.runtimeLimits,
+                timeoutMs: options.timeoutMs || profile.runtimeLimits.timeoutMs
+            }
+        };
+
+        const gwRes = await gateway.executeOperation(req, {
+            ...options,
+            originalWorkspaceRoot: workspaceRoot
+        });
+
+        if (!gwRes.executed || gwRes.machineStatus === OUTCOME_STATUS.BLOCKED || gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
+            return {
+                scannerId: this.id,
+                status: SCANNER_STATUS.FAILED,
+                sandboxStatus: gwRes.sandboxStatus || SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
+                executionPolicy: 'SANDBOX_GATEWAY',
+                toolchainProfileId: profile.profileId,
+                networkPolicy: gwRes.networkPolicy || 'NO_NETWORK',
+                findings: [],
+                durationMs: Date.now() - startTime,
+                errors: [gwRes.reason || gwRes.summary || 'SANDBOX_UNAVAILABLE'],
+                warnings: gwRes.prerequisites || [],
+                coverage: '0% (Build-backed security scan blocked outside sandbox)'
+            };
+        }
+
+        const findings = this.parseRoslynDiagnostics((gwRes.stdout || '') + '\n' + (gwRes.stderr || ''), workspaceRoot, scanId);
+        return {
+            scannerId: this.id,
+            status: SCANNER_STATUS.COMPLETED,
+            sandboxStatus: gwRes.sandboxStatus,
+            executionPolicy: 'SANDBOX_GATEWAY',
+            backendType: gwRes.backendType,
+            toolchainProfileId: profile.profileId,
+            networkPolicy: gwRes.networkPolicy,
+            findings,
+            durationMs: Date.now() - startTime,
+            errors: [],
+            warnings: gwRes.exitCode !== 0 ? [`Build completed with compilation diagnostics (exit code ${gwRes.exitCode})`] : [],
+            coverage: gwRes.exitCode === 0 ? '100% (Sandboxed Roslyn analyzers active)' : 'Coverage active (Sandboxed diagnostics encountered)'
+        };
     }
 }
 

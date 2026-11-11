@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const { loadVulnerabilities, updateVulnerabilityRow } = require('./csvParser');
 const { llmClient } = require('./llmClient');
 const { runBaselineTests, runPostFixTests } = require('./testRunner');
+const { TrustedExecutionGateway } = require('./sandbox/trustedExecutionGateway');
+const { generateSupplyChainSbom } = require('./sandbox/sbomGenerator');
 const {
     OUTCOME_STATUS,
     normalizeMachineOutcome,
@@ -70,6 +72,16 @@ class RemediationEngine {
         this.llmClient = options.llmClient || llmClient;
         this.runBaselineTests = options.testRunner?.runBaselineTests || runBaselineTests;
         this.runPostFixTests = options.testRunner?.runPostFixTests || runPostFixTests;
+        this.executionGateway = options.executionGateway || new TrustedExecutionGateway({
+            workspaceRoot,
+            backend: options.sandboxBackend || null,
+            envReport: options.envReport || null,
+            profilesPath: options.profilesPath || undefined,
+            lifecycleStateDir: workspaceRoot ? path.join(workspaceRoot, 'remediation-output', '.sandbox-instances') : null
+        });
+        this.sandboxBackend = options.sandboxBackend || null;
+        this.envReport = options.envReport || null;
+        this.sbomGenerator = options.sbomGenerator || generateSupplyChainSbom;
         this.adminBundlePath = options.adminBundlePath || null;
         this.requireSignedAgentBundle = options.requireSignedAgentBundle === true;
         this.signatureVerifier = options.signatureVerifier || null;
@@ -81,6 +93,10 @@ class RemediationEngine {
         this.evidenceWriter = options.evidenceWriter || new LocalTamperDetectableEvidenceWriter();
         this.isolatedWorkspaceOptions = options.isolatedWorkspaceOptions || (options.runsRoot ? { runsRoot: options.runsRoot } : {});
         this.updatePaths(workspaceRoot, customCsvPath);
+    }
+
+    async recoverOrphanedSandboxes() {
+        return await this.executionGateway.lifecycleManager.recoverOrphanedInstances(this.sandboxBackend);
     }
 
     updatePaths(workspaceRoot, customCsvPath = null) {
@@ -810,6 +826,11 @@ Perform complete analysis and return a JSON object with EXACTLY these keys:
             baselineValidation = await this.runBaselineTests(finding, isolatedWorkspace.worktreeDir, {
                 workingDirectory: isolatedWorkspace.isolatedRepoPath,
                 runId,
+                applicationId: appNum,
+                vulnerabilityId: finding.Vulnerability_ID,
+                executionGateway: this.executionGateway,
+                sandboxBackend: this.sandboxBackend,
+                envReport: this.envReport,
                 injectionScreen: this.contentInjectionScreen
             });
             commandPolicyDecisions.push({
@@ -1181,6 +1202,11 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
         const postFixValidation = await this.runPostFixTests(finding, isolatedWorkspace.worktreeDir, {
             workingDirectory: isolatedWorkspace.isolatedRepoPath,
             runId,
+            applicationId: appNum,
+            vulnerabilityId: finding.Vulnerability_ID,
+            executionGateway: this.executionGateway,
+            sandboxBackend: this.sandboxBackend,
+            envReport: this.envReport,
             injectionScreen: this.contentInjectionScreen
         });
         commandPolicyDecisions.push({
@@ -1226,7 +1252,13 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
                     originalFinding: finding,
                     postFixTestResult: postFixValidation,
                     targetFilePath: sourceFilePath,
-                    workspaceRoot: isolatedWorkspace.worktreeDir
+                    workspaceRoot: isolatedWorkspace.worktreeDir,
+                    runId,
+                    applicationId: appNum,
+                    vulnerabilityId: finding.Vulnerability_ID,
+                    executionGateway: this.executionGateway,
+                    sandboxBackend: this.sandboxBackend,
+                    envReport: this.envReport
                 });
                 log('RESCAN_VERIFICATION', `Re-Scan Outcome: ${reScanVerification.status} (${reScanVerification.machineStatus}) — ${reScanVerification.reason}`);
             } catch (err) {
@@ -1272,6 +1304,10 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
         let regressionStatus = 'NOT EXECUTED';
         if (postTestOutcome === OUTCOME_STATUS.FAILED) {
             regressionStatus = 'FAIL';
+        } else if (postTestOutcome === OUTCOME_STATUS.TIMED_OUT) {
+            regressionStatus = 'TIMED OUT';
+        } else if (postTestOutcome === OUTCOME_STATUS.CANCELLED) {
+            regressionStatus = 'CANCELLED';
         } else if (postTestOutcome === OUTCOME_STATUS.BLOCKED) {
             regressionStatus = 'BLOCKED';
         } else if (postTestOutcome === OUTCOME_STATUS.COULD_NOT_RUN || postTestOutcome === OUTCOME_STATUS.UNTESTED) {
@@ -1384,12 +1420,39 @@ Return a JSON object with EXACTLY these keys:
             securityReview.machineOutcome = OUTCOME_STATUS.PASSED;
         }
 
+        const sbomEvidence = this.sbomGenerator({
+            runId,
+            applicationId: appNum,
+            vulnerabilityId: finding.Vulnerability_ID,
+            repoRoot: isolatedWorkspace.isolatedRepoPath,
+            imageDigest: postFixValidation?.imageDigest || null,
+            envReport: this.envReport
+        });
+
+        const sandboxExecution = {
+            sandboxStatus: postFixValidation?.sandboxStatus || 'SANDBOX_UNAVAILABLE',
+            backendType: postFixValidation?.backendType || 'NONE',
+            toolchainProfileId: postFixValidation?.toolchainProfileId || null,
+            toolchainProfileHash: postFixValidation?.toolchainProfileHash || null,
+            imageDigest: postFixValidation?.imageDigest || null,
+            networkPolicy: postFixValidation?.networkPolicy || 'NO_NETWORK',
+            dependencyStatus: postFixValidation?.dependencyStatus || 'OFFLINE_NO_RESTORE',
+            dependencyWarnings: postFixValidation?.dependencyWarnings || [],
+            instanceId: postFixValidation?.instanceId || null,
+            timedOut: Boolean(postFixValidation?.timedOut),
+            cancelled: Boolean(postFixValidation?.cancelled),
+            gatewayAuditDecisions: this.executionGateway.getAuditDecisions(runId),
+            gatewayBoundaryNote: this.executionGateway.gatewayBoundaryNote
+        };
+
         currentState.stage = 8;
         currentState.postFixValidation = postFixValidation;
         currentState.reScanVerification = reScanVerification;
         currentState.regressionStatus = regressionStatus;
         currentState.securityReview = securityReview;
         currentState.outcomeEvaluation = outcomeEvaluation;
+        currentState.sandboxExecution = sandboxExecution;
+        currentState.sbomEvidence = sbomEvidence;
         currentState.stage6Approved = isFinalApproved;
         currentState.scopeVerification = postTestScope;
         currentState.updatedAt = now();
@@ -1407,6 +1470,8 @@ Return a JSON object with EXACTLY these keys:
             appliedDiffSha256: computeDiffSha256(postTestScope.actualGitDiff || patchDiff),
             remediationDecision,
             sourceToSinkEvidence,
+            sandboxExecution,
+            sbomEvidence,
             outcomeEvaluation,
             chainEvents
         };
@@ -1632,6 +1697,16 @@ Return a JSON object with EXACTLY these keys:
             scopeVerificationOutcome: evidenceContext.scopeVerification?.status || 'NOT_APPLIED',
             remediationPreferenceDecision: evidenceContext.remediationDecision || null,
             sourceToSinkEvidence: evidenceContext.sourceToSinkEvidence || null,
+            sandboxExecution: evidenceContext.sandboxExecution || null,
+            sbomEvidence: evidenceContext.sbomEvidence
+                ? {
+                    sbomStatus: evidenceContext.sbomEvidence.sbomStatus,
+                    externalSbomCliStatus: evidenceContext.sbomEvidence.externalSbomCliStatus,
+                    format: evidenceContext.sbomEvidence.format,
+                    componentCount: evidenceContext.sbomEvidence.componentCount,
+                    artifactHash: evidenceContext.sbomEvidence.artifactHash
+                }
+                : null,
             finalOutcome: evidenceContext.outcomeEvaluation || {
                 scannerOutcome: OUTCOME_STATUS.NOT_VERIFIED,
                 testOutcome: OUTCOME_STATUS.UNTESTED,
@@ -1699,6 +1774,12 @@ Return a JSON object with EXACTLY these keys:
         }
         if (evidenceContext?.sourceToSinkEvidence) {
             fs.writeFileSync(path.join(targetDir, 'source-to-sink.json'), JSON.stringify(evidenceContext.sourceToSinkEvidence, null, 2), 'utf-8');
+        }
+        if (evidenceContext?.sandboxExecution) {
+            fs.writeFileSync(path.join(targetDir, 'sandbox-execution.json'), JSON.stringify(evidenceContext.sandboxExecution, null, 2), 'utf-8');
+        }
+        if (evidenceContext?.sbomEvidence?.bom) {
+            fs.writeFileSync(path.join(targetDir, 'sbom.cdx.json'), JSON.stringify(evidenceContext.sbomEvidence.bom, null, 2), 'utf-8');
         }
 
         const cleanTitle = (finding.Title || 'finding').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
@@ -1829,6 +1910,20 @@ function generateMarkdownReport(finding, classification, rca, baselineValidation
         lines.push(`- **Baseline Fingerprint**: \`${reScanVerification.beforeFingerprint || 'N/A'}\``);
         lines.push(`- **Findings Detected Post-Fix**: \`${reScanVerification.stillPresent ? 1 : 0}\` (New Regressions: \`${reScanVerification.newFindingsCount || 0}\`)`);
         lines.push(`- **Evaluation Summary**: ${reScanVerification.reason || 'Verification complete.'}`);
+        lines.push('');
+    }
+
+    if (evidenceContext?.sandboxExecution) {
+        const sbx = evidenceContext.sandboxExecution;
+        lines.push('## Execution Isolation & Supply Chain Evidence');
+        lines.push(`- **Sandbox Status**: \`${sbx.sandboxStatus}\` (Backend: \`${sbx.backendType}\`)`);
+        lines.push(`- **Approved Toolchain Profile**: \`${sbx.toolchainProfileId || 'N/A'}\` (Image Digest: \`${sbx.imageDigest || 'NONE'}\`)`);
+        lines.push(`- **Network Policy**: \`${sbx.networkPolicy}\` | **Dependency Status**: \`${sbx.dependencyStatus}\``);
+        if (evidenceContext.sbomEvidence) {
+            const sb = evidenceContext.sbomEvidence;
+            lines.push(`- **Supply Chain SBOM**: \`${sb.format}\` — Status: \`${sb.sbomStatus}\` (${sb.componentCount} manifest components, External CLI: \`${sb.externalSbomCliStatus}\`)`);
+        }
+        lines.push(`- **Boundary Disclosure**: ${sbx.gatewayBoundaryNote}`);
         lines.push('');
     }
 

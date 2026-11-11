@@ -117,14 +117,22 @@ class ReScanVerifier {
             };
         }
 
-        // Check scanner availability
-        const avail = await scanner.isAvailable();
+        const effectiveRoot = params.workspaceRoot || this.workspaceRoot;
+
+        // Check scanner availability (passing sandbox context for container-backed scanners)
+        const avail = await scanner.isAvailable({
+            workspaceRoot: effectiveRoot,
+            executionGateway: params.executionGateway || null,
+            sandboxBackend: params.sandboxBackend || null,
+            envReport: params.envReport || null
+        });
         if (!avail.available) {
             const reason = `Scanner '${scanner.name}' runtime is not installed: ${avail.reason}`;
             const md = `### ⚠️ Re-Scan Verification: ${scanner.name}\n- Status: \`NOT VERIFIED\`\n- Reason: Required runtime unavailable on machine (${avail.reason})\n`;
             return {
                 status: VERIFICATION_STATUS.NOT_VERIFIED,
                 machineStatus: OUTCOME_STATUS.NOT_VERIFIED,
+                sandboxStatus: avail.mode === 'SANDBOX_REQUIRED' ? 'SANDBOX_UNAVAILABLE' : undefined,
                 isResolved: false,
                 reason,
                 summary: reason,
@@ -139,18 +147,27 @@ class ReScanVerifier {
         }
 
         // Resolve scan target: specific remediated file or repository folder (supporting isolated worktree root override)
-        const effectiveRoot = params.workspaceRoot || this.workspaceRoot;
         const relLocPath = originalFinding.filePath || originalFinding.Location_Path || '';
         const scanTarget = targetFilePath && fs.existsSync(targetFilePath)
             ? targetFilePath
             : (relLocPath ? path.join(effectiveRoot, relLocPath) : effectiveRoot);
 
         const startTime = Date.now();
+        const defaultExecutionPolicy = (scanner.id === 'dotnet-security' || scanner.id === 'nuget-audit')
+            ? 'SANDBOX_GATEWAY'
+            : 'READ_ONLY_STATIC_POLICY';
         let reScanResult;
 
         try {
             reScanResult = await scanner.scan(effectiveRoot, scanTarget, {
-                scanId: `rescan-${Date.now()}`
+                scanId: `rescan-${Date.now()}`,
+                isRescan: true,
+                runId: params.runId || `rescan-${Date.now()}`,
+                applicationId: params.applicationId || originalFinding.applicationId || originalFinding.Application_Number || 'APP-RESCAN',
+                vulnerabilityId: params.vulnerabilityId || originalFinding.vulnerabilityId || originalFinding.Vulnerability_ID || 'VUL-RESCAN',
+                executionGateway: params.executionGateway || null,
+                sandboxBackend: params.sandboxBackend || null,
+                envReport: params.envReport || null
             });
         } catch (e) {
             const reason = `Scanner execution failed during re-scan: ${e.message}`;
@@ -237,11 +254,14 @@ class ReScanVerifier {
         }
 
         const finalStatus = toLegacyVerificationDisplay(machineStatus);
+        const executionPolicy = reScanResult.executionPolicy || defaultExecutionPolicy;
+        const sandboxStatus = reScanResult.sandboxStatus || (executionPolicy === 'SANDBOX_GATEWAY' ? 'SANDBOX_UNAVAILABLE' : 'READ_ONLY_STATIC');
 
         // Format Markdown Comparison Evidence
         const evidenceMarkdown = [
             `### 🔬 Post-Remediation Verification & Re-Scan Audit`,
             `- **Scanner**: \`${scanner.name}\` (ID: \`${scanner.id}\`, Version: \`${scanner.version}\`)`,
+            `- **Execution Policy**: \`${executionPolicy}\` (Sandbox: \`${sandboxStatus}\`)`,
             `- **Verification Status**: **\`${finalStatus}\`** (\`${machineStatus}\`)`,
             `- **Post-Fix Validation Outcome**: \`${testOutcome}\``,
             `- **Target Path**: \`${path.relative(effectiveRoot, scanTarget) || '.'}\``,
@@ -257,6 +277,8 @@ class ReScanVerifier {
             status: finalStatus,
             machineStatus,
             testOutcome,
+            executionPolicy,
+            sandboxStatus,
             isResolved: machineStatus === OUTCOME_STATUS.RESOLVED,
             reason: explanation,
             summary: explanation,

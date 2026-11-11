@@ -894,6 +894,14 @@
                                         <span class="meta-label">Pipeline Status</span>
                                         <span class="meta-val" id="activeRunSummaryStatus">Ready</span>
                                     </div>
+                                    <div class="meta-item">
+                                        <span class="meta-label">Sandbox Backend</span>
+                                        <span class="meta-val" id="activeRunSandboxBackend">Checking...</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="meta-label">Toolchain / Network</span>
+                                        <span class="meta-val" id="activeRunToolchainPolicy">--</span>
+                                    </div>
                                 </div>
 
                                 <div class="terminal-header">
@@ -1262,6 +1270,23 @@
                                     <li>✓ Autonomous Git push &amp; PR publishing blocked; standalone legacy .NET MCP disabled for auto-publish</li>
                                     <li>✓ Native VS Code GitHub Copilot Chat handoff (extension does not proxy interactive Copilot Chat tools)</li>
                                 </ul>
+                            </div>
+
+                            <!-- Execution Isolation & Approved Toolchain Policy Card -->
+                            <div class="settings-card">
+                                <div class="card-heading">Phase 3 Execution Isolation &amp; Supply Chain Governance</div>
+                                <div class="compliance-status-badge" id="sandboxStatusBadge">
+                                    <span class="sandbox-dot" id="sandboxStatusDot"></span>
+                                    <span id="sandboxStatusHeadline">Checking execution backend...</span>
+                                </div>
+                                <div class="sandbox-meta-strip" id="sandboxBackendMeta">Awaiting environment discovery...</div>
+                                <ul class="compliance-list" id="sandboxProfilesList">
+                                    <li>Approved toolchain profiles loading...</li>
+                                </ul>
+                                <ul class="sandbox-prereq-list" id="sandboxPrereqsList"></ul>
+                                <div class="u-mt-8">
+                                    <button class="btn btn-secondary btn-sm" id="btnRefreshSandboxStatus">Re-check Sandbox Backend</button>
+                                </div>
                             </div>
 
                             <!-- 7-Stage Agent Policy Card -->

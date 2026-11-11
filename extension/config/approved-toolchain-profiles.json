@@ -1,0 +1,302 @@
+{
+  "policyVersion": "GCAC-PH3-TOOLCHAIN-1.0",
+  "generatedAt": "2026-11-11T09:07:17.732Z",
+  "unsupportedFutureAdapters": [
+    {
+      "stack": "gradle",
+      "status": "FUTURE_ADAPTER",
+      "reason": "Requires validated Gradle offline wrapper/cache profile and fixtures."
+    },
+    {
+      "stack": "ant",
+      "status": "FUTURE_ADAPTER",
+      "reason": "Requires validated Ant build policy profile and fixtures."
+    },
+    {
+      "stack": "python",
+      "status": "FUTURE_ADAPTER",
+      "reason": "Requires validated Python wheelhouse mirror and pip --no-index policy."
+    }
+  ],
+  "profiles": [
+    {
+      "profileId": "dotnet-8.0-lts",
+      "supportedStack": "dotnet",
+      "toolchainVersion": "8.0.404-lts",
+      "targetFrameworks": [
+        "net8.0"
+      ],
+      "imageDigest": "sha256:8e5a7f8a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e",
+      "imageRef": "mcr.microsoft.com/dotnet/sdk@sha256:8e5a7f8a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e",
+      "digestPolicyNote": "Template digest; pin enterprise-verified MCR/Artifactory Linux SDK digest before container execution.",
+      "approvedCommands": {
+        "DOTNET_BUILD": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "build",
+            "--no-restore",
+            "--nologo"
+          ]
+        },
+        "DOTNET_TEST": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "test",
+            "--no-restore",
+            "--nologo",
+            "-v",
+            "normal"
+          ]
+        },
+        "SECURITY_SCAN": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "build",
+            "--no-restore",
+            "--nologo",
+            "/p:EnableNETAnalyzers=true",
+            "/p:AnalysisLevel=latest"
+          ]
+        },
+        "TARGETED_RESCAN": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "build",
+            "--no-restore",
+            "--nologo",
+            "/p:EnableNETAnalyzers=true",
+            "/p:AnalysisLevel=latest"
+          ]
+        },
+        "NUGET_AUDIT": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "list",
+            "package",
+            "--vulnerable",
+            "--include-transitive"
+          ]
+        }
+      },
+      "permittedArguments": [
+        "--no-restore",
+        "--nologo",
+        "-v",
+        "normal",
+        "minimal",
+        "--filter",
+        "/p:EnableNETAnalyzers=true",
+        "/p:AnalysisLevel=latest",
+        "--configuration",
+        "Release",
+        "Debug",
+        "--format",
+        "json",
+        "console"
+      ],
+      "runtimeLimits": {
+        "timeoutMs": 120000,
+        "memoryMb": 2048,
+        "cpus": 2,
+        "pidsLimit": 128
+      },
+      "networkPolicy": "NO_NETWORK",
+      "dependencyCachePolicy": "OFFLINE_NO_RESTORE_PER_APP_CACHE",
+      "outputArtifactPaths": [
+        "/sandbox-out/test-results.trx",
+        "/sandbox-out/roslyn.sarif"
+      ],
+      "profileVersion": "1.0.0",
+      "profileSha256": "82905c448022276973098798cc177e6e2649a0d8adbf1848db3fed075ddd3a1d",
+      "digestStatus": "TEMPLATE_PLACEHOLDER"
+    },
+    {
+      "profileId": "dotnet-9.0-sts",
+      "supportedStack": "dotnet",
+      "toolchainVersion": "9.0.317-sts",
+      "targetFrameworks": [
+        "net9.0",
+        "net8.0"
+      ],
+      "ltsAssessmentNote": "Existing GCAC .NET projects target net9.0 (STS). Plan deliberate LTS migration to net8.0/net10.0 LTS separately.",
+      "imageDigest": "sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b",
+      "imageRef": "mcr.microsoft.com/dotnet/sdk@sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b",
+      "digestPolicyNote": "Template digest; pin enterprise-verified MCR/Artifactory Linux SDK digest before container execution.",
+      "approvedCommands": {
+        "DOTNET_BUILD": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "build",
+            "--no-restore",
+            "--nologo"
+          ]
+        },
+        "DOTNET_TEST": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "test",
+            "--no-restore",
+            "--nologo",
+            "-v",
+            "normal"
+          ]
+        },
+        "SECURITY_SCAN": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "build",
+            "--no-restore",
+            "--nologo",
+            "/p:EnableNETAnalyzers=true",
+            "/p:AnalysisLevel=latest"
+          ]
+        },
+        "TARGETED_RESCAN": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "build",
+            "--no-restore",
+            "--nologo",
+            "/p:EnableNETAnalyzers=true",
+            "/p:AnalysisLevel=latest"
+          ]
+        },
+        "NUGET_AUDIT": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "list",
+            "package",
+            "--vulnerable",
+            "--include-transitive"
+          ]
+        }
+      },
+      "permittedArguments": [
+        "--no-restore",
+        "--nologo",
+        "-v",
+        "normal",
+        "minimal",
+        "--filter",
+        "/p:EnableNETAnalyzers=true",
+        "/p:AnalysisLevel=latest",
+        "--configuration",
+        "Release",
+        "Debug",
+        "--format",
+        "json",
+        "console"
+      ],
+      "runtimeLimits": {
+        "timeoutMs": 120000,
+        "memoryMb": 2048,
+        "cpus": 2,
+        "pidsLimit": 128
+      },
+      "networkPolicy": "NO_NETWORK",
+      "dependencyCachePolicy": "OFFLINE_NO_RESTORE_PER_APP_CACHE",
+      "outputArtifactPaths": [
+        "/sandbox-out/test-results.trx",
+        "/sandbox-out/roslyn.sarif"
+      ],
+      "profileVersion": "1.0.0",
+      "profileSha256": "05ef2e1954f929094487ab680deb67d65e76864e30947da807de38766b79676f",
+      "digestStatus": "TEMPLATE_PLACEHOLDER"
+    },
+    {
+      "profileId": "java-17-maven",
+      "supportedStack": "java-maven",
+      "toolchainVersion": "jdk-17-maven-3.9",
+      "targetFrameworks": [
+        "17",
+        "21"
+      ],
+      "imageDigest": "sha256:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
+      "imageRef": "maven@sha256:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
+      "digestPolicyNote": "Template digest; pin enterprise-verified Eclipse Temurin JDK 17 + Maven 3.9 digest before container execution.",
+      "approvedCommands": {
+        "MAVEN_COMPILE": {
+          "executable": "mvn",
+          "baseArgs": [
+            "compile",
+            "-B",
+            "-o"
+          ]
+        },
+        "MAVEN_TEST": {
+          "executable": "mvn",
+          "baseArgs": [
+            "test",
+            "-B",
+            "-o"
+          ]
+        }
+      },
+      "permittedArguments": [
+        "-B",
+        "-o",
+        "--batch-mode",
+        "--offline"
+      ],
+      "runtimeLimits": {
+        "timeoutMs": 120000,
+        "memoryMb": 2048,
+        "cpus": 2,
+        "pidsLimit": 128
+      },
+      "networkPolicy": "NO_NETWORK",
+      "dependencyCachePolicy": "OFFLINE_M2_PER_APP_CACHE",
+      "outputArtifactPaths": [
+        "/sandbox-out/surefire-reports"
+      ],
+      "profileVersion": "1.0.0",
+      "profileSha256": "5b37d26c26ce4c36258360e787e92a8a3534bde23f8ddc25c86704cebef5e760",
+      "digestStatus": "TEMPLATE_PLACEHOLDER"
+    },
+    {
+      "profileId": "node-22-lts",
+      "supportedStack": "nodejs",
+      "toolchainVersion": "22.x-lts",
+      "targetFrameworks": [
+        "20",
+        "22",
+        "24"
+      ],
+      "imageDigest": "sha256:2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c",
+      "imageRef": "node@sha256:2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c",
+      "digestPolicyNote": "Template digest; pin enterprise-verified Node 22 LTS Linux digest before container execution.",
+      "approvedCommands": {
+        "NPM_TEST": {
+          "executable": "npm",
+          "baseArgs": [
+            "test",
+            "--offline",
+            "--",
+            "--watchAll=false"
+          ]
+        }
+      },
+      "permittedArguments": [
+        "test",
+        "--offline",
+        "--ignore-scripts",
+        "--",
+        "--watchAll=false"
+      ],
+      "runtimeLimits": {
+        "timeoutMs": 90000,
+        "memoryMb": 1024,
+        "cpus": 1,
+        "pidsLimit": 128
+      },
+      "networkPolicy": "NO_NETWORK",
+      "dependencyCachePolicy": "OFFLINE_NPM_LOCKFILE_CACHE",
+      "outputArtifactPaths": [
+        "/sandbox-out/npm-test-results.json"
+      ],
+      "profileVersion": "1.0.0",
+      "profileSha256": "3283d21bd9f1bad54feb26403d8a3a97b63f09c9da046c40002aca812a1db864",
+      "digestStatus": "TEMPLATE_PLACEHOLDER"
+    }
+  ]
+}
