@@ -15,6 +15,15 @@ const { TrustedExecutionGateway } = require('./sandbox/trustedExecutionGateway')
 const { loadAndVerifyToolchainRegistry, isTemplateDigestProfile } = require('./sandbox/toolchainProfiles');
 const { llmClient } = require('./llmClient');
 const { assertPathWithinWorkspace } = require('./pathUtils');
+const {
+    canonicalizePath,
+    isSensitiveSystemOrCredentialRoot,
+    assertPathWithinAuthorizedRoots,
+    isUninitializedGitSubmodule,
+    inspectRepositoryTarget,
+    RepositoryContextRegistry,
+    validateFindingContextContract
+} = require('./repositoryContext');
 const { ScanController } = require('./scanning/scanController');
 const { FindingsStore } = require('./scanning/findingsStore');
 const { ReScanVerifier } = require('./scanning/reScanVerifier');
@@ -29,10 +38,14 @@ let engine = null;
 let findingsStore = null;
 let scanController = null;
 let reScanVerifier = null;
+let registry = null;
 let currentWorkspaceRoot = '';
+let extensionRootPath = path.resolve(__dirname, '..');
 let currentCsvPath = '';
 let hasUserInitiatedScan = false;
 let currentScanTarget = '';
+let activeRepoContext = null;
+const explicitExternalRoots = new Set();
 
 /**
  * Validates IPC messages sent from Webview to Extension Host
@@ -43,6 +56,7 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'selectRepo',
     'selectFile',
     'selectScanTarget',
+    'selectWorkspaceFolder',
     'clearScanResults',
     'setCsvPath',
     'requestData',
@@ -50,6 +64,8 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'loadDetails',
     'runRemediation',
     'retryStage',
+    'reviseFix',
+    'mapFindingRepository',
     'approveRemediation',
     'rejectRemediation',
     'approveFinalGate',
@@ -71,6 +87,106 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'getSandboxStatus',
     'recoverSandboxInstances'
 ]);
+
+function getWorkspaceFoldersSnapshot() {
+    const folders = [];
+    const seen = new Set();
+    const wsFolders = (vscode && vscode.workspace && Array.isArray(vscode.workspace.workspaceFolders))
+        ? vscode.workspace.workspaceFolders
+        : [];
+    for (const f of wsFolders) {
+        const fsPath = f?.uri?.fsPath;
+        if (fsPath && fs.existsSync(fsPath)) {
+            const canon = canonicalizePath(fsPath);
+            if (!seen.has(canon.toLowerCase())) {
+                seen.add(canon.toLowerCase());
+                folders.push({
+                    name: f.name || path.basename(canon),
+                    path: canon
+                });
+            }
+        }
+    }
+    if (currentWorkspaceRoot && fs.existsSync(currentWorkspaceRoot)) {
+        const canonWs = canonicalizePath(currentWorkspaceRoot);
+        if (!seen.has(canonWs.toLowerCase())) {
+            seen.add(canonWs.toLowerCase());
+            folders.unshift({ name: path.basename(canonWs) || 'Workspace', path: canonWs });
+        }
+    }
+    return folders;
+}
+
+function buildAuthorizedRoots() {
+    const set = new Map();
+    const add = (candidate) => {
+        if (!candidate || typeof candidate !== 'string' || !fs.existsSync(candidate)) return;
+        const canon = canonicalizePath(candidate);
+        if (isSensitiveSystemOrCredentialRoot(canon)) return;
+        set.set(canon.toLowerCase(), canon);
+    };
+    for (const wf of getWorkspaceFoldersSnapshot()) add(wf.path);
+    add(currentWorkspaceRoot);
+    if (currentScanTarget && path.isAbsolute(currentScanTarget)) add(currentScanTarget);
+    for (const ext of explicitExternalRoots) add(ext);
+    if (registry) {
+        for (const r of registry.getAllAuthorizedRepositoryRoots()) add(r);
+    }
+    return Array.from(set.values());
+}
+
+function syncAuthorizedRoots() {
+    const roots = buildAuthorizedRoots();
+    if (scanController && typeof scanController.setAuthorizedRoots === 'function') {
+        scanController.setAuthorizedRoots(roots);
+    }
+    if (engine && typeof engine.setAuthorizedRoots === 'function') {
+        engine.setAuthorizedRoots(roots);
+    }
+    return roots;
+}
+
+function resolveAuthorizedTarget(candidateTarget) {
+    if (!candidateTarget || !currentWorkspaceRoot) return null;
+    const raw = String(candidateTarget).trim();
+    const abs = path.isAbsolute(raw) ? raw : path.resolve(currentWorkspaceRoot, raw);
+    const roots = buildAuthorizedRoots();
+    const match = assertPathWithinAuthorizedRoots(abs, roots);
+    if (match && fs.existsSync(match.canonicalPath)) return match.canonicalPath;
+    for (const wf of getWorkspaceFoldersSnapshot()) {
+        const wfCand = path.resolve(wf.path, raw);
+        const safe = assertPathWithinWorkspace(wfCand, wf.path);
+        if (safe && fs.existsSync(safe)) return safe;
+    }
+    return null;
+}
+
+function buildConfigPayload(extra = {}) {
+    const wsFolders = getWorkspaceFoldersSnapshot();
+    const activeTargetAbs = currentScanTarget
+        ? (resolveAuthorizedTarget(currentScanTarget) || currentWorkspaceRoot)
+        : currentWorkspaceRoot;
+    if (!activeRepoContext && activeTargetAbs && fs.existsSync(activeTargetAbs)) {
+        try {
+            activeRepoContext = inspectRepositoryTarget(activeTargetAbs, currentWorkspaceRoot, registry);
+        } catch {}
+    }
+    const historicalCount = findingsStore
+        ? findingsStore.getFindings({ includeHistorical: true }).filter(f => f.isHistorical === true).length
+        : 0;
+    return {
+        type: 'CONFIG_UPDATED',
+        activeRepo: currentScanTarget || currentWorkspaceRoot,
+        activeRepoPath: activeTargetAbs,
+        activeRepoContext,
+        activeCsv: currentCsvPath || '',
+        workspaceFolders: wsFolders,
+        isWorkspaceTrusted: vscode?.workspace ? vscode.workspace.isTrusted !== false : true,
+        hasScanned: hasUserInitiatedScan,
+        historicalFindingsCount: historicalCount,
+        ...extra
+    };
+}
 
 function getSandboxUiSnapshot(workspaceRoot, gateway = null) {
     let env;
@@ -125,14 +241,18 @@ function getSandboxUiSnapshot(workspaceRoot, gateway = null) {
  * @param {FindingsStore} store 
  * @returns {object[]}
  */
-function getCombinedFindings(csvPath, store) {
+function getCombinedFindings(csvPath, store, options = {}) {
     const csvList = (csvPath && fs.existsSync(csvPath)) ? loadVulnerabilities(csvPath) : [];
     for (const r of csvList) {
         if (!r.Source_Origin) r.Source_Origin = 'CSV';
     }
     if (!store) return csvList;
     try {
-        const scannedList = store.toCsvCompatibleRecords();
+        const scannedList = store.toCsvCompatibleRecords({
+            repositoryRoot: options.repositoryRoot || undefined,
+            canonicalRepositoryId: options.canonicalRepositoryId || undefined,
+            includeHistorical: options.includeHistorical === true
+        });
         for (const r of scannedList) {
             r.Source_Origin = 'LocalScanner';
         }
@@ -266,36 +386,67 @@ function broadcast(message) {
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+    extensionRootPath = context?.extensionUri?.fsPath || path.resolve(__dirname, '..');
     currentWorkspaceRoot = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0
         ? vscode.workspace.workspaceFolders[0].uri.fsPath
-        : context.extensionUri.fsPath;
+        : extensionRootPath;
 
     // Do NOT auto-load pre-existing sample CSV on startup so dashboard starts at 0
     currentCsvPath = '';
     hasUserInitiatedScan = false;
     currentScanTarget = '';
+    activeRepoContext = null;
+    explicitExternalRoots.clear();
+
+    registry = new RepositoryContextRegistry({
+        workspaceRoot: currentWorkspaceRoot,
+        extensionRoot: extensionRootPath
+    });
+
+    const authRoots = buildAuthorizedRoots();
 
     // Initialize local findings store and modular scanning subsystem
     findingsStore = new FindingsStore(currentWorkspaceRoot);
     scanController = new ScanController(currentWorkspaceRoot, {
+        extensionRoot: extensionRootPath,
         findingsStore,
+        registry,
+        authorizedRoots: authRoots,
         isWorkspaceTrusted: vscode.workspace ? vscode.workspace.isTrusted : true
     });
     reScanVerifier = new ReScanVerifier(scanController);
 
     engine = new RemediationEngine(currentWorkspaceRoot, currentCsvPath, {
+        extensionRoot: extensionRootPath,
         findingsStore,
-        reScanVerifier
+        reScanVerifier,
+        registry,
+        authorizedRoots: authRoots
     });
 
-    // Safe non-mutating crash recovery of stale sandbox instances on activation
+    // Safe non-mutating crash recovery of stale sandbox instances & interrupted runs on activation
     if (typeof engine.recoverOrphanedSandboxes === 'function') {
         engine.recoverOrphanedSandboxes().catch(() => {});
+    }
+    if (typeof engine.reconcileInterruptedRuns === 'function') {
+        try {
+            engine.reconcileInterruptedRuns();
+        } catch {}
     }
 
     if (vscode.workspace && typeof vscode.workspace.onDidGrantWorkspaceTrust === 'function') {
         vscode.workspace.onDidGrantWorkspaceTrust(() => {
             if (scanController) scanController.setWorkspaceTrust(true);
+            syncAuthorizedRoots();
+            broadcast(buildConfigPayload({}));
+        }, null, context.subscriptions);
+    }
+
+    if (vscode.workspace && typeof vscode.workspace.onDidChangeWorkspaceFolders === 'function') {
+        vscode.workspace.onDidChangeWorkspaceFolders(async () => {
+            syncAuthorizedRoots();
+            const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
+            broadcast(buildConfigPayload({ availableCsvs }));
         }, null, context.subscriptions);
     }
 
@@ -338,15 +489,16 @@ function activate(context) {
     // 3. Register Refresh Command
     context.subscriptions.push(
         vscode.commands.registerCommand('gcac.refreshData', async () => {
-            const data = loadVulnerabilities(currentCsvPath);
+            syncAuthorizedRoots();
+            const repoFilter = (hasUserInitiatedScan && activeRepoContext?.canonicalRepositoryPath)
+                ? { repositoryRoot: activeRepoContext.canonicalRepositoryPath, includeHistorical: false }
+                : { includeHistorical: false };
+            const data = (hasUserInitiatedScan || (currentCsvPath && fs.existsSync(currentCsvPath)))
+                ? getCombinedFindings(currentCsvPath, findingsStore, repoFilter)
+                : [];
             const preloaded = getPreloadedDetails(currentWorkspaceRoot, data);
             const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
-            broadcast({
-                type: 'CONFIG_UPDATED',
-                activeRepo: currentWorkspaceRoot,
-                activeCsv: currentCsvPath,
-                availableCsvs: availableCsvs
-            });
+            broadcast(buildConfigPayload({ availableCsvs }));
             broadcast({ type: 'DATA_UPDATED', vulnerabilities: data, preloadedDetails: preloaded });
             vscode.window.showInformationMessage('GCAC Remediation data refreshed.');
         })
@@ -392,19 +544,38 @@ function activate(context) {
                         scanController.cancelScan();
                     });
                     try {
+                        syncAuthorizedRoots();
                         const rawTarget = currentScanTarget
-                            ? path.resolve(currentWorkspaceRoot, currentScanTarget)
+                            ? (path.isAbsolute(currentScanTarget) ? currentScanTarget : path.resolve(currentWorkspaceRoot, currentScanTarget))
                             : currentWorkspaceRoot;
-                        const safeTarget = assertPathWithinWorkspace(rawTarget, currentWorkspaceRoot) || currentWorkspaceRoot;
+                        const safeTarget = resolveAuthorizedTarget(rawTarget) || currentWorkspaceRoot;
                         const summary = await scanController.startScan({
                             targetRepo: safeTarget,
+                            persistRegistration: true,
                             onProgress: (p) => {
                                 if (currentPanel) currentPanel.webview.postMessage({ type: 'SCAN_PROGRESS', event: p });
                             }
                         });
                         hasUserInitiatedScan = true;
-                        currentScanTarget = path.relative(currentWorkspaceRoot, safeTarget).replace(/\\/g, '/') || '.';
-                        vscode.window.showInformationMessage(`GCAC Scan Complete: ${summary.findingsSummary.total} finding(s) detected.`);
+                        activeRepoContext = summary.repositoryContext || inspectRepositoryTarget(safeTarget, currentWorkspaceRoot, registry);
+                        currentScanTarget = assertPathWithinWorkspace(safeTarget, currentWorkspaceRoot)
+                            ? (path.relative(currentWorkspaceRoot, safeTarget).replace(/\\/g, '/') || '.')
+                            : canonicalizePath(safeTarget);
+                        syncAuthorizedRoots();
+
+                        if (summary.status === 'No Scannable Inputs' || summary.status === 'Unsupported Repository') {
+                            vscode.window.showWarningMessage(`GCAC Scan: ${summary.status} (${summary.unsupportedReason || 'No supported scannable source/manifest files found.'})`);
+                        } else if (summary.errors && summary.errors.length > 0) {
+                            vscode.window.showWarningMessage(`GCAC Scan completed with ${summary.errors.length} scanner error(s) — coverage incomplete. Findings: ${summary.findingsSummary.total}.`);
+                        } else {
+                            vscode.window.showInformationMessage(`GCAC Scan Complete: ${summary.findingsSummary.total} finding(s) detected.`);
+                        }
+
+                        const updatedFindings = getCombinedFindings(currentCsvPath, findingsStore, {
+                            repositoryRoot: activeRepoContext?.canonicalRepositoryPath || safeTarget,
+                            includeHistorical: false
+                        });
+                        broadcast(buildConfigPayload({ availableCsvs: await getAvailableCsvFiles(currentWorkspaceRoot) }));
                         if (currentPanel) {
                             currentPanel.webview.postMessage({
                                 type: 'SCAN_COMPLETED',
@@ -414,9 +585,8 @@ function activate(context) {
                                 targetPath: safeTarget,
                                 summary
                             });
-                            const updatedFindings = getCombinedFindings(currentCsvPath, findingsStore);
-                            broadcast({ type: 'DATA_UPDATED', vulnerabilities: updatedFindings });
                         }
+                        broadcast({ type: 'DATA_UPDATED', vulnerabilities: updatedFindings });
                     } catch (err) {
                         vscode.window.showErrorMessage(`GCAC Scan Error: ${err.message}`);
                     }
@@ -442,15 +612,20 @@ function activate(context) {
     };
 
     const triggerRefresh = (uri) => {
-        const data = loadVulnerabilities(currentCsvPath);
+        const repoFilter = (hasUserInitiatedScan && activeRepoContext?.canonicalRepositoryPath)
+            ? { repositoryRoot: activeRepoContext.canonicalRepositoryPath, includeHistorical: false }
+            : { includeHistorical: false };
+        const data = (hasUserInitiatedScan || (currentCsvPath && fs.existsSync(currentCsvPath)))
+            ? getCombinedFindings(currentCsvPath, findingsStore, repoFilter)
+            : [];
         const preloaded = getPreloadedDetails(currentWorkspaceRoot, data);
         const fileName = uri && uri.fsPath ? path.basename(uri.fsPath) : '';
         const payload = { type: 'DATA_UPDATED', vulnerabilities: data, preloadedDetails: preloaded, updatedFile: fileName };
         broadcast(payload);
 
         if (uri && uri.fsPath) {
-            const match = path.basename(uri.fsPath).match(/(?:GCAS-E2E-\d+|VUL-POC-\d+)/i) ||
-                path.dirname(uri.fsPath).match(/(?:GCAS-E2E-\d+|VUL-POC-\d+)/i);
+            const match = path.basename(uri.fsPath).match(/(?:GCAS-E2E-\d+|VUL-POC-\d+|SCAN-[A-Za-z0-9_-]+)/i) ||
+                path.dirname(uri.fsPath).match(/(?:GCAS-E2E-\d+|VUL-POC-\d+|SCAN-[A-Za-z0-9_-]+)/i);
             if (match) {
                 const freshDetails = loadVulnerabilityDetails(currentWorkspaceRoot, match[0].toUpperCase());
                 broadcast({ type: 'DETAILS_LOADED', details: freshDetails });
@@ -504,6 +679,18 @@ function activate(context) {
                 const isHumanApproved = isApproveCmd || isFinalApproveCmd;
                 const isFinalApproved = isFinalApproveCmd;
 
+                // Extract optional repository hint if explicitly supplied inside prompt
+                const repoArgMatch = prompt.match(/in\s+repository\s+"([^"]+)"/i);
+                const requestedRepoArg = repoArgMatch ? repoArgMatch[1].trim() : null;
+                const authRoots = buildAuthorizedRoots();
+                if (requestedRepoArg && path.isAbsolute(requestedRepoArg)) {
+                    const matched = assertPathWithinAuthorizedRoots(requestedRepoArg, authRoots);
+                    if (!matched) {
+                        response.markdown(`\n\n❌ **SEC-02 / Boundary Blocked**: Repository '${requestedRepoArg}' is outside authorized workspace/registered roots. Select or map it via the GCAC Remediation Hub first.\n`);
+                        return;
+                    }
+                }
+
                 const runModeDesc = isFinalApproved
                     ? 'Final Sign-off & Completion'
                     : (isHumanApproved ? 'Authorizing Patch & Executing Genuine Tests' : 'Initiating Multi-Stage Pipeline (Classification, RCA, Baseline Testing)');
@@ -514,6 +701,8 @@ function activate(context) {
                     const result = await engine.executePipeline(vulnId, {
                         isHumanApproved,
                         isFinalApproved,
+                        authorizedRoots: authRoots,
+                        workspaceTrusted: vscode.workspace ? vscode.workspace.isTrusted !== false : true,
                         onProgress: (evt) => {
                             if (evt.type === 'STAGE_START') {
                                 response.markdown(`- ⏳ **Stage ${evt.stageNumber} Active**: \`${evt.stageId}\`\n`);
@@ -584,53 +773,122 @@ function getPreloadedDetails(workspaceRoot, vulnerabilities) {
 }
 
 /**
- * Helper to locate source files strictly within workspace
+ * Helper to locate source files strictly within authorized repository roots (including external repos)
  */
-function resolveSourceFilePath(workspaceRoot, repository, targetPath) {
+function resolveSourceFilePath(workspaceRoot, repository, targetPath, authorizedRootsList = null) {
     if (!targetPath) return null;
+    const roots = Array.isArray(authorizedRootsList) && authorizedRootsList.length > 0
+        ? authorizedRootsList
+        : (buildAuthorizedRoots().length > 0 ? buildAuthorizedRoots() : (workspaceRoot ? [workspaceRoot] : []));
 
-    // 1. Direct path
-    const directRel = repository ? path.join(repository, targetPath) : targetPath;
-    const directAbs = path.isAbsolute(directRel) ? directRel : path.join(workspaceRoot, directRel);
-    const safeDirect = assertPathWithinWorkspace(directAbs, workspaceRoot);
-    if (safeDirect && fs.existsSync(safeDirect) && fs.statSync(safeDirect).isFile()) {
-        return safeDirect;
+    const repoRef = (repository || '').trim();
+    if (repoRef) {
+        if (path.isAbsolute(repoRef)) {
+            const authRepo = assertPathWithinAuthorizedRoots(repoRef, roots);
+            if (authRepo && fs.existsSync(authRepo.canonicalPath)) {
+                const candidate = assertPathWithinWorkspace(path.resolve(authRepo.canonicalPath, targetPath), authRepo.canonicalPath);
+                if (candidate && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+                    return candidate;
+                }
+            }
+        } else {
+            for (const root of roots) {
+                const repoDir = path.resolve(root, repoRef);
+                const safeRepoDir = assertPathWithinWorkspace(repoDir, root);
+                if (safeRepoDir && fs.existsSync(safeRepoDir)) {
+                    const candidate = assertPathWithinWorkspace(path.resolve(safeRepoDir, targetPath), safeRepoDir);
+                    if (candidate && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+                        return candidate;
+                    }
+                }
+            }
+        }
     }
 
-    // 2. Relative to workspace
-    const wsRel = path.join(workspaceRoot, targetPath);
-    const safeWs = assertPathWithinWorkspace(wsRel, workspaceRoot);
-    if (safeWs && fs.existsSync(safeWs) && fs.statSync(safeWs).isFile()) {
-        return safeWs;
+    // Check active workspace or authorized roots directly if targetPath is relative to repo/root
+    for (const root of roots) {
+        const cand = path.resolve(root, targetPath);
+        const safeCand = assertPathWithinWorkspace(cand, root);
+        if (safeCand && fs.existsSync(safeCand) && fs.statSync(safeCand).isFile()) {
+            return safeCand;
+        }
     }
 
-    // 3. Search within repository folder for the base filename
-    const repoBase = repository ? path.join(workspaceRoot, repository) : workspaceRoot;
-    const safeRepoBase = assertPathWithinWorkspace(repoBase, workspaceRoot);
-    if (safeRepoBase && fs.existsSync(safeRepoBase) && fs.statSync(safeRepoBase).isDirectory()) {
+    // Search within explicit repository folder only (never scan arbitrary parent dirs)
+    let searchBase = null;
+    if (repoRef) {
+        if (path.isAbsolute(repoRef)) {
+            const authRepo = assertPathWithinAuthorizedRoots(repoRef, roots);
+            if (authRepo) searchBase = authRepo.canonicalPath;
+        } else if (workspaceRoot) {
+            searchBase = assertPathWithinWorkspace(path.resolve(workspaceRoot, repoRef), workspaceRoot);
+        }
+    }
+    if (searchBase && fs.existsSync(searchBase) && fs.statSync(searchBase).isDirectory()) {
         const targetFilename = path.basename(targetPath).toLowerCase();
-        const findRecursive = (dir) => {
+        const findRecursive = (dir, depth = 0) => {
+            if (depth > 8) return null;
             try {
                 const entries = fs.readdirSync(dir, { withFileTypes: true });
                 for (const entry of entries) {
-                    if (['bin', 'obj', 'node_modules', '.git'].includes(entry.name)) continue;
+                    if (['bin', 'obj', 'node_modules', '.git', '.gcac-runs'].includes(entry.name)) continue;
                     const full = path.join(dir, entry.name);
                     if (entry.isFile() && entry.name.toLowerCase() === targetFilename) {
-                        return assertPathWithinWorkspace(full, workspaceRoot);
+                        return assertPathWithinAuthorizedRoots(full, roots)?.canonicalPath || null;
                     }
                     if (entry.isDirectory()) {
-                        const res = findRecursive(full);
+                        const res = findRecursive(full, depth + 1);
                         if (res) return res;
                     }
                 }
             } catch (e) { }
             return null;
         };
-        const found = findRecursive(safeRepoBase);
+        const found = findRecursive(searchBase, 0);
         if (found) return found;
     }
 
     return null;
+}
+
+/**
+ * Canonical Copilot Chat remediation prompt builder (Block C).
+ * Enforces SEC-02 fail-closed metadata validation and never emits empty scan arguments.
+ */
+function buildCopilotRemediationPrompt(finding, csvPath = '', options = {}) {
+    const authRoots = Array.isArray(options.authorizedRoots) && options.authorizedRoots.length > 0
+        ? options.authorizedRoots
+        : buildAuthorizedRoots();
+    const activeReg = options.registry || registry;
+    const ctxCheck = validateFindingContextContract(finding, {
+        authorizedRoots: authRoots,
+        registry: activeReg
+    });
+
+    if (!ctxCheck.valid) {
+        return {
+            ok: false,
+            requiresMapping: ctxCheck.requiresMapping === true,
+            reasonCode: ctxCheck.reasonCode,
+            reason: ctxCheck.reason,
+            finding
+        };
+    }
+
+    const ctx = ctxCheck.context;
+    const isScanned = ctx.sourceOrigin === 'LocalScanner' || Boolean(ctx.scanExecutionId || ctx.scannerId);
+    const hasCsv = !isScanned && Boolean(csvPath && String(csvPath).trim().length > 0);
+    const scanArg = hasCsv
+        ? String(csvPath).trim()
+        : (ctx.scanExecutionId || ctx.scannerId || 'local-scan');
+    const scannerMeta = ctx.scannerId ? `, scanner "${ctx.scannerId}"` : '';
+    const query = `@vulnerability-orchestrator /remediate-vulnerability ${ctx.findingId} in repository "${ctx.repositoryPath}" using scan "${scanArg}" (application "${ctx.applicationId}"${scannerMeta})`;
+
+    return {
+        ok: true,
+        query,
+        context: ctx
+    };
 }
 
 /**
@@ -649,17 +907,21 @@ async function handleWebviewMessage(message, webview) {
         return;
     }
 
-    if (!engine) engine = new RemediationEngine(currentWorkspaceRoot, currentCsvPath);
+    if (!engine) {
+        engine = new RemediationEngine(currentWorkspaceRoot, currentCsvPath, {
+            extensionRoot: extensionRootPath,
+            findingsStore,
+            reScanVerifier,
+            registry,
+            authorizedRoots: buildAuthorizedRoots()
+        });
+    }
 
     switch (message.command) {
         case 'getConfig': {
+            syncAuthorizedRoots();
             const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
-            webview.postMessage({
-                type: 'CONFIG_UPDATED',
-                activeRepo: currentWorkspaceRoot,
-                activeCsv: currentCsvPath,
-                availableCsvs: availableCsvs
-            });
+            webview.postMessage(buildConfigPayload({ availableCsvs }));
             webview.postMessage({
                 type: 'SANDBOX_STATUS_UPDATED',
                 ...getSandboxUiSnapshot(currentWorkspaceRoot, engine?.executionGateway)
@@ -697,22 +959,17 @@ async function handleWebviewMessage(message, webview) {
                 }
             });
             if (uris && uris.length > 0) {
-                const safeCsv = assertPathWithinWorkspace(uris[0].fsPath, currentWorkspaceRoot);
+                const safeCsv = assertPathWithinAuthorizedRoots(uris[0].fsPath, buildAuthorizedRoots());
                 if (safeCsv) {
-                    currentCsvPath = safeCsv;
+                    currentCsvPath = safeCsv.canonicalPath;
                     engine.updatePaths(currentWorkspaceRoot, currentCsvPath);
                     const list = loadVulnerabilities(currentCsvPath);
                     const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
-                    broadcast({
-                        type: 'CONFIG_UPDATED',
-                        activeRepo: currentWorkspaceRoot,
-                        activeCsv: currentCsvPath,
-                        availableCsvs: availableCsvs
-                    });
+                    broadcast(buildConfigPayload({ availableCsvs }));
                     broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
                     vscode.window.showInformationMessage(`Loaded CSV: ${path.basename(currentCsvPath)}`);
                 } else {
-                    vscode.window.showErrorMessage('Security Warning: Selected CSV must reside within the workspace boundary.');
+                    vscode.window.showErrorMessage('Security Warning: Selected CSV must reside within an authorized workspace or repository root.');
                 }
             }
             break;
@@ -726,20 +983,41 @@ async function handleWebviewMessage(message, webview) {
                 title: 'Select Target Application Repository Folder'
             });
             if (uris && uris.length > 0) {
-                const safeDir = assertPathWithinWorkspace(uris[0].fsPath, currentWorkspaceRoot);
-                if (safeDir) {
-                    const rel = path.relative(currentWorkspaceRoot, safeDir).replace(/\\/g, '/') || '.';
-                    currentScanTarget = rel;
-                    broadcast({
-                        type: 'TARGET_SELECTED',
-                        targetPath: rel,
-                        isFolder: true,
-                        displayName: path.basename(safeDir) || 'Workspace'
-                    });
-                    vscode.window.showInformationMessage(`Active target folder selected: ${rel}`);
-                } else {
-                    vscode.window.showErrorMessage('Security Warning: Selected folder must reside within the workspace boundary.');
+                const selectedRaw = uris[0].fsPath;
+                if (vscode.workspace && !vscode.workspace.isTrusted && !assertPathWithinWorkspace(selectedRaw, currentWorkspaceRoot)) {
+                    vscode.window.showErrorMessage('Restricted Mode: Grant Workspace Trust before authorizing external repositories.');
+                    return;
                 }
+                const canonSelected = canonicalizePath(selectedRaw);
+                if (!fs.existsSync(canonSelected) || !fs.statSync(canonSelected).isDirectory() || isSensitiveSystemOrCredentialRoot(canonSelected)) {
+                    vscode.window.showErrorMessage('Blocked: Selected folder is invalid, inaccessible, or a restricted system/credential directory.');
+                    return;
+                }
+
+                explicitExternalRoots.add(canonSelected);
+                const repoInspection = inspectRepositoryTarget(canonSelected, currentWorkspaceRoot, registry);
+                if (repoInspection.isUninitializedSubmodule) {
+                    vscode.window.showWarningMessage('Selected folder is an uninitialized Git submodule / gitlink without checked-out source files.');
+                } else if (registry && repoInspection.canonicalRepositoryPath) {
+                    registry.resolveOrRegisterRepository(repoInspection.canonicalRepositoryPath);
+                }
+                activeRepoContext = repoInspection;
+                currentScanTarget = assertPathWithinWorkspace(canonSelected, currentWorkspaceRoot)
+                    ? (path.relative(currentWorkspaceRoot, canonSelected).replace(/\\/g, '/') || '.')
+                    : canonSelected;
+                syncAuthorizedRoots();
+
+                const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
+                broadcast({
+                    type: 'TARGET_SELECTED',
+                    targetPath: currentScanTarget,
+                    canonicalPath: canonSelected,
+                    isFolder: true,
+                    displayName: path.basename(canonSelected) || 'Workspace',
+                    repoContext: activeRepoContext
+                });
+                broadcast(buildConfigPayload({ availableCsvs }));
+                vscode.window.showInformationMessage(`Active repository selected: ${canonSelected} (${activeRepoContext.detectedTechnology})`);
             }
             break;
         }
@@ -755,36 +1033,70 @@ async function handleWebviewMessage(message, webview) {
                 }
             });
             if (uris && uris.length > 0) {
-                const safeFile = assertPathWithinWorkspace(uris[0].fsPath, currentWorkspaceRoot);
-                if (safeFile) {
-                    const rel = path.relative(currentWorkspaceRoot, safeFile).replace(/\\/g, '/');
-                    currentScanTarget = rel;
-                    broadcast({
-                        type: 'TARGET_SELECTED',
-                        targetPath: rel,
-                        isFolder: false,
-                        displayName: path.basename(safeFile)
-                    });
-                    vscode.window.showInformationMessage(`Target file selected: ${rel}`);
-                } else {
-                    vscode.window.showErrorMessage('Security Warning: Selected file must reside within the workspace boundary.');
+                const selectedFile = canonicalizePath(uris[0].fsPath);
+                if (isSensitiveSystemOrCredentialRoot(selectedFile) || !fs.existsSync(selectedFile)) {
+                    vscode.window.showErrorMessage('Blocked: Selected file is inaccessible or within a restricted directory.');
+                    return;
                 }
+                const inWs = assertPathWithinWorkspace(selectedFile, currentWorkspaceRoot);
+                if (!inWs && vscode.workspace && !vscode.workspace.isTrusted) {
+                    vscode.window.showErrorMessage('Restricted Mode: Grant Workspace Trust before selecting external files.');
+                    return;
+                }
+                const fileInspection = inspectRepositoryTarget(selectedFile, currentWorkspaceRoot, registry);
+                const repoRootForFile = fileInspection.canonicalRepositoryPath || path.dirname(selectedFile);
+                explicitExternalRoots.add(repoRootForFile);
+                if (registry && !isSensitiveSystemOrCredentialRoot(repoRootForFile)) {
+                    registry.resolveOrRegisterRepository(repoRootForFile);
+                }
+                activeRepoContext = fileInspection;
+                currentScanTarget = inWs
+                    ? path.relative(currentWorkspaceRoot, selectedFile).replace(/\\/g, '/')
+                    : selectedFile;
+                syncAuthorizedRoots();
+
+                broadcast({
+                    type: 'TARGET_SELECTED',
+                    targetPath: currentScanTarget,
+                    canonicalPath: selectedFile,
+                    isFolder: false,
+                    displayName: path.basename(selectedFile),
+                    repoContext: activeRepoContext
+                });
+                broadcast(buildConfigPayload({}));
+                vscode.window.showInformationMessage(`Target file selected: ${currentScanTarget}`);
             }
             break;
         }
 
-        case 'selectScanTarget': {
-            if (message.targetPath !== undefined) {
-                const target = message.targetPath ? path.resolve(currentWorkspaceRoot, message.targetPath) : currentWorkspaceRoot;
-                const safeTarget = assertPathWithinWorkspace(target, currentWorkspaceRoot);
+        case 'selectScanTarget':
+        case 'selectWorkspaceFolder': {
+            const rawReq = message.folderPath !== undefined ? message.folderPath : message.targetPath;
+            if (rawReq !== undefined) {
+                const target = rawReq ? (path.isAbsolute(rawReq) ? rawReq : path.resolve(currentWorkspaceRoot, rawReq)) : currentWorkspaceRoot;
+                const safeTarget = resolveAuthorizedTarget(target);
                 if (safeTarget) {
-                    const rel = path.relative(currentWorkspaceRoot, safeTarget).replace(/\\/g, '/') || '.';
+                    const rel = assertPathWithinWorkspace(safeTarget, currentWorkspaceRoot)
+                        ? (path.relative(currentWorkspaceRoot, safeTarget).replace(/\\/g, '/') || '.')
+                        : canonicalizePath(safeTarget);
                     currentScanTarget = rel;
+                    activeRepoContext = inspectRepositoryTarget(safeTarget, currentWorkspaceRoot, registry);
+                    syncAuthorizedRoots();
+                    const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
                     broadcast({
                         type: 'TARGET_SELECTED',
                         targetPath: rel,
+                        canonicalPath: safeTarget,
                         isFolder: fs.existsSync(safeTarget) && fs.statSync(safeTarget).isDirectory(),
-                        displayName: path.basename(safeTarget) || 'Workspace'
+                        displayName: path.basename(safeTarget) || 'Workspace',
+                        repoContext: activeRepoContext
+                    });
+                    broadcast(buildConfigPayload({ availableCsvs }));
+                } else {
+                    webview.postMessage({
+                        type: 'ACTION_FEEDBACK',
+                        text: 'Blocked: Target path is outside authorized workspace and registered repository roots.',
+                        status: 'error'
                     });
                 }
             }
@@ -795,10 +1107,12 @@ async function handleWebviewMessage(message, webview) {
             hasUserInitiatedScan = false;
             currentCsvPath = '';
             currentScanTarget = '';
+            activeRepoContext = null;
             if (findingsStore) {
                 findingsStore.clearFindings();
             }
             broadcast({ type: 'DATA_UPDATED', vulnerabilities: [] });
+            broadcast(buildConfigPayload({}));
             webview.postMessage({
                 type: 'ACTION_FEEDBACK',
                 text: 'Scan results cleared. Dashboard reset to 0.',
@@ -808,24 +1122,19 @@ async function handleWebviewMessage(message, webview) {
         }
 
         case 'setCsvPath': {
-            const safePath = assertPathWithinWorkspace(message.csvPath, currentWorkspaceRoot);
-            if (safePath && fs.existsSync(safePath)) {
-                currentCsvPath = safePath;
+            const safeMatch = assertPathWithinAuthorizedRoots(message.csvPath, buildAuthorizedRoots());
+            if (safeMatch && fs.existsSync(safeMatch.canonicalPath)) {
+                currentCsvPath = safeMatch.canonicalPath;
                 engine.updatePaths(currentWorkspaceRoot, currentCsvPath);
                 const list = loadVulnerabilities(currentCsvPath);
                 const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
-                broadcast({
-                    type: 'CONFIG_UPDATED',
-                    activeRepo: currentWorkspaceRoot,
-                    activeCsv: currentCsvPath,
-                    availableCsvs: availableCsvs
-                });
+                broadcast(buildConfigPayload({ availableCsvs }));
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
                 vscode.window.showInformationMessage(`Switched CSV to: ${path.basename(currentCsvPath)}`);
             } else {
                 webview.postMessage({
                     type: 'ACTION_FEEDBACK',
-                    text: 'Security Warning: CSV path must be within active workspace root.',
+                    text: 'Security Warning: CSV path must be within an authorized workspace or repository root.',
                     status: 'error'
                 });
             }
@@ -834,18 +1143,16 @@ async function handleWebviewMessage(message, webview) {
 
         case 'requestData':
         case 'refresh': {
-            const list = hasUserInitiatedScan || (currentCsvPath && fs.existsSync(currentCsvPath))
-                ? getCombinedFindings(currentCsvPath, findingsStore)
+            syncAuthorizedRoots();
+            const repoFilter = (hasUserInitiatedScan && activeRepoContext?.canonicalRepositoryPath)
+                ? { repositoryRoot: activeRepoContext.canonicalRepositoryPath, includeHistorical: false }
+                : { includeHistorical: false };
+            const list = (hasUserInitiatedScan || (currentCsvPath && fs.existsSync(currentCsvPath)))
+                ? getCombinedFindings(currentCsvPath, findingsStore, repoFilter)
                 : [];
             const preloaded = getPreloadedDetails(currentWorkspaceRoot, list);
             const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
-            webview.postMessage({
-                type: 'CONFIG_UPDATED',
-                activeRepo: currentScanTarget || currentWorkspaceRoot,
-                activeCsv: currentCsvPath || '',
-                availableCsvs: availableCsvs,
-                hasScanned: hasUserInitiatedScan
-            });
+            webview.postMessage(buildConfigPayload({ availableCsvs }));
             webview.postMessage({ type: 'INIT_DATA', vulnerabilities: list, preloadedDetails: preloaded });
             webview.postMessage({
                 type: 'SANDBOX_STATUS_UPDATED',
@@ -856,10 +1163,10 @@ async function handleWebviewMessage(message, webview) {
 
         case 'loadDetails': {
             let details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
-            // If report not found in markdown files, check findingsStore
+            const combined = getCombinedFindings(currentCsvPath, findingsStore, { includeHistorical: true });
+            const finding = combined.find(f => f.Vulnerability_ID === message.vulnerabilityId);
+
             if (!details || !details.hasEvidence) {
-                const combined = getCombinedFindings(currentCsvPath, findingsStore);
-                const finding = combined.find(f => f.Vulnerability_ID === message.vulnerabilityId);
                 if (finding) {
                     details = {
                         vulnerabilityId: finding.Vulnerability_ID,
@@ -872,8 +1179,11 @@ async function handleWebviewMessage(message, webview) {
                             `- **Severity**: \`${finding.Severity}\``,
                             `- **Rule / Advisory ID**: \`${finding.CVE_ID || 'N/A'}\``,
                             `- **Category**: \`${finding.Detailed_Name || 'Security Finding'}\``,
+                            `- **Detection Method**: \`${finding.Detection_Method || 'LOCAL_SCAN'}\``,
+                            `- **Originating Scanner**: \`${finding.Scanner_ID || 'N/A'}\` (Scan ID: \`${finding.Scan_ID || 'N/A'}\`)`,
+                            `- **Application Identity**: \`${finding.Application_Number || 'UNMAPPED'}\``,
                             `- **Source Location**: \`${finding.Location_Path}:${finding.Line_Number || 1}\``,
-                            `- **Repository**: \`${finding.Repository || 'workspace'}\``,
+                            `- **Repository**: \`${finding.Repository_Root || finding.Repository || 'UNMAPPED'}\``,
                             `- **Source Classification**: \`${finding.Source_Classification || 'LocalScanner'}\``,
                             `- **Remediation Guidance**: ${finding.Remediation_Guidance || 'Remediate according to security best practice.'}`,
                             ``,
@@ -891,6 +1201,32 @@ async function handleWebviewMessage(message, webview) {
                         timings: null
                     };
                 }
+            }
+
+            if (details && engine) {
+                const liveState = engine.loadRunState(message.vulnerabilityId);
+                if (liveState) {
+                    details.runState = liveState;
+                    details.runId = liveState.runId || details.runId || null;
+                    details.attemptId = liveState.attemptId || details.attemptId || null;
+                    details.attemptNumber = Number(liveState.attemptNumber || details.attemptNumber || 1);
+                    details.retryCount = Number(liveState.retryCount ?? details.retryCount ?? 0);
+                    details.attemptHistory = Array.isArray(liveState.attemptHistory) ? liveState.attemptHistory : (details.attemptHistory || []);
+                    details.failedStage = liveState.failedStage ?? details.failedStage ?? null;
+                    details.failedStageId = liveState.failedStageId || details.failedStageId || null;
+                    details.failureCategory = liveState.failureCategory || details.failureCategory || null;
+                    details.failureReason = liveState.failureReason || details.failureReason || null;
+                    details.diagnostics = liveState.diagnostics || details.diagnostics || details.validation || null;
+                    details.baselineValidation = details.baselineValidation || liveState.baselineValidation || null;
+                    details.reScanVerification = details.reScanVerification || liveState.reScanVerification || null;
+                }
+                details.retryEligibility = engine.evaluateRetryEligibility(
+                    liveState || message.vulnerabilityId,
+                    {
+                        finding,
+                        workspaceTrusted: vscode?.workspace ? vscode.workspace.isTrusted !== false : true
+                    }
+                );
             }
             webview.postMessage({ type: 'DETAILS_LOADED', details });
             break;
@@ -944,6 +1280,7 @@ async function handleWebviewMessage(message, webview) {
             }
 
             try {
+                syncAuthorizedRoots();
                 webview.postMessage({
                     type: 'ACTION_FEEDBACK',
                     text: 'Starting local vulnerability scan...',
@@ -954,11 +1291,11 @@ async function handleWebviewMessage(message, webview) {
                 const resolvedTarget = path.isAbsolute(requestedTarget)
                     ? requestedTarget
                     : path.resolve(currentWorkspaceRoot, requestedTarget);
-                const targetPath = assertPathWithinWorkspace(resolvedTarget, currentWorkspaceRoot);
+                const targetPath = resolveAuthorizedTarget(resolvedTarget);
                 if (!targetPath) {
                     webview.postMessage({
                         type: 'ACTION_FEEDBACK',
-                        text: 'Security Warning: Scan target path must remain inside active workspace boundary.',
+                        text: `Security Warning: Scan target '${requestedTarget}' is missing, restricted, or outside authorized repositories. Select a repository folder first.`,
                         status: 'error'
                     });
                     return;
@@ -966,27 +1303,56 @@ async function handleWebviewMessage(message, webview) {
                 const scanResult = await scanController.startScan({
                     scannerIds: message.scannerIds,
                     targetRepo: targetPath,
+                    persistRegistration: true,
                     onProgress: (evt) => {
                         webview.postMessage({ type: 'SCAN_PROGRESS', event: evt });
                     }
                 });
 
                 hasUserInitiatedScan = true;
-                currentScanTarget = targetPath;
+                activeRepoContext = scanResult.repositoryContext || inspectRepositoryTarget(targetPath, currentWorkspaceRoot, registry);
+                currentScanTarget = assertPathWithinWorkspace(targetPath, currentWorkspaceRoot)
+                    ? (path.relative(currentWorkspaceRoot, targetPath).replace(/\\/g, '/') || '.')
+                    : canonicalizePath(targetPath);
+                syncAuthorizedRoots();
+
+                const availableCsvs = await getAvailableCsvFiles(currentWorkspaceRoot);
+                broadcast(buildConfigPayload({ availableCsvs }));
                 webview.postMessage({
                     type: 'SCAN_COMPLETED',
                     result: scanResult,
                     scanId: scanResult.scanId,
                     findingsCount: scanResult.findingsSummary.total,
-                    targetPath: targetPath
+                    targetPath: targetPath,
+                    repoContext: activeRepoContext,
+                    status: scanResult.status,
+                    unverifiedCoverage: Boolean(scanResult.unverifiedCoverage)
                 });
-                const combined = getCombinedFindings(currentCsvPath, findingsStore);
+                const combined = getCombinedFindings(currentCsvPath, findingsStore, {
+                    repositoryRoot: activeRepoContext?.canonicalRepositoryPath || targetPath,
+                    includeHistorical: false
+                });
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: combined });
-                webview.postMessage({
-                    type: 'ACTION_FEEDBACK',
-                    text: `Scan finished: ${scanResult.findingsSummary.total} findings identified (${scanResult.findingsSummary.critical} Critical, ${scanResult.findingsSummary.high} High).`,
-                    status: scanResult.errors.length === 0 ? 'success' : 'warning'
-                });
+
+                if (scanResult.status === 'No Scannable Inputs' || scanResult.status === 'Unsupported Repository') {
+                    webview.postMessage({
+                        type: 'ACTION_FEEDBACK',
+                        text: `Scan skipped (${scanResult.status}): ${scanResult.unsupportedReason || 'No supported source/manifest inputs found in target repository.'}`,
+                        status: 'warning'
+                    });
+                } else if (scanResult.errors && scanResult.errors.length > 0) {
+                    webview.postMessage({
+                        type: 'ACTION_FEEDBACK',
+                        text: `Scan finished with ${scanResult.errors.length} scanner failure(s) — coverage incomplete. Findings: ${scanResult.findingsSummary.total}.`,
+                        status: 'warning'
+                    });
+                } else {
+                    webview.postMessage({
+                        type: 'ACTION_FEEDBACK',
+                        text: `Scan finished (${scanResult.repositoryContext?.applicationNumber || 'local'}): ${scanResult.findingsSummary.total} finding(s) (${scanResult.findingsSummary.critical} Critical, ${scanResult.findingsSummary.high} High).`,
+                        status: 'success'
+                    });
+                }
             } catch (err) {
                 webview.postMessage({
                     type: 'ACTION_FEEDBACK',
@@ -1011,14 +1377,16 @@ async function handleWebviewMessage(message, webview) {
         }
 
         case 'getCodeqlStatus': {
-            // Report CodeQL CLI availability and installation path details
             try {
                 const { CodeQLScanner } = require('./scanning/adapters/codeqlScanner');
                 const codeqlScanner = new CodeQLScanner();
-                const avail = await codeqlScanner.isAvailable(currentWorkspaceRoot);
-                const localBinPath = require('path').join(currentWorkspaceRoot, 'tools', 'codeql',
+                const avail = await codeqlScanner.isAvailable(currentWorkspaceRoot, extensionRootPath);
+                const toolRoot = fs.existsSync(path.join(currentWorkspaceRoot, 'scripts', 'setup-codeql.js'))
+                    ? currentWorkspaceRoot
+                    : extensionRootPath;
+                const localBinPath = path.join(toolRoot, 'tools', 'codeql',
                     process.platform === 'win32' ? 'codeql.exe' : 'codeql');
-                const setupScriptPath = require('path').join(currentWorkspaceRoot, 'scripts', 'setup-codeql.js');
+                const setupScriptPath = path.join(toolRoot, 'scripts', 'setup-codeql.js');
                 webview.postMessage({
                     type: 'CODEQL_STATUS',
                     available: avail.available,
@@ -1051,19 +1419,19 @@ async function handleWebviewMessage(message, webview) {
                 });
                 return;
             }
-            const setupScript = assertPathWithinWorkspace(
-                path.join(currentWorkspaceRoot, 'scripts', 'setup-codeql.js'),
-                currentWorkspaceRoot
-            );
-            if (!setupScript || !fs.existsSync(setupScript)) {
+            const scriptCandidates = [
+                assertPathWithinWorkspace(path.join(currentWorkspaceRoot, 'scripts', 'setup-codeql.js'), currentWorkspaceRoot),
+                assertPathWithinWorkspace(path.join(extensionRootPath, 'scripts', 'setup-codeql.js'), extensionRootPath)
+            ].filter(Boolean);
+            const setupScript = scriptCandidates.find(p => fs.existsSync(p));
+            if (!setupScript) {
                 webview.postMessage({
                     type: 'ACTION_FEEDBACK',
-                    text: 'Security Warning: setup-codeql.js not found within active workspace.',
+                    text: 'Security Warning: setup-codeql.js not found within active workspace or extension installation.',
                     status: 'error'
                 });
                 return;
             }
-            // Launch setup-codeql.js in VS Code terminal for visibility
             if (vscode && vscode.window) {
                 const terminal = vscode.window.createTerminal({ name: 'CodeQL Setup' });
                 terminal.show(true);
@@ -1110,7 +1478,6 @@ async function handleWebviewMessage(message, webview) {
         }
 
         case 'runRemediation': {
-            // Check workspace trust
             if (vscode.workspace && !vscode.workspace.isTrusted) {
                 vscode.window.showErrorMessage('GCAC: Remediation actions are disabled in Restricted Mode. Please trust this workspace to proceed.');
                 webview.postMessage({
@@ -1121,19 +1488,60 @@ async function handleWebviewMessage(message, webview) {
                 return;
             }
 
+            const sendEnrichedDetails = (vulnId) => {
+                const details = loadVulnerabilityDetails(currentWorkspaceRoot, vulnId);
+                const liveState = engine?.loadRunState(vulnId);
+                const combinedAll = getCombinedFindings(currentCsvPath, findingsStore, { includeHistorical: true });
+                const matchedFinding = combinedAll.find(f => f.Vulnerability_ID === vulnId) || null;
+                if (details && liveState) {
+                    details.runState = liveState;
+                    details.runId = liveState.runId || details.runId || null;
+                    details.attemptId = liveState.attemptId || details.attemptId || null;
+                    details.attemptNumber = Number(liveState.attemptNumber || details.attemptNumber || 1);
+                    details.retryCount = Number(liveState.retryCount ?? details.retryCount ?? 0);
+                    details.attemptHistory = Array.isArray(liveState.attemptHistory) ? liveState.attemptHistory : (details.attemptHistory || []);
+                    details.failedStage = liveState.failedStage ?? details.failedStage ?? null;
+                    details.failedStageId = liveState.failedStageId || details.failedStageId || null;
+                    details.failureCategory = liveState.failureCategory || details.failureCategory || null;
+                    details.failureReason = liveState.failureReason || details.failureReason || null;
+                    details.diagnostics = liveState.diagnostics || details.diagnostics || details.validation || null;
+                    details.retryEligibility = engine.evaluateRetryEligibility(liveState, {
+                        finding: matchedFinding,
+                        workspaceTrusted: vscode?.workspace ? vscode.workspace.isTrusted !== false : true
+                    });
+                }
+                webview.postMessage({ type: 'DETAILS_LOADED', details });
+            };
+
             try {
+                syncAuthorizedRoots();
                 await engine.executePipeline(message.vulnerabilityId, {
                     isHumanApproved: false,
                     isFinalApproved: false,
+                    authorizedRoots: buildAuthorizedRoots(),
+                    workspaceTrusted: vscode?.workspace ? vscode.workspace.isTrusted !== false : true,
                     onProgress: (event) => {
                         webview.postMessage({ type: 'REMEDIATION_PROGRESS', event });
                     }
                 });
-                const list = getCombinedFindings(currentCsvPath, findingsStore);
+                const repoFilter = (hasUserInitiatedScan && activeRepoContext?.canonicalRepositoryPath)
+                    ? { repositoryRoot: activeRepoContext.canonicalRepositoryPath, includeHistorical: false }
+                    : { includeHistorical: false };
+                const list = getCombinedFindings(currentCsvPath, findingsStore, repoFilter);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
-                const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
-                webview.postMessage({ type: 'DETAILS_LOADED', details });
+                sendEnrichedDetails(message.vulnerabilityId);
             } catch (err) {
+                if (String(err.message || '').includes('SEC-02 Blocked')) {
+                    const combinedAll = getCombinedFindings(currentCsvPath, findingsStore, { includeHistorical: true });
+                    const matched = combinedAll.find(f => f.Vulnerability_ID === message.vulnerabilityId);
+                    webview.postMessage({
+                        type: 'REPOSITORY_MAPPING_REQUIRED',
+                        vulnerabilityId: message.vulnerabilityId,
+                        reasonCode: 'MISSING_OR_AMBIGUOUS_METADATA',
+                        reason: err.message,
+                        finding: matched || null
+                    });
+                }
                 vscode.window.showErrorMessage(`Remediation error: ${err.message}`);
                 webview.postMessage({
                     type: 'REMEDIATION_PROGRESS',
@@ -1144,6 +1552,7 @@ async function handleWebviewMessage(message, webview) {
                     text: `Remediation error: ${err.message}`,
                     status: 'error'
                 });
+                sendEnrichedDetails(message.vulnerabilityId);
                 webview.postMessage({ type: 'REMEDIATION_ERROR', error: err.message });
             }
             break;
@@ -1152,18 +1561,55 @@ async function handleWebviewMessage(message, webview) {
         case 'retryStage': {
             if (vscode.workspace && !vscode.workspace.isTrusted) {
                 vscode.window.showErrorMessage('GCAC: Remediation actions are disabled in Restricted Mode.');
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: 'Retry blocked: Workspace is untrusted (Restricted Mode).',
+                    status: 'error'
+                });
                 return;
             }
             try {
-                await engine.retryStage(message.vulnerabilityId, message.fromStage || 5, {
+                syncAuthorizedRoots();
+                const workspaceTrusted = vscode?.workspace ? vscode.workspace.isTrusted !== false : true;
+                const combinedAll = getCombinedFindings(currentCsvPath, findingsStore, { includeHistorical: true });
+                const finding = combinedAll.find(f => f.Vulnerability_ID === message.vulnerabilityId) || null;
+                const liveState = engine.loadRunState(message.vulnerabilityId);
+                const eligibility = engine.evaluateRetryEligibility(liveState || message.vulnerabilityId, {
+                    targetStage: Number.isInteger(message.fromStage) ? message.fromStage : undefined,
+                    finding,
+                    workspaceTrusted,
+                    environmentRecovered: message.environmentRecovered === true
+                });
+
+                if (!eligibility.retryEligible) {
+                    webview.postMessage({
+                        type: 'ACTION_FEEDBACK',
+                        text: `Retry unavailable: ${eligibility.reason}`,
+                        status: 'warning'
+                    });
+                    const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
+                    if (details) {
+                        details.retryEligibility = eligibility;
+                        webview.postMessage({ type: 'DETAILS_LOADED', details });
+                    }
+                    return;
+                }
+
+                await engine.retryStage(message.vulnerabilityId, message.fromStage ?? eligibility.recommendedStage, {
+                    expectedRunId: message.runId || eligibility.runId || undefined,
+                    workspaceTrusted,
+                    authorizedRoots: buildAuthorizedRoots(),
+                    environmentRecovered: message.environmentRecovered === true,
                     onProgress: (event) => {
                         webview.postMessage({ type: 'REMEDIATION_PROGRESS', event });
                     }
                 });
-                const list = getCombinedFindings(currentCsvPath, findingsStore);
+                const repoFilter = (hasUserInitiatedScan && activeRepoContext?.canonicalRepositoryPath)
+                    ? { repositoryRoot: activeRepoContext.canonicalRepositoryPath, includeHistorical: false }
+                    : { includeHistorical: false };
+                const list = getCombinedFindings(currentCsvPath, findingsStore, repoFilter);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
-                const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
-                webview.postMessage({ type: 'DETAILS_LOADED', details });
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: message.vulnerabilityId }, webview);
             } catch (err) {
                 vscode.window.showErrorMessage(`Retry error: ${err.message}`);
                 webview.postMessage({
@@ -1171,7 +1617,131 @@ async function handleWebviewMessage(message, webview) {
                     text: `Retry error: ${err.message}`,
                     status: 'error'
                 });
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: message.vulnerabilityId }, webview);
                 webview.postMessage({ type: 'REMEDIATION_ERROR', error: err.message });
+            }
+            break;
+        }
+
+        case 'reviseFix': {
+            if (vscode.workspace && !vscode.workspace.isTrusted) {
+                vscode.window.showErrorMessage('GCAC: Remediation actions are disabled in Restricted Mode.');
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: 'Revise Fix blocked: Workspace is untrusted (Restricted Mode).',
+                    status: 'error'
+                });
+                return;
+            }
+            try {
+                syncAuthorizedRoots();
+                await engine.reviseFix(message.vulnerabilityId, {
+                    expectedRunId: message.runId || undefined,
+                    developerNotes: message.developerNotes || '',
+                    workspaceTrusted: vscode?.workspace ? vscode.workspace.isTrusted !== false : true,
+                    authorizedRoots: buildAuthorizedRoots(),
+                    onProgress: (event) => {
+                        webview.postMessage({ type: 'REMEDIATION_PROGRESS', event });
+                    }
+                });
+                const repoFilter = (hasUserInitiatedScan && activeRepoContext?.canonicalRepositoryPath)
+                    ? { repositoryRoot: activeRepoContext.canonicalRepositoryPath, includeHistorical: false }
+                    : { includeHistorical: false };
+                const list = getCombinedFindings(currentCsvPath, findingsStore, repoFilter);
+                broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: message.vulnerabilityId }, webview);
+            } catch (err) {
+                vscode.window.showErrorMessage(`Fix revision error: ${err.message}`);
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: `Fix revision error: ${err.message}`,
+                    status: 'error'
+                });
+                webview.postMessage({ type: 'REMEDIATION_ERROR', error: err.message });
+            }
+            break;
+        }
+
+        case 'mapFindingRepository': {
+            if (vscode.workspace && !vscode.workspace.isTrusted) {
+                vscode.window.showErrorMessage('Restricted Mode: Cannot bind finding repository in untrusted workspace.');
+                return;
+            }
+            const vulnId = message.vulnerabilityId;
+            if (!vulnId) return;
+
+            let chosenRepoPath = message.repositoryPath ? String(message.repositoryPath).trim() : '';
+            if (!chosenRepoPath) {
+                const uris = await vscode.window.showOpenDialog({
+                    canSelectFiles: false,
+                    canSelectFolders: true,
+                    canSelectMany: false,
+                    title: `Select Local Repository for Finding ${vulnId}`
+                });
+                if (!uris || uris.length === 0) return;
+                chosenRepoPath = uris[0].fsPath;
+            }
+
+            const canonRepo = canonicalizePath(chosenRepoPath);
+            if (!fs.existsSync(canonRepo) || !fs.statSync(canonRepo).isDirectory() || isSensitiveSystemOrCredentialRoot(canonRepo)) {
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: 'Blocked: Repository path is missing or points to a restricted OS/credential folder.',
+                    status: 'error'
+                });
+                return;
+            }
+            if (isUninitializedGitSubmodule(canonRepo, currentWorkspaceRoot)) {
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: 'Blocked: Target directory is an uninitialized Git submodule / gitlink.',
+                    status: 'error'
+                });
+                return;
+            }
+
+            explicitExternalRoots.add(canonRepo);
+            const resolvedMeta = registry
+                ? registry.resolveOrRegisterRepository(canonRepo, { explicitApplicationId: message.applicationNumber || '' })
+                : null;
+            syncAuthorizedRoots();
+
+            const mappedAppId = resolvedMeta?.applicationNumber || '';
+            const mappedCanonicalId = resolvedMeta?.canonicalRepositoryId || '';
+            const mappedTech = resolvedMeta?.technology || undefined;
+
+            let updated = false;
+            if (findingsStore && findingsStore.getFindingById(vulnId)) {
+                findingsStore.updateFindingMapping(vulnId, {
+                    applicationNumber: mappedAppId,
+                    applicationName: resolvedMeta?.applicationName || path.basename(canonRepo),
+                    applicationIdentitySource: resolvedMeta?.identitySource || 'LOCAL_REGISTERED',
+                    repository: canonRepo,
+                    repositoryRoot: canonRepo,
+                    canonicalRepositoryId: mappedCanonicalId,
+                    technology: mappedTech
+                });
+                updated = true;
+            } else if (currentCsvPath && fs.existsSync(currentCsvPath)) {
+                updated = updateVulnerabilityRow(currentCsvPath, vulnId, {
+                    Application_Number: mappedAppId,
+                    Repository: canonRepo
+                });
+            }
+
+            if (updated) {
+                const repoFilter = (hasUserInitiatedScan && activeRepoContext?.canonicalRepositoryPath)
+                    ? { repositoryRoot: activeRepoContext.canonicalRepositoryPath, includeHistorical: false }
+                    : { includeHistorical: false };
+                const list = getCombinedFindings(currentCsvPath, findingsStore, repoFilter);
+                broadcast(buildConfigPayload({}));
+                broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: vulnId }, webview);
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: `Mapped '${vulnId}' to repository '${canonRepo}' (Identity: ${mappedAppId}).`,
+                    status: 'success'
+                });
             }
             break;
         }
@@ -1183,18 +1753,23 @@ async function handleWebviewMessage(message, webview) {
             }
 
             try {
+                syncAuthorizedRoots();
                 vscode.window.showInformationMessage(`Stage 4 Gate authorized for ${message.vulnerabilityId}. Executing genuine testing...`);
                 await engine.executePipeline(message.vulnerabilityId, {
                     isHumanApproved: true,
                     isFinalApproved: false,
+                    authorizedRoots: buildAuthorizedRoots(),
+                    workspaceTrusted: vscode?.workspace ? vscode.workspace.isTrusted !== false : true,
                     onProgress: (event) => {
                         webview.postMessage({ type: 'REMEDIATION_PROGRESS', event });
                     }
                 });
-                const list = getCombinedFindings(currentCsvPath, findingsStore);
+                const repoFilter = (hasUserInitiatedScan && activeRepoContext?.canonicalRepositoryPath)
+                    ? { repositoryRoot: activeRepoContext.canonicalRepositoryPath, includeHistorical: false }
+                    : { includeHistorical: false };
+                const list = getCombinedFindings(currentCsvPath, findingsStore, repoFilter);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
-                const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
-                webview.postMessage({ type: 'DETAILS_LOADED', details });
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: message.vulnerabilityId }, webview);
             } catch (err) {
                 vscode.window.showErrorMessage(`Approval error: ${err.message}`);
                 webview.postMessage({
@@ -1206,6 +1781,7 @@ async function handleWebviewMessage(message, webview) {
                     text: `Approval error: ${err.message}`,
                     status: 'error'
                 });
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: message.vulnerabilityId }, webview);
                 webview.postMessage({ type: 'REMEDIATION_ERROR', error: err.message });
             }
             break;
@@ -1238,18 +1814,23 @@ async function handleWebviewMessage(message, webview) {
             }
 
             try {
+                syncAuthorizedRoots();
                 vscode.window.showInformationMessage(`Final Gate authorized for ${message.vulnerabilityId}. Finalizing documentation...`);
                 await engine.executePipeline(message.vulnerabilityId, {
                     isHumanApproved: true,
                     isFinalApproved: true,
+                    authorizedRoots: buildAuthorizedRoots(),
+                    workspaceTrusted: vscode?.workspace ? vscode.workspace.isTrusted !== false : true,
                     onProgress: (event) => {
                         webview.postMessage({ type: 'REMEDIATION_PROGRESS', event });
                     }
                 });
-                const list = getCombinedFindings(currentCsvPath, findingsStore);
+                const repoFilter = (hasUserInitiatedScan && activeRepoContext?.canonicalRepositoryPath)
+                    ? { repositoryRoot: activeRepoContext.canonicalRepositoryPath, includeHistorical: false }
+                    : { includeHistorical: false };
+                const list = getCombinedFindings(currentCsvPath, findingsStore, repoFilter);
                 broadcast({ type: 'DATA_UPDATED', vulnerabilities: list });
-                const details = loadVulnerabilityDetails(currentWorkspaceRoot, message.vulnerabilityId);
-                webview.postMessage({ type: 'DETAILS_LOADED', details });
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: message.vulnerabilityId }, webview);
             } catch (err) {
                 vscode.window.showErrorMessage(`Final gate error: ${err.message}`);
                 webview.postMessage({
@@ -1261,6 +1842,7 @@ async function handleWebviewMessage(message, webview) {
                     text: `Final gate error: ${err.message}`,
                     status: 'error'
                 });
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: message.vulnerabilityId }, webview);
                 webview.postMessage({ type: 'REMEDIATION_ERROR', error: err.message });
             }
             break;
@@ -1284,8 +1866,10 @@ async function handleWebviewMessage(message, webview) {
         }
 
         case 'openLocation': {
-            const fullPath = resolveSourceFilePath(currentWorkspaceRoot, message.repository, message.path);
-            const safePath = fullPath ? assertPathWithinWorkspace(fullPath, currentWorkspaceRoot) : null;
+            const authRoots = buildAuthorizedRoots();
+            const fullPath = resolveSourceFilePath(currentWorkspaceRoot, message.repository, message.path, authRoots);
+            const safeMatch = fullPath ? assertPathWithinAuthorizedRoots(fullPath, authRoots) : null;
+            const safePath = safeMatch ? safeMatch.canonicalPath : null;
 
             if (safePath && fs.existsSync(safePath)) {
                 vscode.workspace.openTextDocument(safePath).then(doc => {
@@ -1301,10 +1885,10 @@ async function handleWebviewMessage(message, webview) {
                     status: 'success'
                 });
             } else {
-                vscode.window.showWarningMessage(`Source file not found or outside workspace: ${message.path || 'Unknown'}`);
+                vscode.window.showWarningMessage(`Source file not found or outside authorized repositories: ${message.path || 'Unknown'}`);
                 webview.postMessage({
                     type: 'ACTION_FEEDBACK',
-                    text: `File not found or outside workspace boundary: ${message.path || 'Unknown'}`,
+                    text: `File not found or outside authorized repository boundary: ${message.path || 'Unknown'}`,
                     status: 'warning'
                 });
             }
@@ -1312,8 +1896,10 @@ async function handleWebviewMessage(message, webview) {
         }
 
         case 'getSourceCode': {
-            const fullPath = resolveSourceFilePath(currentWorkspaceRoot, message.repository, message.path);
-            const safePath = fullPath ? assertPathWithinWorkspace(fullPath, currentWorkspaceRoot) : null;
+            const authRoots = buildAuthorizedRoots();
+            const fullPath = resolveSourceFilePath(currentWorkspaceRoot, message.repository, message.path, authRoots);
+            const safeMatch = fullPath ? assertPathWithinAuthorizedRoots(fullPath, authRoots) : null;
+            const safePath = safeMatch ? safeMatch.canonicalPath : null;
 
             if (safePath && fs.existsSync(safePath)) {
                 try {
@@ -1321,7 +1907,7 @@ async function handleWebviewMessage(message, webview) {
                     webview.postMessage({
                         type: 'SOURCE_CODE_LOADED',
                         filePath: safePath,
-                        relativePath: path.relative(currentWorkspaceRoot, safePath),
+                        relativePath: path.relative(safeMatch.authorizedRoot || currentWorkspaceRoot, safePath),
                         code: code,
                         targetLine: parseInt(message.line, 10) || 1
                     });
@@ -1329,13 +1915,12 @@ async function handleWebviewMessage(message, webview) {
                     webview.postMessage({ type: 'SOURCE_CODE_ERROR', error: e.message });
                 }
             } else {
-                webview.postMessage({ type: 'SOURCE_CODE_ERROR', error: 'File not found or outside workspace boundary' });
+                webview.postMessage({ type: 'SOURCE_CODE_ERROR', error: 'File not found or outside authorized repository boundary' });
             }
             break;
         }
 
         case 'launchCopilot': {
-            // Verify workspace trust
             if (vscode.workspace && !vscode.workspace.isTrusted) {
                 vscode.window.showErrorMessage('GCAC: Copilot agent invocation is disabled in Restricted Mode. Please trust this workspace.');
                 webview.postMessage({
@@ -1346,8 +1931,8 @@ async function handleWebviewMessage(message, webview) {
                 return;
             }
 
-            // Verify vulnerability exists
-            const findings = getCombinedFindings(currentCsvPath, findingsStore);
+            syncAuthorizedRoots();
+            const findings = getCombinedFindings(currentCsvPath, findingsStore, { includeHistorical: true });
             const finding = findings.find(f => f.Vulnerability_ID === message.vulnerabilityId);
             if (!finding) {
                 vscode.window.showErrorMessage(`Vulnerability record '${message.vulnerabilityId}' not found in scan.`);
@@ -1359,13 +1944,33 @@ async function handleWebviewMessage(message, webview) {
                 return;
             }
 
-            const targetRepo = finding.Repository ? path.join(currentWorkspaceRoot, finding.Repository) : currentWorkspaceRoot;
-            const query = `@vulnerability-orchestrator /remediate-vulnerability ${finding.Vulnerability_ID} in repository "${targetRepo}" using scan "${currentCsvPath}"`;
+            const promptRes = buildCopilotRemediationPrompt(finding, currentCsvPath, {
+                authorizedRoots: buildAuthorizedRoots(),
+                registry
+            });
 
-            let chatOpened = false;
+            if (!promptRes.ok) {
+                if (vscode.window && typeof vscode.window.showWarningMessage === 'function') {
+                    vscode.window.showWarningMessage(promptRes.reason);
+                }
+                webview.postMessage({
+                    type: 'REPOSITORY_MAPPING_REQUIRED',
+                    vulnerabilityId: finding.Vulnerability_ID,
+                    reasonCode: promptRes.reasonCode,
+                    reason: promptRes.reason,
+                    finding
+                });
+                webview.postMessage({
+                    type: 'ACTION_FEEDBACK',
+                    text: promptRes.reason,
+                    status: 'warning'
+                });
+                return;
+            }
+
+            const query = promptRes.query;
             try {
                 vscode.commands.executeCommand('workbench.action.chat.open', { query, isPartialQuery: false });
-                chatOpened = true;
             } catch (e) {
                 console.warn('Could not execute workbench.action.chat.open:', e.message);
             }
@@ -1375,11 +1980,12 @@ async function handleWebviewMessage(message, webview) {
                 prompt: query,
                 vulnerabilityId: finding.Vulnerability_ID,
                 title: finding.Title,
+                findingContext: promptRes.context,
                 manualSubmissionRequired: true
             });
             webview.postMessage({
                 type: 'ACTION_FEEDBACK',
-                text: `Copilot Chat opened with prefilled query. Press Enter in Copilot Chat to begin.`,
+                text: `Copilot Chat opened with validated scan context. Press Enter in Copilot Chat to begin.`,
                 status: 'info'
             });
             break;
@@ -1393,7 +1999,9 @@ async function handleWebviewMessage(message, webview) {
 
         case 'loadReportContent': {
             const reportPath = message.filePath;
-            const safePath = assertPathWithinWorkspace(reportPath, currentWorkspaceRoot);
+            const authRoots = buildAuthorizedRoots();
+            const safeMatch = assertPathWithinAuthorizedRoots(reportPath, authRoots);
+            const safePath = safeMatch ? safeMatch.canonicalPath : null;
             if (safePath && fs.existsSync(safePath)) {
                 try {
                     const content = fs.readFileSync(safePath, 'utf-8');
@@ -1409,7 +2017,7 @@ async function handleWebviewMessage(message, webview) {
             } else {
                 webview.postMessage({
                     type: 'ACTION_FEEDBACK',
-                    text: 'Security Warning: Report path must be within active workspace boundary.',
+                    text: 'Security Warning: Report path must be within an authorized workspace or repository root.',
                     status: 'error'
                 });
             }
@@ -1505,5 +2113,7 @@ module.exports = {
     getWebviewHtml,
     getNonce,
     getCombinedFindings,
+    resolveSourceFilePath,
+    buildCopilotRemediationPrompt,
     ALLOWED_IPC_COMMANDS
 };

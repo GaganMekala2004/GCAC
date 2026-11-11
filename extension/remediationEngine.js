@@ -47,8 +47,33 @@ const {
     LocalTamperDetectableEvidenceWriter,
     sha256Hex
 } = require('./evidenceLedger');
+const { assertPathWithinWorkspace } = require('./pathUtils');
+const {
+    canonicalizePath,
+    assertPathWithinAuthorizedRoots,
+    RepositoryContextRegistry,
+    validateFindingContextContract
+} = require('./repositoryContext');
 
 const SUPPRESSION_REGEX = /#pragma\s+warning\s+disable|@SuppressWarnings|\[SuppressMessage|\/\/\s*(?:nosec|noqa)/i;
+
+const DEFAULT_RETRY_POLICY = Object.freeze({
+    maxRetries: 3,
+    backoffMs: [1000, 2500, 5000]
+});
+
+const STAGE_NAMES = Object.freeze({
+    0: 'Initialization / Discovery',
+    1: 'Stage 1: Vulnerability Classification',
+    2: 'Stage 2: Code Analysis & RCA',
+    3: 'Stage 3: Baseline Security Testing',
+    4: 'Stage 4: Patch Proposal & Human Approval Gate',
+    5: 'Stage 5: Isolated Patch Application',
+    6: 'Stage 6: Post-Fix Bench Testing',
+    7: 'Stage 7: Regression & Re-Scan Validation',
+    8: 'Stage 8: Final Audit & Human Sign-Off Gate',
+    9: 'Stage 9: Documentation & Evidence Ledger'
+});
 
 /**
  * Enterprise Multi-Agent Remediation Engine for GCAC
@@ -91,8 +116,40 @@ class RemediationEngine {
         });
         this.contentInjectionScreen = options.contentInjectionScreen || new ContentInjectionScreen();
         this.evidenceWriter = options.evidenceWriter || new LocalTamperDetectableEvidenceWriter();
+        this.registry = options.registry || (workspaceRoot ? new RepositoryContextRegistry({ workspaceRoot, extensionRoot: this.extensionRoot }) : null);
+        this._explicitAuthorizedRoots = Array.isArray(options.authorizedRoots) ? [...options.authorizedRoots] : [];
+        this.retryPolicy = {
+            maxRetries: Number(options.retryPolicy?.maxRetries ?? DEFAULT_RETRY_POLICY.maxRetries),
+            backoffMs: Array.isArray(options.retryPolicy?.backoffMs)
+                ? options.retryPolicy.backoffMs
+                : [...DEFAULT_RETRY_POLICY.backoffMs]
+        };
         this.isolatedWorkspaceOptions = options.isolatedWorkspaceOptions || (options.runsRoot ? { runsRoot: options.runsRoot } : {});
         this.updatePaths(workspaceRoot, customCsvPath);
+    }
+
+    _buildAuthorizedRoots(workspaceRoot, extraRoots = []) {
+        const set = new Set();
+        const add = (p) => {
+            if (typeof p === 'string' && p.trim().length > 0 && fs.existsSync(p.trim())) {
+                set.add(canonicalizePath(p.trim()));
+            }
+        };
+        add(workspaceRoot);
+        for (const r of this._explicitAuthorizedRoots) add(r);
+        if (this.registry) {
+            for (const r of this.registry.getAllAuthorizedRepositoryRoots()) add(r);
+        }
+        for (const r of extraRoots) add(r);
+        return Array.from(set);
+    }
+
+    setAuthorizedRoots(roots = []) {
+        this._explicitAuthorizedRoots = Array.isArray(roots) ? [...roots] : [];
+        this.authorizedRoots = this._buildAuthorizedRoots(this.workspaceRoot);
+        if (this.isolatedWorkspaceManager && typeof this.isolatedWorkspaceManager.setAuthorizedRoots === 'function') {
+            this.isolatedWorkspaceManager.setAuthorizedRoots(this.authorizedRoots);
+        }
     }
 
     async recoverOrphanedSandboxes() {
@@ -101,32 +158,61 @@ class RemediationEngine {
 
     updatePaths(workspaceRoot, customCsvPath = null) {
         this.workspaceRoot = workspaceRoot;
+        if (!this.registry && workspaceRoot) {
+            this.registry = new RepositoryContextRegistry({ workspaceRoot, extensionRoot: this.extensionRoot });
+        } else if (this.registry && workspaceRoot && typeof this.registry.setWorkspaceRoot === 'function') {
+            this.registry.setWorkspaceRoot(workspaceRoot);
+        }
+        this.authorizedRoots = this._buildAuthorizedRoots(workspaceRoot);
         this.csvPath = customCsvPath && fs.existsSync(customCsvPath)
             ? customCsvPath
             : path.join(workspaceRoot, 'vulnerability', 'vulnerabilities.csv');
         this.outputDir = path.join(workspaceRoot, 'output');
         this.remOutputDir = path.join(workspaceRoot, 'remediation-output');
         this.evidenceDir = path.join(workspaceRoot, 'evidence');
-        this.isolatedWorkspaceManager = new IsolatedWorkspaceManager(workspaceRoot, this.isolatedWorkspaceOptions);
+        this.isolatedWorkspaceManager = new IsolatedWorkspaceManager(workspaceRoot, {
+            ...this.isolatedWorkspaceOptions,
+            authorizedRoots: this.authorizedRoots
+        });
 
         if (!fs.existsSync(this.outputDir)) fs.mkdirSync(this.outputDir, { recursive: true });
         if (!fs.existsSync(this.remOutputDir)) fs.mkdirSync(this.remOutputDir, { recursive: true });
     }
 
     /**
-     * Resolves the actual source code file on disk within an explicit root or repository.
+     * Resolves the actual source code file on disk within an explicit root or authorized repository.
      */
     resolveSourceFile(finding, baseRoot = null) {
         if (!finding || !finding.Location_Path) return null;
         const root = baseRoot || this.workspaceRoot;
 
-        if (finding.Repository && root === this.workspaceRoot) {
-            const relRepo = path.join(root, finding.Repository, finding.Location_Path);
-            if (fs.existsSync(relRepo) && fs.statSync(relRepo).isFile()) return relRepo;
+        if (root === this.workspaceRoot) {
+            const repoRef = (finding.Repository_Root || finding.Repository || '').trim();
+            if (repoRef) {
+                let resolvedRepoDir = null;
+                if (path.isAbsolute(repoRef)) {
+                    const match = assertPathWithinAuthorizedRoots(repoRef, this.authorizedRoots || []);
+                    if (match && fs.existsSync(match.canonicalPath)) {
+                        resolvedRepoDir = match.canonicalPath;
+                    }
+                } else {
+                    const relDir = path.resolve(root, repoRef);
+                    const safeDir = assertPathWithinWorkspace(relDir, root);
+                    if (safeDir && fs.existsSync(safeDir)) {
+                        resolvedRepoDir = safeDir;
+                    }
+                }
+                if (resolvedRepoDir) {
+                    const candidate = assertPathWithinWorkspace(path.resolve(resolvedRepoDir, finding.Location_Path), resolvedRepoDir);
+                    if (candidate && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+                        return candidate;
+                    }
+                }
+            }
         }
 
-        const directWs = path.join(root, finding.Location_Path);
-        if (fs.existsSync(directWs) && fs.statSync(directWs).isFile()) return directWs;
+        const directWs = assertPathWithinWorkspace(path.resolve(root, finding.Location_Path), root);
+        if (directWs && fs.existsSync(directWs) && fs.statSync(directWs).isFile()) return directWs;
 
         const searchBase = (finding.Repository && root === this.workspaceRoot)
             ? path.join(root, finding.Repository)
@@ -267,19 +353,428 @@ class RemediationEngine {
         return res;
     }
 
+    _classifyPipelineError(err) {
+        const msg = err?.message || String(err || 'Unknown pipeline failure');
+        if (/timed?\s*out|ETIMEDOUT/i.test(msg)) return 'TIMED_OUT';
+        if (/cancel|abort/i.test(msg)) return 'CANCELLED';
+        if (/SANDBOX_UNAVAILABLE/i.test(msg)) return 'SANDBOX_UNAVAILABLE';
+        if (/SEC-02|Gate Integrity|Approval Gate|OutboundContextBlocked|Untrusted Content|AgentConfigIntegrity|Scope/i.test(msg)) {
+            return 'EXECUTION_BLOCKED';
+        }
+        if (/executable.*not installed|tool.*missing|not found on PATH/i.test(msg)) return 'TEST_TOOL_MISSING';
+        if (/IsolatedWorkspaceBlockedError/i.test(err?.name || '') || /IsolatedWorkspaceBlocked/i.test(msg)) return 'EXECUTION_BLOCKED';
+        return 'RUNNER_CRASH';
+    }
+
+    _archiveAttemptEvidence(vulnerabilityId, state) {
+        if (!state) return null;
+        const targetDir = path.join(this.remOutputDir, vulnerabilityId);
+        if (!fs.existsSync(targetDir)) return null;
+
+        const priorAttemptNumber = Number(state.attemptNumber || 1);
+        const priorAttemptId = state.attemptId || `att-${priorAttemptNumber}-${String(state.runId || 'run').slice(0, 8)}`;
+        const attemptDir = path.join(targetDir, 'attempts', priorAttemptId);
+        fs.mkdirSync(attemptDir, { recursive: true });
+
+        const filesToArchive = [
+            'run-state.json',
+            'agent-execution-trace.log',
+            'baseline-validation.json',
+            'validation.json',
+            'security-review.json',
+            're-scan-verification.json',
+            'changes.patch',
+            'remediation-report.md'
+        ];
+        const archivedFiles = [];
+        for (const f of filesToArchive) {
+            const src = path.join(targetDir, f);
+            if (fs.existsSync(src)) {
+                fs.copyFileSync(src, path.join(attemptDir, f));
+                archivedFiles.push(f);
+            }
+        }
+
+        const record = {
+            attemptId: priorAttemptId,
+            attemptNumber: priorAttemptNumber,
+            runId: state.runId || null,
+            startedAt: state.attemptStartedAt || state.updatedAt || null,
+            endedAt: new Date().toISOString(),
+            stageReached: state.stage || 0,
+            failedStage: state.failedStage || null,
+            failedStageId: state.failedStageId || null,
+            status: state.status || 'UNKNOWN',
+            failureCategory: state.failureCategory || null,
+            failureReason: state.failureReason || null,
+            proposedDiffSha256: state.proposedDiffSha256 || null,
+            archiveDir: path.relative(this.remOutputDir, attemptDir).replace(/\\/g, '/'),
+            archivedFiles
+        };
+        return record;
+    }
+
     /**
-     * Stage-aware retry preserving verified prior stages while invalidating any stale approval.
+     * Marks any orphaned IN_PROGRESS run states left behind by extension reload/crash as INTERRUPTED.
      */
-    async retryStage(vulnerabilityId, fromStage = 5, options = {}) {
+    reconcileInterruptedRuns() {
+        const reconciled = [];
+        if (!fs.existsSync(this.remOutputDir)) return reconciled;
+        let dirs = [];
+        try { dirs = fs.readdirSync(this.remOutputDir, { withFileTypes: true }); } catch { return reconciled; }
+        for (const entry of dirs) {
+            if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+            const vulnId = entry.name;
+            if (this.activeRuns.has(vulnId)) continue;
+            const state = this.loadRunState(vulnId);
+            if (state && (state.status === 'IN_PROGRESS' || state.status === 'RETRY_SCHEDULED')) {
+                state.status = 'INTERRUPTED';
+                state.failedStage = state.failedStage || state.stage || 1;
+                state.failureCategory = 'INTERRUPTED_BY_RELOAD';
+                state.failureReason = 'Execution interrupted before completion (VS Code reload or extension host restart).';
+                state.lastFailureAt = new Date().toISOString();
+                state.updatedAt = state.lastFailureAt;
+                this.saveRunState(vulnId, state);
+                reconciled.push({ vulnerabilityId: vulnId, failedStage: state.failedStage, runId: state.runId });
+            }
+        }
+        return reconciled;
+    }
+
+    /**
+     * Explicit retry/revise eligibility policy enforcement (Block E).
+     */
+    evaluateRetryEligibility(stateOrId, options = {}) {
+        const maxRetries = Number(this.retryPolicy?.maxRetries ?? DEFAULT_RETRY_POLICY.maxRetries);
+        const state = typeof stateOrId === 'string' ? this.loadRunState(stateOrId) : stateOrId;
+        const vulnId = typeof stateOrId === 'string' ? stateOrId : (state?.vulnerabilityId || options.finding?.Vulnerability_ID || '');
+
+        if (!vulnId) {
+            return {
+                retryEligible: false,
+                canReviseFix: false,
+                reasonCode: 'MISSING_VULNERABILITY_ID',
+                reason: 'No vulnerability selected.',
+                retryCount: 0,
+                maxRetries,
+                backoffRemainingMs: 0,
+                failedStage: null
+            };
+        }
+
+        const retryCount = Number(state?.retryCount || 0);
+        const isInterruptedReload = Boolean(state && (state.status === 'INTERRUPTED' || (state.status === 'IN_PROGRESS' && !this.activeRuns.has(vulnId))));
+        const postVal = state?.postFixValidation || null;
+        const reScan = state?.reScanVerification || null;
+        const failureCategory = state?.failureCategory
+            || (isInterruptedReload ? 'INTERRUPTED_BY_RELOAD' : null)
+            || postVal?.failureCategory
+            || null;
+        const failedStage = state?.failedStage
+            || (isInterruptedReload ? (state.stage || 1) : null)
+            || (postVal && postVal.passed === false ? 6 : null)
+            || (reScan && (reScan.machineStatus === OUTCOME_STATUS.STILL_PRESENT || reScan.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED) ? 7 : null);
+
+        const baseMeta = {
+            runId: state?.runId || null,
+            attemptId: state?.attemptId || null,
+            attemptNumber: Number(state?.attemptNumber || (state ? 1 : 0)),
+            retryCount,
+            maxRetries,
+            backoffRemainingMs: 0,
+            failedStage,
+            failedStageTitle: failedStage ? (STAGE_NAMES[failedStage] || `Stage ${failedStage}`) : null,
+            failureCategory
+        };
+
+        if (!options.skipActiveRunCheck && this.activeRuns.has(vulnId)) {
+            return {
+                ...baseMeta,
+                retryEligible: false,
+                canReviseFix: false,
+                reasonCode: 'ACTIVE_EXECUTION',
+                reason: `Pipeline is actively running for '${vulnId}'. Retry is disabled during execution.`
+            };
+        }
+
+        if (options.workspaceTrusted === false) {
+            return {
+                ...baseMeta,
+                retryEligible: false,
+                canReviseFix: false,
+                reasonCode: 'UNTRUSTED_WORKSPACE',
+                reason: 'Workspace is untrusted; grant VS Code Workspace Trust before executing or retrying remediation.'
+            };
+        }
+
+        // Validate repository & application mapping when finding or context is available
+        const findingCandidate = options.finding || state?.findingSnapshot || (state?.findingContext ? {
+            Vulnerability_ID: vulnId,
+            Application_Number: state.applicationNumber || state.findingContext.applicationId,
+            Repository: state.findingContext.repositoryReference || state.findingContext.repositoryPath,
+            Repository_Root: state.findingContext.repositoryPath,
+            Location_Path: state.targetRelPath
+        } : null);
+
+        if (findingCandidate) {
+            const ctxCheck = validateFindingContextContract(findingCandidate, {
+                authorizedRoots: this.authorizedRoots,
+                registry: this.registry
+            });
+            if (!ctxCheck.valid) {
+                return {
+                    ...baseMeta,
+                    retryEligible: false,
+                    canReviseFix: false,
+                    requiresMapping: true,
+                    reasonCode: ctxCheck.reasonCode || 'INVALID_REPO_MAPPING',
+                    reason: ctxCheck.reason
+                };
+            }
+        }
+
+        if (!state) {
+            return {
+                ...baseMeta,
+                retryEligible: false,
+                canReviseFix: false,
+                reasonCode: 'NO_RUN_STATE',
+                reason: 'No failed or interrupted run exists to retry. Use Fix / Remediate to start a fresh run.'
+            };
+        }
+
+        if (state.status === 'COMPLETED' && state.outcomeEvaluation?.isResolved === true) {
+            return {
+                ...baseMeta,
+                retryEligible: false,
+                canReviseFix: false,
+                reasonCode: 'ALREADY_COMPLETED',
+                reason: 'Remediation completed cleanly; retry is unnecessary.'
+            };
+        }
+
+        if (state.status === 'AWAITING_HUMAN_APPROVAL') {
+            return {
+                ...baseMeta,
+                retryEligible: false,
+                canReviseFix: true,
+                reasonCode: 'AWAITING_STAGE4_APPROVAL',
+                reason: 'Workflow is paused at Stage 4 awaiting developer diff review — inspect diff and click Approve & Continue.'
+            };
+        }
+
+        // Check diff / approval drift when targeting Stage 6+
+        const requestedStage = Number.isInteger(options.targetStage) ? options.targetStage : (failedStage || state.stage || 5);
+        if (requestedStage >= 6) {
+            if (!state.stage4Approved || !state.approvalRecord || state.approvalRecord.decision !== 'APPROVED') {
+                return {
+                    ...baseMeta,
+                    retryEligible: false,
+                    canReviseFix: true,
+                    reasonCode: 'UNAPPROVED_OR_MISSING_APPROVAL',
+                    reason: 'Stage 4 diff-bound human approval is missing; cannot retry Stage 6 without prior approved diff.'
+                };
+            }
+            if (state.approvalRecord.expiresAt && new Date(state.approvalRecord.expiresAt).getTime() <= Date.now()) {
+                return {
+                    ...baseMeta,
+                    retryEligible: false,
+                    canReviseFix: true,
+                    reasonCode: 'APPROVAL_EXPIRED',
+                    reason: 'Stage 4 human approval expired; use Review Failure / Revise Fix to generate or re-approve a diff.'
+                };
+            }
+            if (state.proposedDiffSha256 && computeDiffSha256(state.patchDiff || '') !== state.proposedDiffSha256) {
+                return {
+                    ...baseMeta,
+                    retryEligible: false,
+                    canReviseFix: true,
+                    reasonCode: 'DIFF_CHANGED',
+                    reason: 'Proposed patch diff changed after Stage 4 review; re-approval is mandatory.'
+                };
+            }
+            const appliedTarget = state.isolatedTargetFile && fs.existsSync(state.isolatedTargetFile)
+                ? state.isolatedTargetFile
+                : state.sourceFilePath;
+            if (state.expectedPostApplySha256 && appliedTarget && fs.existsSync(appliedTarget)) {
+                const liveSha = sha256Hex(fs.readFileSync(appliedTarget));
+                if (liveSha !== state.expectedPostApplySha256) {
+                    return {
+                        ...baseMeta,
+                        retryEligible: false,
+                        canReviseFix: true,
+                        reasonCode: 'SCOPE_OR_FILE_MODIFIED',
+                        reason: 'Target file checksum changed outside approved Stage 5 patch; blind retry blocked.'
+                    };
+                }
+            }
+        }
+
+        // Compute backoff remaining
+        const backoffTable = this.retryPolicy?.backoffMs || DEFAULT_RETRY_POLICY.backoffMs;
+        const requiredDelayMs = retryCount < maxRetries ? Number(backoffTable[Math.min(retryCount, backoffTable.length - 1)] || 0) : 0;
+        const lastFailMs = state.lastFailureAt ? new Date(state.lastFailureAt).getTime() : 0;
+        const elapsedMs = lastFailMs > 0 ? Math.max(0, Date.now() - lastFailMs) : requiredDelayMs;
+        const backoffRemainingMs = lastFailMs > 0 ? Math.max(0, requiredDelayMs - elapsedMs) : 0;
+
+        // Enforce genuine code/test failure exclusion for blind execution retry
+        const isCodeOrSecurityFailure = [
+            'TESTS_FAILED',
+            'BUILD_FAILED',
+            'NO_TESTS_DISCOVERED',
+            'STILL_PRESENT',
+            'REGRESSION_DETECTED'
+        ].includes(failureCategory) || (reScan && (reScan.machineStatus === OUTCOME_STATUS.STILL_PRESENT || reScan.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED));
+
+        if (isCodeOrSecurityFailure) {
+            return {
+                ...baseMeta,
+                backoffRemainingMs,
+                retryEligible: false,
+                canReviseFix: true,
+                recommendedAction: 'REVISE_FIX',
+                reasonCode: 'GENUINE_FAILURE_REQUIRES_FIX_REVISION',
+                reason: `Post-fix validation failed (${failureCategory || 'STILL_PRESENT'}). Blind retry of unchanged code is disabled; use Review Failure / Revise Fix to synthesize and approve a revised patch.`
+            };
+        }
+
+        if (failureCategory === 'EXECUTION_BLOCKED' || failureCategory === 'RESTORE_FAILED' || failureCategory === 'PARSE_FAILED') {
+            return {
+                ...baseMeta,
+                backoffRemainingMs,
+                retryEligible: false,
+                canReviseFix: (failedStage || 0) >= 6,
+                reasonCode: failureCategory,
+                reason: `Execution stopped (${failureCategory}): ${state.failureReason || postVal?.rootError || 'Fix policy/restore/diagnostic condition before rerunning.'}`
+            };
+        }
+
+        if ((failureCategory === 'SANDBOX_UNAVAILABLE' || failureCategory === 'TEST_TOOL_MISSING') && options.environmentRecovered !== true) {
+            return {
+                ...baseMeta,
+                backoffRemainingMs,
+                retryEligible: false,
+                canReviseFix: false,
+                reasonCode: failureCategory,
+                reason: `${failureCategory === 'SANDBOX_UNAVAILABLE' ? 'Phase 3 container sandbox unavailable' : 'Required test runtime/toolchain missing'}. Restore environment before retrying Stage ${requestedStage}.`
+            };
+        }
+
+        if (retryCount >= maxRetries) {
+            return {
+                ...baseMeta,
+                backoffRemainingMs: 0,
+                retryEligible: false,
+                canReviseFix: (failedStage || state.stage || 0) >= 5,
+                reasonCode: 'RETRY_LIMIT_EXCEEDED',
+                reason: `Bounded retry limit reached (${retryCount} of ${maxRetries} retries used). Review failure evidence before further attempts.`
+            };
+        }
+
+        const transientEligible = isInterruptedReload
+            || ['TIMED_OUT', 'CANCELLED', 'RUNNER_CRASH', 'INTERRUPTED_BY_RELOAD', 'SCAN_FAILED_TRANSIENT'].includes(failureCategory)
+            || ((failureCategory === 'SANDBOX_UNAVAILABLE' || failureCategory === 'TEST_TOOL_MISSING') && options.environmentRecovered === true);
+
+        if (transientEligible) {
+            return {
+                ...baseMeta,
+                backoffRemainingMs,
+                retryEligible: true,
+                canReviseFix: (failedStage || 0) >= 5,
+                recommendedAction: 'RETRY_STAGE',
+                recommendedStage: failedStage || requestedStage,
+                reasonCode: failureCategory || 'INTERRUPTED_BY_RELOAD',
+                reason: `Eligible for bounded Retry Stage ${failedStage || requestedStage} (${retryCount}/${maxRetries} retries used).`
+            };
+        }
+
+        // If no failure recorded yet, allow explicit programmatic Stage 5 reset (e.g. restarting before Final Gate)
+        if (!failedStage && state.status !== 'FAILED' && state.status !== 'Validation Failed' && requestedStage <= 5) {
+            return {
+                ...baseMeta,
+                backoffRemainingMs: 0,
+                retryEligible: true,
+                canReviseFix: true,
+                recommendedAction: 'STAGE_RESET',
+                recommendedStage: requestedStage,
+                reasonCode: 'STAGE_RESET_ALLOWED',
+                reason: 'Stage 5 reset allowed; prior approval invalidated and fresh Stage 4 review enforced.'
+            };
+        }
+
+        return {
+            ...baseMeta,
+            backoffRemainingMs,
+            retryEligible: false,
+            canReviseFix: (failedStage || state.stage || 0) >= 6,
+            reasonCode: 'INELIGIBLE_STATE',
+            reason: `Stage ${requestedStage} is not eligible for blind retry (status: ${state.status}).`
+        };
+    }
+
+    /**
+     * Stage-aware retry preserving verified prior stages while enforcing eligibility,
+     * bounded retry limits, backoff, concurrency protection, attempt archiving, and Stage 4 diff-bound approvals.
+     */
+    async retryStage(vulnerabilityId, fromStage = null, options = {}) {
         const cleanId = this.validateSingleExecutionRequest(vulnerabilityId);
+
+        if (this.activeRuns.has(cleanId)) {
+            throw new Error(`Remediation pipeline is already active for '${cleanId}'. Duplicate concurrent retry blocked.`);
+        }
+
         const state = this.loadRunState(cleanId);
         if (!state) {
             return await this.executePipeline(cleanId, options);
         }
 
+        if (options.expectedRunId && state.runId && options.expectedRunId !== state.runId) {
+            throw new Error(`Run ID Mismatch: Expected run '${options.expectedRunId}', but stored state belongs to '${state.runId}'.`);
+        }
+
+        const resolvedStage = Number.isInteger(fromStage)
+            ? fromStage
+            : (state.failedStage || (state.stage >= 6 ? 6 : Math.max(1, state.stage || 1)));
+
+        const eligibility = this.evaluateRetryEligibility(state, {
+            ...options,
+            targetStage: resolvedStage
+        });
+
+        if (!eligibility.retryEligible) {
+            throw new Error(`Retry Blocked (${eligibility.reasonCode}): ${eligibility.reason}`);
+        }
+
+        // Enforce backoff for transient failure retries
+        if (eligibility.backoffRemainingMs > 0) {
+            if (options.rejectDuringBackoff === true) {
+                throw new Error(`Retry Backoff Active: Wait ${Math.ceil(eligibility.backoffRemainingMs / 1000)}s before retrying Stage ${resolvedStage}.`);
+            }
+            if (options.waitForBackoff !== false) {
+                await new Promise(resolve => setTimeout(resolve, eligibility.backoffRemainingMs));
+            }
+        }
+
+        // Archive prior attempt failure evidence without mutating/deleting historical records
+        const archivedRecord = this._archiveAttemptEvidence(cleanId, state);
+        const nextAttemptNumber = Number(state.attemptNumber || 1) + 1;
+        const nextAttemptId = `att-${nextAttemptNumber}-${crypto.randomUUID().slice(0, 8)}`;
+        const history = Array.isArray(state.attemptHistory) ? [...state.attemptHistory] : [];
+        if (archivedRecord) history.push(archivedRecord);
+
+        state.attemptHistory = history;
+        state.attemptNumber = nextAttemptNumber;
+        state.attemptId = nextAttemptId;
+        state.retryCount = Number(state.retryCount || 0) + 1;
+        state.attemptStartedAt = new Date().toISOString();
+        state.failedStage = null;
+        state.failedStageId = null;
+        state.failureCategory = null;
+        state.failureReason = null;
+
         // Preserve verified prior stages; never reuse prior approval if Stage 4 or Stage 5 is retried
-        if (fromStage <= 4) {
-            state.stage = Math.min(state.stage || 1, Math.max(1, fromStage - 1));
+        if (resolvedStage <= 4) {
+            state.stage = Math.min(state.stage || 1, Math.max(1, resolvedStage - 1));
             state.stage4Approved = false;
             state.stage6Approved = false;
             state.patchAppliedAtStage5 = false;
@@ -290,7 +785,7 @@ class RemediationEngine {
             state.patchDiff = '';
             state.fullRemediatedCode = '';
             state.proposedDiffSha256 = null;
-        } else if (fromStage === 5) {
+        } else if (resolvedStage === 5) {
             // Re-entering Stage 4/5 boundary restores snapshot and requires fresh diff-bound human authorization
             const rollbackTarget = state.isolatedTargetFile && fs.existsSync(state.isolatedTargetFile)
                 ? state.isolatedTargetFile
@@ -304,7 +799,7 @@ class RemediationEngine {
             state.expectedPostApplySha256 = null;
             state.approvalRecord = null;
         } else {
-            // Retrying Stage 6 bench test while preserving Stage 1-3 RCA/baseline & Stage 5 hash-verified patch
+            // Retrying Stage 6+ bench test while preserving Stage 1-3 RCA/baseline & Stage 5 hash-verified patch
             state.stage6Approved = false;
         }
         state.status = 'RETRY_SCHEDULED';
@@ -313,8 +808,89 @@ class RemediationEngine {
 
         return await this.executePipeline(cleanId, {
             ...options,
-            retryFromStage: fromStage,
-            isHumanApproved: fromStage >= 6 ? (options.isHumanApproved ?? state.stage4Approved === true) : false,
+            runId: state.runId,
+            attemptId: nextAttemptId,
+            retryFromStage: resolvedStage,
+            isHumanApproved: resolvedStage >= 6 ? (options.isHumanApproved ?? state.stage4Approved === true) : false,
+            isFinalApproved: false
+        });
+    }
+
+    /**
+     * Separate recovery path for genuine post-fix failures (Block E):
+     * archives failure evidence, rolls back the failed patch, feeds failure diagnostics to patch synthesis,
+     * and ALWAYS stops at Stage 4 requiring fresh diff-bound human approval.
+     */
+    async reviseFix(vulnerabilityId, options = {}) {
+        const cleanId = this.validateSingleExecutionRequest(vulnerabilityId);
+
+        if (this.activeRuns.has(cleanId)) {
+            throw new Error(`Remediation pipeline is already active for '${cleanId}'. Cannot revise fix concurrently.`);
+        }
+        if (options.workspaceTrusted === false) {
+            throw new Error('SEC-02 Blocked: Workspace is untrusted; grant VS Code Workspace Trust before revising fix.');
+        }
+
+        const state = this.loadRunState(cleanId);
+        if (!state) {
+            return await this.executePipeline(cleanId, { ...options, isHumanApproved: false, isFinalApproved: false });
+        }
+
+        if (options.expectedRunId && state.runId && options.expectedRunId !== state.runId) {
+            throw new Error(`Run ID Mismatch: Expected run '${options.expectedRunId}', but stored state belongs to '${state.runId}'.`);
+        }
+
+        const archivedRecord = this._archiveAttemptEvidence(cleanId, state);
+        const history = Array.isArray(state.attemptHistory) ? [...state.attemptHistory] : [];
+        if (archivedRecord) history.push(archivedRecord);
+
+        const nextAttemptNumber = Number(state.attemptNumber || 1) + 1;
+        const nextAttemptId = `att-${nextAttemptNumber}-${crypto.randomUUID().slice(0, 8)}`;
+
+        const priorFailureParts = [];
+        if (state.postFixValidation?.rootError) priorFailureParts.push(`Test/Build Error: ${state.postFixValidation.rootError}`);
+        else if (state.postFixValidation?.summary) priorFailureParts.push(`Test Outcome: ${state.postFixValidation.summary}`);
+        if (state.reScanVerification?.reason) priorFailureParts.push(`Re-Scan Result: ${state.reScanVerification.reason}`);
+        if (state.failureReason) priorFailureParts.push(`Stage Error: ${state.failureReason}`);
+        if (options.developerNotes) priorFailureParts.push(`Developer Guidance: ${String(options.developerNotes).slice(0, 400)}`);
+
+        const rollbackTarget = state.isolatedTargetFile && fs.existsSync(state.isolatedTargetFile)
+            ? state.isolatedTargetFile
+            : state.sourceFilePath;
+        if (rollbackTarget) {
+            this.rollbackFileDetailed(cleanId, rollbackTarget);
+        }
+
+        state.attemptHistory = history;
+        state.attemptNumber = nextAttemptNumber;
+        state.attemptId = nextAttemptId;
+        state.attemptStartedAt = new Date().toISOString();
+        state.stage = 3;
+        state.stage4Approved = false;
+        state.stage6Approved = false;
+        state.patchAppliedAtStage5 = false;
+        state.postWriteFilesChanged = [];
+        state.expectedPostApplySha256 = null;
+        state.pendingApprovalRequest = null;
+        state.approvalRecord = null;
+        state.patchDiff = '';
+        state.fullRemediatedCode = '';
+        state.proposedDiffSha256 = null;
+        state.failedStage = null;
+        state.failedStageId = null;
+        state.failureCategory = null;
+        state.failureReason = null;
+        state.revisionFeedback = priorFailureParts.join(' | ');
+        state.status = 'REVISION_REQUESTED';
+        state.updatedAt = new Date().toISOString();
+        this.saveRunState(cleanId, state);
+
+        return await this.executePipeline(cleanId, {
+            ...options,
+            runId: state.runId,
+            attemptId: nextAttemptId,
+            revisionFeedback: state.revisionFeedback,
+            isHumanApproved: false,
             isFinalApproved: false
         });
     }
@@ -411,6 +987,15 @@ class RemediationEngine {
             throw new Error(`Vulnerability ID '${vulnerabilityId}' not found in CSV or Scan Findings Store.`);
         }
 
+        if (options.workspaceTrusted === false) {
+            throw new Error('SEC-02 / Trust Blocked: Workspace is untrusted; grant VS Code Workspace Trust before remediation.');
+        }
+
+        const effectiveAuthorizedRoots = this._buildAuthorizedRoots(
+            this.workspaceRoot,
+            Array.isArray(options.authorizedRoots) ? options.authorizedRoots : []
+        );
+
         const appNum = (finding.Application_Number || '').trim();
         const repoField = (finding.Repository || '').trim();
         if (!appNum || !repoField || appNum.includes(',') || repoField.includes(',')) {
@@ -418,6 +1003,16 @@ class RemediationEngine {
                 `SEC-02 Blocked: Finding '${finding.Vulnerability_ID}' has missing or ambiguous Application_Number/Repository metadata.`
             );
         }
+
+        const ctxValidation = validateFindingContextContract(finding, {
+            authorizedRoots: effectiveAuthorizedRoots,
+            registry: this.registry
+        });
+        if (!ctxValidation.valid) {
+            throw new Error(ctxValidation.reason);
+        }
+        const findingContext = ctxValidation.context;
+        const resolvedRepositoryPath = ctxValidation.resolvedRepositoryPath;
 
         const minimizedFinding = buildMinimizedSingleFinding(finding);
 
@@ -435,9 +1030,22 @@ class RemediationEngine {
             }
         }
 
-        const runId = (isApproved && existingState && existingState.runId)
-            ? existingState.runId
+        const isRetryExecution = Boolean(options.retryFromStage || options.attemptId || options.revisionFeedback);
+        const runId = ((isApproved || isRetryExecution) && existingState && existingState.runId)
+            ? (options.runId || existingState.runId)
             : crypto.randomUUID();
+        const attemptNumber = isRetryExecution && existingState
+            ? Number(existingState.attemptNumber || 1)
+            : (isApproved && existingState ? Number(existingState.attemptNumber || 1) : 1);
+        const attemptId = options.attemptId
+            || (isApproved && existingState?.attemptId ? existingState.attemptId : `att-${attemptNumber}-${runId.slice(0, 8)}`);
+        const attemptHistory = (isRetryExecution || isApproved) && Array.isArray(existingState?.attemptHistory)
+            ? [...existingState.attemptHistory]
+            : [];
+        const retryCount = (isRetryExecution || isApproved) && existingState
+            ? Number(existingState.retryCount || 0)
+            : 0;
+        const attemptStartedAt = (isApproved && existingState?.attemptStartedAt) ? existingState.attemptStartedAt : new Date().toISOString();
 
         if (isFinalApproved) {
             if (!existingState || existingState.vulnerabilityId !== vulnerabilityId || !existingState.stage4Approved) {
@@ -459,12 +1067,26 @@ class RemediationEngine {
             }
         }
 
-        log('DISCOVERY', `[RunId:${runId}] Ingested minimized finding '${minimizedFinding.Vulnerability_ID}' (${minimizedFinding.Title}) for Application '${appNum}'`);
+        let currentStageNumber = 0;
+        let currentStageId = 'discovery';
+        let isolatedWorkspace = existingState?.isolatedWorkspace || null;
+        let classification = existingState?.classification || null;
+        let governance = existingState?.governance || null;
+        let rca = existingState?.rca || null;
+        let baselineValidation = existingState?.baselineValidation || null;
+        let postFixValidation = existingState?.postFixValidation || null;
+        let sourceFilePath = existingState?.sourceFilePath || null;
+        let targetRelPath = minimizedFinding.Location_Path || 'source';
+        let remediationDecision = existingState?.remediationDecision || null;
+        let sourceToSinkEvidence = existingState?.sourceToSinkEvidence || null;
+
+        try {
+        log('DISCOVERY', `[RunId:${runId}] [Attempt:${attemptId}] Ingested minimized finding '${minimizedFinding.Vulnerability_ID}' (${minimizedFinding.Title}) for Application '${appNum}' (Repo: ${resolvedRepositoryPath})`);
         chainEvents.push({
             timestamp: new Date().toISOString(),
             stage: 'DISCOVERY',
             eventType: 'RUN_INITIALIZED',
-            payload: { runId, vulnerabilityId, applicationId: appNum }
+            payload: { runId, attemptId, vulnerabilityId, applicationId: appNum, canonicalRepositoryId: findingContext.canonicalRepositoryId }
         });
 
         // 2. Screen untrusted finding text fields (Block A)
@@ -496,13 +1118,17 @@ class RemediationEngine {
         });
 
         // 4. Create or reuse isolated per-run Git worktree (Block B)
-        let isolatedWorkspace = existingState?.isolatedWorkspace || null;
-        if (!isApproved || !isolatedWorkspace || !fs.existsSync(isolatedWorkspace.worktreeDir)) {
+        const canReuseExistingWorktree = (isApproved || isRetryExecution) && isolatedWorkspace && isolatedWorkspace.worktreeDir && fs.existsSync(isolatedWorkspace.worktreeDir);
+        if (!canReuseExistingWorktree) {
+            const worktreeRunSegment = fs.existsSync(path.join(this.isolatedWorkspaceManager.runsRoot || '', `${finding.Vulnerability_ID}_${runId}`))
+                ? `${runId}_${attemptId}`
+                : runId;
             isolatedWorkspace = this.isolatedWorkspaceManager.createIsolatedWorkspace({
-                runId,
+                runId: worktreeRunSegment,
                 vulnerabilityId: finding.Vulnerability_ID,
                 applicationId: appNum,
-                repositoryPath: repoField,
+                repositoryPath: resolvedRepositoryPath || repoField,
+                authorizedRoots: effectiveAuthorizedRoots,
                 expectedFileRelPath: minimizedFinding.Location_Path || null,
                 minimizedFinding
             });
@@ -516,9 +1142,9 @@ class RemediationEngine {
         }
 
         // Load genuine source file from ISOLATED worktree (never live repo!)
-        const sourceFilePath = isolatedWorkspace.isolatedTargetFile || this.resolveSourceFile(finding, isolatedWorkspace.isolatedRepoPath);
+        sourceFilePath = isolatedWorkspace.isolatedTargetFile || this.resolveSourceFile(finding, isolatedWorkspace.isolatedRepoPath);
         let sourceCode = '';
-        let targetRelPath = minimizedFinding.Location_Path || 'source';
+        targetRelPath = minimizedFinding.Location_Path || 'source';
         if (sourceFilePath && fs.existsSync(sourceFilePath)) {
             sourceCode = fs.readFileSync(sourceFilePath, 'utf-8');
             targetRelPath = path.relative(isolatedWorkspace.worktreeDir, sourceFilePath).replace(/\\/g, '/');
@@ -544,12 +1170,12 @@ class RemediationEngine {
         const ownershipClassification = classifyFileOwnership(targetRelPath, {
             allowDependencyManifests: isDependencyManifestFinding
         });
-        const remediationDecision = existingState?.remediationDecision || evaluateRemediationStrategy({
+        remediationDecision = existingState?.remediationDecision || evaluateRemediationStrategy({
             finding: minimizedFinding,
             sourceCode,
             ownershipClassification
         });
-        let sourceToSinkEvidence = existingState?.sourceToSinkEvidence || extractSourceToSinkEvidence({
+        sourceToSinkEvidence = existingState?.sourceToSinkEvidence || extractSourceToSinkEvidence({
             finding: minimizedFinding,
             sourceCode,
             rca: existingState?.rca || null,
@@ -649,35 +1275,61 @@ class RemediationEngine {
             findingContext: minimizedFinding
         };
 
-        let classification = existingState?.classification || null;
-        let governance = existingState?.governance || null;
-        let rca = existingState?.rca || null;
-        let baselineValidation = existingState?.baselineValidation || null;
         let patchDiff = existingState?.patchDiff || '';
         let fullRemediatedCode = existingState?.fullRemediatedCode || '';
         let approvedFilePaths = existingState?.approvedFilePaths || [];
         let pendingApprovalRequest = existingState?.pendingApprovalRequest || null;
         let approvalRecord = existingState?.approvalRecord || null;
+        const revisionFeedback = options.revisionFeedback || existingState?.revisionFeedback || '';
 
         const isResuming = isApproved && existingState && existingState.stage >= 4 && existingState.runId === runId;
 
         if (!isResuming) {
+            const reuseVerifiedPrior = isRetryExecution && existingState && existingState.runId === runId;
+            const retryStageFloor = Number(options.retryFromStage || (options.revisionFeedback ? 4 : 1));
+            const preserveStage1 = reuseVerifiedPrior && Boolean(classification && governance) && retryStageFloor >= 2;
+            const preserveStage2 = reuseVerifiedPrior && Boolean(rca) && retryStageFloor >= 3;
+            const preserveStage3 = reuseVerifiedPrior && Boolean(baselineValidation) && retryStageFloor >= 4 && baselineValidation.machineStatus !== OUTCOME_STATUS.BLOCKED;
+
             // Mark in-progress checkpoint (interrupted runs must never appear completed)
+            currentStageNumber = Math.max(1, retryStageFloor <= 4 ? retryStageFloor : 1);
+            currentStageId = currentStageNumber === 2 ? 'code-analysis' : currentStageNumber === 3 ? 'baseline-test' : 'classification';
             this.saveRunState(finding.Vulnerability_ID, {
                 runId,
+                attemptId,
+                attemptNumber,
+                retryCount,
+                attemptHistory,
+                attemptStartedAt,
                 vulnerabilityId: finding.Vulnerability_ID,
                 applicationNumber: appNum,
-                stage: 1,
+                findingContext,
+                findingSnapshot: minimizedFinding,
+                workspaceTrusted: options.workspaceTrusted !== false,
+                stage: currentStageNumber,
                 status: 'IN_PROGRESS',
                 isolatedWorkspace,
+                isolatedTargetFile: sourceFilePath,
+                sourceFilePath,
+                targetRelPath,
+                classification,
+                governance,
+                rca,
+                baselineValidation,
                 remediationDecision,
                 sourceToSinkEvidence,
+                revisionFeedback,
                 updatedAt: now()
             });
 
             // ==========================================
             // STAGE 1: CLASSIFICATION AGENT (Real LLM)
             // ==========================================
+            currentStageNumber = 1;
+            currentStageId = 'classification';
+            if (preserveStage1) {
+                log('CLASSIFY', `Preserving verified Stage 1 classification from RunId:${runId}.`);
+            } else {
             onProgress({ type: 'STAGE_START', stageId: 'classification', stageNumber: 1 });
             log('CLASSIFY', `Prompting real LLM for advisory security classification of ${minimizedFinding.Vulnerability_ID}...`);
 
@@ -756,10 +1408,16 @@ Perform an objective ADVISORY classification (scanner severity remains authorita
                 summary: classification.summary || `Authoritative severity ${governance.originalScannerSeverity} (${classification.cwe}).`,
                 classification: classification
             });
+            }
 
             // ==========================================
             // STAGE 2: CODE ANALYSIS / RCA AGENT (Real LLM)
             // ==========================================
+            currentStageNumber = 2;
+            currentStageId = 'code-analysis';
+            if (preserveStage2) {
+                log('RCA', `Preserving verified Stage 2 RCA from RunId:${runId}.`);
+            } else {
             onProgress({ type: 'STAGE_START', stageId: 'code-analysis', stageNumber: 2 });
             log('RCA', `Prompting real LLM for deep Root Cause Analysis & dataflow tracing at '${targetRelPath}:${minimizedFinding.Line_Number || 1}'...`);
 
@@ -816,15 +1474,22 @@ Perform complete analysis and return a JSON object with EXACTLY these keys:
                 summary: rca.summary || `Root cause identified in ${path.basename(targetRelPath)} at line ${finding.Line_Number || 1}.`,
                 rca: rca
             });
+            }
 
             // ==========================================
             // STAGE 3: BASELINE TESTING (Inside Isolated Worktree)
             // ==========================================
+            currentStageNumber = 3;
+            currentStageId = 'baseline-test';
+            if (preserveStage3) {
+                log('BASELINE_TEST', `Preserving verified Stage 3 baseline validation from RunId:${runId}.`);
+            } else {
             onProgress({ type: 'STAGE_START', stageId: 'baseline-test', stageNumber: 3 });
             log('BASELINE_TEST', `Executing genuine baseline tests in isolated worktree '${isolatedWorkspace.isolatedRepoPath}'...`);
 
             baselineValidation = await this.runBaselineTests(finding, isolatedWorkspace.worktreeDir, {
                 workingDirectory: isolatedWorkspace.isolatedRepoPath,
+                repositoryTested: resolvedRepositoryPath,
                 runId,
                 applicationId: appNum,
                 vulnerabilityId: finding.Vulnerability_ID,
@@ -869,11 +1534,18 @@ Perform complete analysis and return a JSON object with EXACTLY these keys:
                 summary: `Baseline testing: ${baselineValidation.summary}`,
                 baselineValidation: baselineValidation
             });
+            }
 
             // ==========================================
             // PROPOSE SECURE CODE PATCH (Real LLM, before Stage 4 approval)
             // ==========================================
-            log('REMEDIATE', `Prompting real LLM to synthesize minimal secure code patch for ${finding.Technology}...`);
+            currentStageNumber = 4;
+            currentStageId = 'human-gate';
+            log('REMEDIATE', `Prompting real LLM to synthesize minimal secure code patch for ${finding.Technology || 'target'}...`);
+
+            const revisionNoteBlock = revisionFeedback
+                ? `\nPrior Attempt Failure Diagnostics (MUST address in this revised patch):\n${revisionFeedback}\n`
+                : '';
 
             const remediationPrompt = `
 You are the Remediation Agent.
@@ -884,7 +1556,7 @@ Technology: ${finding.Technology}
 Vulnerability: ${finding.Title} (${classification.cwe})
 Preference Ladder Strategy: ${remediationDecision.selectedTier} — ${remediationDecision.recommendedStrategy}
 Remediation Guidance: ${finding.Remediation_Guidance || 'Apply secure coding best practices.'}
-
+${revisionNoteBlock}
 RCA Root Cause & Proposed Fix:
 ${rca.rootCause}
 ${rca.proposedFix}
@@ -1012,10 +1684,23 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
 
         const currentState = {
             runId,
+            attemptId,
+            attemptNumber,
+            retryCount,
+            attemptHistory,
+            attemptStartedAt,
             vulnerabilityId: finding.Vulnerability_ID,
             applicationNumber: appNum,
+            findingContext,
+            findingSnapshot: minimizedFinding,
+            workspaceTrusted: options.workspaceTrusted !== false,
             stage: 4,
             status: isApproved ? 'APPROVED' : 'AWAITING_HUMAN_APPROVAL',
+            failedStage: null,
+            failedStageId: null,
+            failureCategory: null,
+            failureReason: null,
+            revisionFeedback: revisionFeedback || null,
             stage4Approved: isApproved,
             stage6Approved: isFinalApproved,
             baseCommitHash: isolatedWorkspace.baseCommitSha,
@@ -1066,6 +1751,10 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
 
             this.persistArtifacts(finding, classification, rca, baselineValidation, patchDiff, traceLogs, null, null, false, false, null, {
                 runId,
+                attemptId,
+                attemptNumber,
+                attemptHistory,
+                findingContext,
                 appNum,
                 agentIntegrity,
                 inputReferenceHashes: { minimizedFindingSha256, baseSourceSha256, baseCommitSha: isolatedWorkspace.baseCommitSha },
@@ -1083,6 +1772,7 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
                 stageNumber: 4,
                 vulnerabilityId: finding.Vulnerability_ID,
                 runId,
+                attemptId,
                 proposedDiffSha256,
                 approvedFilePaths,
                 message: 'Proposed secure patch generated by LLM is ready. Diff-bound developer review required before applying isolated changes.'
@@ -1090,6 +1780,11 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
 
             return {
                 runId,
+                attemptId,
+                attemptNumber,
+                retryCount,
+                attemptHistory,
+                findingContext,
                 status: 'Awaiting Human Review',
                 isAwaitingApproval: true,
                 stage: 4,
@@ -1117,6 +1812,8 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
         // ==========================================
         // STAGE 5: REMEDIATION (Apply authorized fix ONLY inside isolated worktree + Pre/Post Scope Verification)
         // ==========================================
+        currentStageNumber = 5;
+        currentStageId = 'remediation';
         onProgress({ type: 'STAGE_START', stageId: 'remediation', stageNumber: 5 });
         log('GOVERNANCE_GATE', `Local Stage 4 Gate Authorized [RunId:${runId}, DiffSHA256:${proposedDiffSha256.substring(0, 12)}..., Auth:${approvalRecord?.reviewerAuthorizationStatus || 'AUTHENTICATION_NOT_VERIFIED'}]. Applying inside isolated worktree.`);
 
@@ -1196,11 +1893,14 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
         // ==========================================
         // STAGE 6: POST-FIX TESTING (Inside Isolated Worktree)
         // ==========================================
+        currentStageNumber = 6;
+        currentStageId = 'bench-test';
         onProgress({ type: 'STAGE_START', stageId: 'bench-test', stageNumber: 6 });
         log('BENCH_TEST', `Executing genuine post-fix test suite inside isolated worktree '${isolatedWorkspace.isolatedRepoPath}'...`);
 
-        const postFixValidation = await this.runPostFixTests(finding, isolatedWorkspace.worktreeDir, {
+        postFixValidation = await this.runPostFixTests(finding, isolatedWorkspace.worktreeDir, {
             workingDirectory: isolatedWorkspace.isolatedRepoPath,
+            repositoryTested: resolvedRepositoryPath,
             runId,
             applicationId: appNum,
             vulnerabilityId: finding.Vulnerability_ID,
@@ -1445,7 +2145,36 @@ Return a JSON object with EXACTLY these keys:
             gatewayBoundaryNote: this.executionGateway.gatewayBoundaryNote
         };
 
+        const hasPostTestFailure = postFixValidation && (postFixValidation.passed === false || postFixValidation.executed === false);
+        const hasReScanFailure = Boolean(reScanVerification && (
+            reScanVerification.machineStatus === OUTCOME_STATUS.STILL_PRESENT ||
+            reScanVerification.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED
+        ));
+        const derivedFailedStage = hasPostTestFailure ? 6 : (hasReScanFailure ? 7 : (!outcomeEvaluation.isResolved ? 8 : null));
+        const derivedFailureCategory = postFixValidation?.failureCategory && postFixValidation.failureCategory !== 'NONE'
+            ? postFixValidation.failureCategory
+            : (reScanVerification?.machineStatus === OUTCOME_STATUS.STILL_PRESENT
+                ? 'STILL_PRESENT'
+                : (reScanVerification?.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED ? 'REGRESSION_DETECTED' : null));
+        const derivedFailureReason = !outcomeEvaluation.isResolved
+            ? (postFixValidation?.rootError || postFixValidation?.reason || reScanVerification?.reason || outcomeEvaluation.blockingReasons.join('; '))
+            : null;
+
+        currentStageNumber = 8;
+        currentStageId = 'final-human-gate';
         currentState.stage = 8;
+        currentState.attemptId = attemptId;
+        currentState.attemptNumber = attemptNumber;
+        currentState.retryCount = retryCount;
+        currentState.attemptHistory = attemptHistory;
+        currentState.findingContext = findingContext;
+        currentState.findingSnapshot = minimizedFinding;
+        currentState.failedStage = derivedFailedStage;
+        currentState.failedStageId = derivedFailedStage === 6 ? 'bench-test' : derivedFailedStage === 7 ? 'regression' : derivedFailedStage === 8 ? 'final-human-gate' : null;
+        currentState.failureCategory = derivedFailureCategory;
+        currentState.failureReason = derivedFailureReason;
+        currentState.lastFailureAt = derivedFailedStage ? new Date().toISOString() : null;
+        currentState.diagnostics = postFixValidation || null;
         currentState.postFixValidation = postFixValidation;
         currentState.reScanVerification = reScanVerification;
         currentState.regressionStatus = regressionStatus;
@@ -1456,10 +2185,19 @@ Return a JSON object with EXACTLY these keys:
         currentState.stage6Approved = isFinalApproved;
         currentState.scopeVerification = postTestScope;
         currentState.updatedAt = now();
+        currentState.retryEligibility = this.evaluateRetryEligibility(currentState, {
+            finding,
+            workspaceTrusted: options.workspaceTrusted,
+            skipActiveRunCheck: true
+        });
         this.saveRunState(finding.Vulnerability_ID, currentState);
 
         const evidenceContext = {
             runId,
+            attemptId,
+            attemptNumber,
+            attemptHistory,
+            findingContext,
             appNum,
             agentIntegrity,
             inputReferenceHashes: { minimizedFindingSha256, baseSourceSha256, baseCommitSha: isolatedWorkspace.baseCommitSha },
@@ -1518,14 +2256,28 @@ Return a JSON object with EXACTLY these keys:
                 stageNumber: 8,
                 vulnerabilityId: finding.Vulnerability_ID,
                 runId,
+                attemptId,
+                failedStage: currentState.failedStage,
+                failureCategory: currentState.failureCategory,
+                retryEligibility: currentState.retryEligibility,
+                diagnostics: postFixValidation,
                 message: `Testing outcome: ${outcomeEvaluation.testOutcome}; audit rating: ${securityReview.rating} (${securityReview.score ?? 'N/A'}/100). Final human sign-off required.`
             });
 
             return {
                 runId,
+                attemptId,
+                attemptNumber,
+                retryCount,
+                attemptHistory,
+                findingContext,
                 status: outcomeEvaluation.isResolved ? 'Approved' : outcomeEvaluation.legacyRemediationStatus,
                 isAwaitingFinalApproval: true,
                 stage: 8,
+                failedStage: currentState.failedStage,
+                failureCategory: currentState.failureCategory,
+                failureReason: currentState.failureReason,
+                retryEligibility: currentState.retryEligibility,
                 vulnerabilityId: finding.Vulnerability_ID,
                 patchDiff: patchDiff,
                 validation: postFixValidation,
@@ -1541,6 +2293,8 @@ Return a JSON object with EXACTLY these keys:
         // ==========================================
         // STAGE 9: DOCUMENTATION AGENT & INTEGRITY LEDGER
         // ==========================================
+        currentStageNumber = 9;
+        currentStageId = 'manual-validations';
         log('FINAL_GATE', `Final Human Sign-Off Granted [RunId:${runId}]. Evaluating strict machine closure criteria...`);
         onProgress({ type: 'STAGE_START', stageId: 'manual-validations', stageNumber: 9 });
         log('DOCUMENTATION', `Finalizing local records and tamper-detectable evidence manifest (no remote Git push performed)...`);
@@ -1599,10 +2353,16 @@ Return a JSON object with EXACTLY these keys:
             });
         }
 
+        currentState.stage = 9;
         currentState.status = outcomeEvaluation.isResolved ? 'COMPLETED' : outcomeEvaluation.finalValidationOutcome;
         currentState.finalRemediationStatus = finalRemediationStatus;
         currentState.outcomeEvaluation = outcomeEvaluation;
         currentState.reportPath = reportPath;
+        currentState.retryEligibility = this.evaluateRetryEligibility(currentState, {
+            finding,
+            workspaceTrusted: options.workspaceTrusted,
+            skipActiveRunCheck: true
+        });
         this.saveRunState(finding.Vulnerability_ID, currentState);
 
         // Re-write integrity manifest after final run-state.json update so all files match SHA-256 digests
@@ -1619,11 +2379,19 @@ Return a JSON object with EXACTLY these keys:
             type: 'WORKFLOW_COMPLETE',
             vulnerabilityId: finding.Vulnerability_ID,
             reportPath: reportPath,
-            status: finalRemediationStatus
+            status: finalRemediationStatus,
+            runId,
+            attemptId,
+            retryEligibility: currentState.retryEligibility
         });
 
         return {
             runId,
+            attemptId,
+            attemptNumber,
+            retryCount,
+            attemptHistory,
+            findingContext,
             status: finalRemediationStatus,
             isCompleted: outcomeEvaluation.isResolved,
             isResolved: outcomeEvaluation.isResolved,
@@ -1637,8 +2405,86 @@ Return a JSON object with EXACTLY these keys:
             outcomeEvaluation,
             remediationDecision,
             sourceToSinkEvidence,
+            retryEligibility: currentState.retryEligibility,
             traceLogs: traceLogs
         };
+        } catch (err) {
+            const failureCategory = this._classifyPipelineError(err);
+            const failTimeIso = new Date().toISOString();
+            const failedDiagnostics = currentStageNumber === 3 ? baselineValidation : postFixValidation;
+            log('ERROR', `[Stage ${currentStageNumber}] Failed (${failureCategory}): ${err.message}`);
+
+            const prev = this.loadRunState(vulnerabilityId) || existingState || {};
+            const failedState = {
+                ...prev,
+                runId,
+                attemptId,
+                attemptNumber,
+                retryCount,
+                attemptHistory,
+                attemptStartedAt,
+                vulnerabilityId: finding.Vulnerability_ID,
+                applicationNumber: appNum,
+                findingContext,
+                findingSnapshot: minimizedFinding,
+                workspaceTrusted: options.workspaceTrusted !== false,
+                stage: currentStageNumber || prev.stage || 0,
+                status: 'FAILED',
+                failedStage: currentStageNumber || prev.stage || 1,
+                failedStageId: currentStageId,
+                failureCategory,
+                failureReason: err.message,
+                lastFailureAt: failTimeIso,
+                diagnostics: failedDiagnostics || prev.diagnostics || null,
+                isolatedWorkspace: isolatedWorkspace || prev.isolatedWorkspace || null,
+                isolatedTargetFile: sourceFilePath || prev.isolatedTargetFile || null,
+                sourceFilePath: sourceFilePath || prev.sourceFilePath || null,
+                targetRelPath: targetRelPath || prev.targetRelPath || minimizedFinding.Location_Path,
+                classification: classification || prev.classification || null,
+                governance: governance || prev.governance || null,
+                rca: rca || prev.rca || null,
+                baselineValidation: baselineValidation || prev.baselineValidation || null,
+                postFixValidation: postFixValidation || prev.postFixValidation || null,
+                remediationDecision: remediationDecision || prev.remediationDecision || null,
+                sourceToSinkEvidence: sourceToSinkEvidence || prev.sourceToSinkEvidence || null,
+                updatedAt: now()
+            };
+            failedState.retryEligibility = this.evaluateRetryEligibility(failedState, {
+                finding,
+                workspaceTrusted: options.workspaceTrusted,
+                skipActiveRunCheck: true
+            });
+            try {
+                this.saveRunState(finding.Vulnerability_ID, failedState);
+                const errTargetDir = path.join(this.remOutputDir, finding.Vulnerability_ID);
+                if (fs.existsSync(errTargetDir) && traceLogs.length > 0) {
+                    fs.writeFileSync(path.join(errTargetDir, 'agent-execution-trace.log'), traceLogs.join('\n'), 'utf-8');
+                }
+                if (baselineValidation && fs.existsSync(errTargetDir)) {
+                    fs.writeFileSync(path.join(errTargetDir, 'baseline-validation.json'), JSON.stringify(baselineValidation, null, 2), 'utf-8');
+                }
+                if (postFixValidation && fs.existsSync(errTargetDir)) {
+                    fs.writeFileSync(path.join(errTargetDir, 'validation.json'), JSON.stringify(postFixValidation, null, 2), 'utf-8');
+                }
+            } catch {}
+
+            onProgress({
+                type: 'WORKFLOW_FAILED',
+                vulnerabilityId: finding.Vulnerability_ID,
+                runId,
+                attemptId,
+                attemptNumber,
+                retryCount,
+                failedStage: failedState.failedStage,
+                failedStageId: failedState.failedStageId,
+                failureCategory,
+                reason: err.message,
+                diagnostics: failedState.diagnostics,
+                retryEligibility: failedState.retryEligibility
+            });
+
+            throw err;
+        }
     }
 
     _finalizeEvidenceLedger(finding, runState, evidenceContext = {}) {
@@ -1781,6 +2627,9 @@ Return a JSON object with EXACTLY these keys:
         if (evidenceContext?.sbomEvidence?.bom) {
             fs.writeFileSync(path.join(targetDir, 'sbom.cdx.json'), JSON.stringify(evidenceContext.sbomEvidence.bom, null, 2), 'utf-8');
         }
+        if (evidenceContext?.findingContext) {
+            fs.writeFileSync(path.join(targetDir, 'finding-context.json'), JSON.stringify(evidenceContext.findingContext, null, 2), 'utf-8');
+        }
 
         const cleanTitle = (finding.Title || 'finding').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
         const reportFileName = `${cleanTitle}_${id.toLowerCase().replace(/-/g, '_')}.md`;
@@ -1812,16 +2661,19 @@ function generateMarkdownReport(finding, classification, rca, baselineValidation
     lines.push('## Vulnerability Information');
     lines.push(`- **Vulnerability ID**: \`${finding.Vulnerability_ID}\``);
     lines.push(`- **CVE ID**: \`${finding.CVE_ID || 'N/A'}\``);
-    lines.push(`- **Application Number**: \`${finding.Application_Number || 'APP-1000'}\``);
-    lines.push(`- **Application Name**: \`${finding.Application_Name || 'App'}\``);
+    lines.push(`- **Application Number**: \`${finding.Application_Number || 'UNMAPPED'}\``);
+    lines.push(`- **Application Name**: \`${finding.Application_Name || finding.Repository || 'Unknown'}\``);
     lines.push(`- **Severity**: \`${finding.Severity}\``);
     lines.push(`- **Finding Title**: ${finding.Title}`);
     lines.push(`- **Category / Detailed Name**: ${classification?.cwe || finding.Detailed_Name || finding.Title}`);
     lines.push(`- **Location Path**: \`${finding.Location_Path}\``);
     lines.push(`- **Line Number**: ${finding.Line_Number || 1}`);
     lines.push(`- **Source Classification**: \`${classification?.route || finding.Source_Classification || 'SpecializedAction'}\``);
-    lines.push(`- **Technology**: \`${finding.Technology || 'dotnet'}\``);
-    lines.push(`- **Repository**: \`${finding.Repository || 'workspace'}\``);
+    lines.push(`- **Technology**: \`${finding.Technology || 'unknown'}\``);
+    lines.push(`- **Repository**: \`${finding.Repository_Root || finding.Repository || 'UNMAPPED'}\``);
+    if (finding.Scanner_ID) {
+        lines.push(`- **Originating Scanner**: \`${finding.Scanner_ID}\` (Scan ID: \`${finding.Scan_ID || 'N/A'}\`)`);
+    }
     lines.push(`- **Remediation Guidance**: ${finding.Remediation_Guidance || 'Apply secure coding best practices.'}`);
     lines.push('');
 
@@ -1891,7 +2743,13 @@ function generateMarkdownReport(finding, classification, rca, baselineValidation
     if (validation) {
         lines.push('## Post-Fix Test Validation');
         lines.push(`- **Result**: **${validation.status || 'NOT EXECUTED'}** (Exit Code: ${validation.exitCode ?? 'N/A'})`);
-        lines.push(`- **Test Counts**: Total: ${validation.testsTotal || 0}, Passed: ${validation.testsPassed || 0}, Failed: ${validation.testsFailed || 0}`);
+        lines.push(`- **Test Counts**: ${validation.countsKnown === false ? 'Counts Unavailable (Unknown)' : `Total: ${validation.testsTotal || 0}, Passed: ${validation.testsPassed || 0}, Failed: ${validation.testsFailed || 0}, Skipped: ${validation.testsSkipped || 0}`}`);
+        if (validation.command) lines.push(`- **Command**: \`${validation.command}\``);
+        if (validation.repositoryTested) lines.push(`- **Repository Tested**: \`${validation.repositoryTested}\``);
+        if (validation.failureCategory && validation.failureCategory !== 'NONE') lines.push(`- **Failure Category**: \`${validation.failureCategory}\``);
+        if (validation.rootError) lines.push(`- **Root Diagnostic**: ${validation.rootError}`);
+        if (validation.testReportLocation) lines.push(`- **Test Report Artifact**: \`${validation.testReportLocation}\``);
+        if (validation.suggestedNextAction) lines.push(`- **Suggested Next Action**: ${validation.suggestedNextAction}`);
         lines.push(`- **Summary**: ${validation.summary || 'Validation completed'}`);
         lines.push('');
         if (validation.consoleOutput) {

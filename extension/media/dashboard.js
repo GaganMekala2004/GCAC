@@ -148,13 +148,107 @@
         };
     }
 
+    function buildRetryUiState(details, isActiveExecution = false) {
+        const eligibility = details?.retryEligibility || null;
+        const retryCount = Number(details?.retryCount ?? eligibility?.retryCount ?? details?.runState?.retryCount ?? 0);
+        const maxRetries = Number(eligibility?.maxRetries ?? 3);
+        const failedStage = details?.failedStage ?? eligibility?.failedStage ?? details?.runState?.failedStage ?? null;
+        const failedStageTitle = eligibility?.failedStageTitle || (failedStage ? `Failed at Stage ${failedStage}` : 'Validation / Execution Failed');
+        const failureCategory = details?.failureCategory || eligibility?.failureCategory || details?.validation?.failureCategory || '';
+        const failureReason = details?.failureReason || details?.validation?.rootError || details?.validation?.reason || 'Execution did not succeed.';
+
+        if (isActiveExecution) {
+            return {
+                retryCount,
+                maxRetries,
+                failedStage,
+                failedStageTitle,
+                failureCategory,
+                failureReason,
+                retryDisabled: true,
+                canReviseFix: false,
+                unavailableReason: 'Execution is currently active; retry is disabled until the run finishes.'
+            };
+        }
+
+        const retryEligible = eligibility ? Boolean(eligibility.retryEligible) : false;
+        const canReviseFix = eligibility ? Boolean(eligibility.canReviseFix) : (failedStage >= 5);
+        return {
+            retryCount,
+            maxRetries,
+            failedStage,
+            failedStageTitle,
+            failureCategory,
+            failureReason,
+            retryDisabled: !retryEligible,
+            canReviseFix,
+            unavailableReason: retryEligible ? '' : (eligibility?.reason || 'Stage is not eligible for automatic blind retry.')
+        };
+    }
+
+    function computeTestEvidenceSummary(val, sec, currentSbx) {
+        const rawStatus = String(val?.status || '').trim().toUpperCase();
+        const machineStatus = String(val?.machineStatus || '').trim().toUpperCase();
+        const failCat = String(val?.failureCategory || '').trim().toUpperCase();
+
+        const isBlockedOrTimeout = rawStatus === 'BLOCKED' || rawStatus === 'TIMED OUT' || rawStatus === 'CANCELLED'
+            || rawStatus === 'SANDBOX UNAVAILABLE' || machineStatus === 'BLOCKED' || machineStatus === 'TIMED_OUT'
+            || machineStatus === 'CANCELLED' || failCat === 'SANDBOX_UNAVAILABLE' || failCat === 'EXECUTION_BLOCKED'
+            || failCat === 'TIMED_OUT' || failCat === 'CANCELLED';
+        const isNotExecuted = isBlockedOrTimeout || rawStatus === 'NOT EXECUTED' || rawStatus === 'COULD NOT RUN'
+            || machineStatus === 'UNTESTED' || machineStatus === 'COULD_NOT_RUN' || val?.executed === false;
+
+        let statusLabel = rawStatus || (val?.buildResult === 'PASS' ? 'PASS' : 'FAIL');
+        if (failCat === 'SANDBOX_UNAVAILABLE') statusLabel = 'SANDBOX UNAVAILABLE';
+        else if (failCat === 'TIMED_OUT' || val?.timedOut) statusLabel = 'TIMED OUT';
+        else if (failCat === 'CANCELLED' || val?.cancelled) statusLabel = 'CANCELLED';
+        else if (failCat === 'BUILD_FAILED') statusLabel = 'BUILD FAILED';
+        else if (failCat === 'RESTORE_FAILED') statusLabel = 'RESTORE FAILED';
+        else if (failCat === 'NO_TESTS_DISCOVERED') statusLabel = 'NO TESTS DISCOVERED';
+        else if (failCat === 'TEST_TOOL_MISSING') statusLabel = 'TOOL MISSING';
+        else if (failCat === 'PARSE_FAILED') statusLabel = 'PARSE FAILED';
+        else if (failCat === 'EXECUTION_BLOCKED' || machineStatus === 'BLOCKED') statusLabel = 'BLOCKED';
+        else if (isNotExecuted && !statusLabel) statusLabel = 'NOT EXECUTED';
+
+        const countsKnown = val?.countsKnown !== false;
+        const testsPassed = val?.testsPassed ?? 0;
+        const testsFailed = val?.testsFailed ?? 0;
+        const testsSkipped = val?.testsSkipped ?? 0;
+        const testsTotal = val?.testsTotal ?? (testsPassed + testsFailed + testsSkipped);
+        const buildPass = (statusLabel === 'PASS' || machineStatus === 'PASSED') && !isNotExecuted && testsFailed === 0 && testsTotal > 0;
+        const duration = val?.durationMs ? `${(val.durationMs / 1000).toFixed(2)}s` : 'N/A';
+        const score = sec?.score ?? val?.confidenceScore ?? 0;
+
+        return {
+            statusLabel,
+            failCat,
+            isBlockedOrTimeout,
+            isNotExecuted,
+            buildPass,
+            countsKnown,
+            testsPassed,
+            testsFailed,
+            testsSkipped,
+            testsTotal,
+            duration,
+            score,
+            sandboxStatus: val?.sandboxStatus || currentSbx?.sandboxStatus || 'SANDBOX UNAVAILABLE',
+            backendType: val?.backendType || currentSbx?.backendType || 'NONE',
+            profileId: val?.toolchainProfileId || 'Unresolved',
+            networkPolicy: val?.networkPolicy || 'NO_NETWORK',
+            dependencyStatus: val?.dependencyStatus || 'OFFLINE_NO_RESTORE'
+        };
+    }
+
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
             aggregateActivityTrend,
             computeStatusBreakdown,
             aggregateStageDurations,
             normalizeScanProgressEvent,
-            formatScanHistoryEntry
+            formatScanHistoryEntry,
+            buildRetryUiState,
+            computeTestEvidenceSummary
         };
     }
 
@@ -188,8 +282,12 @@
     // Active Target Configuration State
     let currentConfig = {
         activeRepo: '',
+        activeRepoPath: '',
+        activeRepoContext: null,
         activeCsv: '',
-        availableCsvs: []
+        availableCsvs: [],
+        workspaceFolders: [],
+        isWorkspaceTrusted: true
     };
 
     // Cache of loaded details for accurate metrics calculation
@@ -255,6 +353,9 @@
 
     // DOM Elements - Target Context
     const displayRepoName = document.getElementById('displayRepoName');
+    const displayRepoIdentityBadge = document.getElementById('displayRepoIdentityBadge');
+    const workspaceFolderChip = document.getElementById('workspaceFolderChip');
+    const selectWorkspaceFolder = document.getElementById('selectWorkspaceFolder');
     const btnBrowseRepo = document.getElementById('btnBrowseRepo');
     const selectTargetCsv = document.getElementById('selectTargetCsv');
     const btnBrowseCsv = document.getElementById('btnBrowseCsv');
@@ -326,7 +427,11 @@
     const detailTech = document.getElementById('detailTech');
     const detailSla = document.getElementById('detailSla');
     const detailLocation = document.getElementById('detailLocation');
+    const detailProvenance = document.getElementById('detailProvenance');
     const detailGuidance = document.getElementById('detailGuidance');
+    const repoMappingBanner = document.getElementById('repoMappingBanner');
+    const repoMappingReasonText = document.getElementById('repoMappingReasonText');
+    const btnMapFindingRepository = document.getElementById('btnMapFindingRepository');
 
     const btnLaunchCopilot = document.getElementById('btnLaunchCopilot');
     const btnRunRemediation = document.getElementById('btnRunRemediation');
@@ -351,9 +456,15 @@
 
     const failureRecoveryCard = document.getElementById('failureRecoveryCard');
     const failureStageTitle = document.getElementById('failureStageTitle');
+    const failureCategoryBadge = document.getElementById('failureCategoryBadge');
     const failureSummaryText = document.getElementById('failureSummaryText');
+    const retryUnavailableReason = document.getElementById('retryUnavailableReason');
     const btnRetryStage = document.getElementById('btnRetryStage');
+    const btnReviseFix = document.getElementById('btnReviseFix');
+    const btnViewTestEvidence = document.getElementById('btnViewTestEvidence');
+    const btnViewFailureLogs = document.getElementById('btnViewFailureLogs');
     const btnReviewDiffFromFailure = document.getElementById('btnReviewDiffFromFailure');
+    const failureAttemptHistory = document.getElementById('failureAttemptHistory');
 
     const evidenceTabBtns = document.querySelectorAll('.evidence-tabs-header .tab-btn');
     const evidenceTabPanes = document.querySelectorAll('.evidence-tab-panes .tab-pane');
@@ -435,6 +546,7 @@
 
     // DOM Elements - Target Selection & Scan Chooser
     const dashZeroStateBanner = document.getElementById('dashZeroStateBanner');
+    const scanCoverageBanner = document.getElementById('scanCoverageBanner');
     const btnDashScanNow = document.getElementById('btnDashScanNow');
     const selectScanPreset = document.getElementById('selectScanPreset');
     const btnChooseFolder = document.getElementById('btnChooseFolder');
@@ -978,22 +1090,71 @@
             });
         }
 
-        // Failure Recovery Actions
+        // Failure Recovery Actions (Block E)
         if (btnRetryStage) {
             btnRetryStage.addEventListener('click', () => {
-                if (!selectedVulnerability) return;
+                if (!selectedVulnerability || btnRetryStage.disabled || isRemediating) return;
+                const retryState = buildRetryUiState(currentDetails, false);
+                if (retryState.retryDisabled) {
+                    showToast(retryState.unavailableReason || 'Retry is currently unavailable.', 'warning');
+                    return;
+                }
                 isRemediating = true;
+                btnRetryStage.disabled = true;
+                if (btnReviseFix) btnReviseFix.disabled = true;
                 postToHost({
                     command: 'retryStage',
                     vulnerabilityId: selectedVulnerability.Vulnerability_ID,
-                    fromStage: 5
+                    fromStage: retryState.failedStage ?? undefined,
+                    runId: currentDetails?.runId || currentDetails?.runState?.runId || undefined
                 });
             });
+        }
+
+        if (btnReviseFix) {
+            btnReviseFix.addEventListener('click', () => {
+                if (!selectedVulnerability || btnReviseFix.disabled || isRemediating) return;
+                isRemediating = true;
+                if (btnRetryStage) btnRetryStage.disabled = true;
+                btnReviseFix.disabled = true;
+                postToHost({
+                    command: 'reviseFix',
+                    vulnerabilityId: selectedVulnerability.Vulnerability_ID,
+                    runId: currentDetails?.runId || currentDetails?.runState?.runId || undefined
+                });
+            });
+        }
+
+        if (btnViewTestEvidence) {
+            btnViewTestEvidence.addEventListener('click', () => switchEvidenceTab('validation'));
+        }
+
+        if (btnViewFailureLogs) {
+            btnViewFailureLogs.addEventListener('click', () => switchEvidenceTab('trace'));
         }
 
         if (btnReviewDiffFromFailure) {
             btnReviewDiffFromFailure.addEventListener('click', () => {
                 switchEvidenceTab('diff');
+            });
+        }
+
+        if (btnMapFindingRepository) {
+            btnMapFindingRepository.addEventListener('click', () => {
+                if (!selectedVulnerability) return;
+                postToHost({
+                    command: 'mapFindingRepository',
+                    vulnerabilityId: selectedVulnerability.Vulnerability_ID
+                });
+            });
+        }
+
+        if (selectWorkspaceFolder) {
+            selectWorkspaceFolder.addEventListener('change', (e) => {
+                const chosen = e.target.value;
+                if (chosen) {
+                    postToHost({ command: 'selectWorkspaceFolder', folderPath: chosen });
+                }
             });
         }
 
@@ -1126,10 +1287,24 @@
                 case 'CONFIG_UPDATED':
                     currentConfig = {
                         activeRepo: message.activeRepo || '',
+                        activeRepoPath: message.activeRepoPath || '',
+                        activeRepoContext: message.activeRepoContext || null,
                         activeCsv: message.activeCsv || '',
-                        availableCsvs: message.availableCsvs || []
+                        availableCsvs: message.availableCsvs || [],
+                        workspaceFolders: Array.isArray(message.workspaceFolders) ? message.workspaceFolders : [],
+                        isWorkspaceTrusted: message.isWorkspaceTrusted !== false
                     };
                     renderConfigContext();
+                    break;
+
+                case 'REPOSITORY_MAPPING_REQUIRED':
+                    if (repoMappingBanner) {
+                        repoMappingBanner.classList.remove('u-hidden');
+                        if (repoMappingReasonText) {
+                            repoMappingReasonText.textContent = message.reason || 'Map this finding to an authorized local repository before remediation.';
+                        }
+                    }
+                    showToast(message.reason || 'Repository mapping required before remediation.', 'warning');
                     break;
 
                 case 'SANDBOX_STATUS_UPDATED':
@@ -1210,6 +1385,7 @@
                     if (headerRunIndicator) headerRunIndicator.style.display = 'none';
                     if (navActiveRunPulse) navActiveRunPulse.style.display = 'none';
                     if (btnRunRemediationText) btnRunRemediationText.textContent = 'Execute Engine';
+                    if (currentDetails) renderInspectorDetails(currentDetails);
                     showToast(message.error || 'Remediation pipeline error', 'error');
                     break;
 
@@ -1258,13 +1434,37 @@
     function renderConfigContext() {
         const repoBaseName = currentConfig.activeRepo ? currentConfig.activeRepo.split(/[/\\]/).filter(Boolean).pop() : 'Not Set';
         const csvBaseName = currentConfig.activeCsv ? currentConfig.activeCsv.split(/[/\\]/).filter(Boolean).pop() : 'Not Set';
+        const repoCtx = currentConfig.activeRepoContext;
 
         if (displayRepoName) {
             displayRepoName.textContent = repoBaseName;
-            displayRepoName.title = currentConfig.activeRepo || 'No repository selected';
+            displayRepoName.title = currentConfig.activeRepoPath || currentConfig.activeRepo || 'No repository selected';
+        }
+        if (displayRepoIdentityBadge) {
+            if (repoCtx && repoCtx.applicationNumber) {
+                displayRepoIdentityBadge.textContent = `${repoCtx.applicationNumber}${repoCtx.detectedTechnology ? ` • ${repoCtx.detectedTechnology}` : ''}`;
+                displayRepoIdentityBadge.classList.remove('u-hidden');
+            } else if (repoCtx && !repoCtx.supported && repoCtx.unsupportedReason) {
+                displayRepoIdentityBadge.textContent = `${repoCtx.detectedTechnology || 'UNSUPPORTED'}`;
+                displayRepoIdentityBadge.classList.remove('u-hidden');
+            } else {
+                displayRepoIdentityBadge.classList.add('u-hidden');
+            }
+        }
+        if (workspaceFolderChip && selectWorkspaceFolder) {
+            const folders = Array.isArray(currentConfig.workspaceFolders) ? currentConfig.workspaceFolders : [];
+            if (folders.length > 1) {
+                workspaceFolderChip.classList.remove('u-hidden');
+                selectWorkspaceFolder.innerHTML = folders.map(f => {
+                    const isSel = (currentConfig.activeRepoPath || '').toLowerCase() === f.path.toLowerCase();
+                    return `<option value="${escapeHtml(f.path)}" ${isSel ? 'selected' : ''}>${escapeHtml(f.name)}</option>`;
+                }).join('');
+            } else {
+                workspaceFolderChip.classList.add('u-hidden');
+            }
         }
         if (settingsRepoVal) {
-            settingsRepoVal.textContent = currentConfig.activeRepo || 'No repository selected';
+            settingsRepoVal.textContent = currentConfig.activeRepoPath || currentConfig.activeRepo || 'No repository selected';
         }
         if (settingsCsvVal) {
             settingsCsvVal.textContent = currentConfig.activeCsv || 'No CSV selected';
@@ -1285,9 +1485,15 @@
         }
 
         if (targetContextStatusText) {
-            targetContextStatusText.textContent = repoBaseName !== 'Not Set' && csvBaseName !== 'Not Set'
-                ? `Bounded: ${repoBaseName}`
-                : 'Configure Target';
+            if (currentConfig.isWorkspaceTrusted === false) {
+                targetContextStatusText.textContent = 'Restricted Mode (Read-Only)';
+            } else if (repoBaseName !== 'Not Set') {
+                targetContextStatusText.textContent = repoCtx?.applicationNumber
+                    ? `${repoCtx.applicationNumber}: ${repoBaseName}`
+                    : `Bounded: ${repoBaseName}`;
+            } else {
+                targetContextStatusText.textContent = 'Configure Target';
+            }
         }
     }
 
@@ -1296,6 +1502,8 @@
     // --------------------------------------------------------------------------
     function startRemediation(vulnerabilityId) {
         isRemediating = true;
+        if (btnRetryStage) btnRetryStage.disabled = true;
+        if (btnReviseFix) btnReviseFix.disabled = true;
 
         // Update header & buttons
         if (headerRunIndicator) headerRunIndicator.style.display = 'flex';
@@ -1390,6 +1598,22 @@
                 showToast(`Remediation pipeline completed for ${evt.vulnerabilityId}!`, 'success');
                 postToHost({ command: 'requestData' });
                 postToHost({ command: 'loadReports' });
+                if (selectedVulnerability) {
+                    postToHost({ command: 'loadDetails', vulnerabilityId: selectedVulnerability.Vulnerability_ID });
+                }
+                break;
+
+            case 'WORKFLOW_FAILED':
+                isRemediating = false;
+                if (headerRunIndicator) headerRunIndicator.style.display = 'none';
+                if (navActiveRunPulse) navActiveRunPulse.style.display = 'none';
+                if (btnRunRemediationText) btnRunRemediationText.textContent = 'Retry / Inspect';
+                if (activeRunSummaryStage) activeRunSummaryStage.textContent = evt.failedStage ? `Failed at Stage ${evt.failedStage}` : 'Failed';
+                if (activeRunSummaryStatus) activeRunSummaryStatus.textContent = evt.failureCategory || 'Failed';
+                if (evt.failedStage) {
+                    const uiStageIdx = evt.failedStage >= 6 ? 4 : Math.max(0, evt.failedStage - 1);
+                    setStageStatus(uiStageIdx, 'failed', evt.reason || evt.failureCategory || 'Execution failed.');
+                }
                 if (selectedVulnerability) {
                     postToHost({ command: 'loadDetails', vulnerabilityId: selectedVulnerability.Vulnerability_ID });
                 }
@@ -1577,7 +1801,11 @@
         }
 
         if (qualityMetricRetries) {
-            qualityMetricRetries.textContent = 'N/A';
+            let totalRetries = 0;
+            detailsCache.forEach(det => {
+                totalRetries += Number(det?.retryCount ?? det?.runState?.retryCount ?? 0);
+            });
+            qualityMetricRetries.textContent = detailsCache.size > 0 ? String(totalRetries) : 'N/A';
         }
 
         // Update nav counters
@@ -2095,7 +2323,7 @@
                 </td>
                 <td>
                     <div class="u-fw-600 u-text-primary">${escapeHtml(v.Title)}</div>
-                    <div class="u-font-11 u-text-muted u-mt-1">${escapeHtml(v.Detailed_Name || '')}</div>
+                    <div class="u-font-11 u-text-muted u-mt-1">${escapeHtml(v.Detailed_Name || '')}${v.Detection_Method === 'HEURISTIC_PATTERN' ? ' • Heuristic Pattern' : ''}</div>
                 </td>
                 <td>
                     <span class="badge ${sevClass}">${escapeHtml(v.Severity || 'Unknown')}</span>
@@ -2104,8 +2332,8 @@
                     <span class="badge ${sourceBadgeClass}">${escapeHtml(sourceLabel)}</span>
                 </td>
                 <td>
-                    <div class="u-fw-500">${escapeHtml(v.Application_Name || '')}</div>
-                    <div class="u-font-11 u-text-muted u-mono">${escapeHtml(v.Repository ? v.Repository.replace('sample-repos/', '') : '')}</div>
+                    <div class="u-fw-500">${escapeHtml(v.Application_Name || v.Application_Number || 'Unmapped')}</div>
+                    <div class="u-font-11 u-text-muted u-mono">${v.Repository && v.Application_Number ? escapeHtml(v.Repository.replace('sample-repos/', '')) : '<span class="badge badge-warning">Unmapped (SEC-02)</span>'}</div>
                 </td>
                 <td>
                     <div class="font-mono u-font-11 u-text-secondary">${escapeHtml(v.Location_Path || '')}${v.Line_Number ? `:${v.Line_Number}` : ''}</div>
@@ -2153,12 +2381,34 @@
             detailSeverity.textContent = v.Severity;
             detailSeverity.className = `badge ${getSeverityBadgeClass(v.Severity)}`;
         }
-        const isScannerFinding = (v.Source_Type === 'SCANNER' || v.Source_Type === 'scanner');
-        if (detailApp) detailApp.textContent = `${v.Application_Name || ''} (${v.Application_Number || ''})`;
-        if (detailRepo) detailRepo.textContent = v.Repository || 'workspace';
-        if (detailTech) detailTech.textContent = isScannerFinding && v.Scanner_ID ? `${v.Technology || 'dotnet'} (${v.Scanner_ID})` : (v.Technology || 'dotnet');
+        const isScannerFinding = (v.Source_Type === 'SCANNER' || v.Source_Type === 'scanner' || v.Source_Origin === 'LocalScanner');
+        const appNumDisplay = (v.Application_Number || '').trim();
+        const repoDisplay = (v.Repository_Root || v.Repository || '').trim();
+        const missingMapping = !appNumDisplay || !repoDisplay || appNumDisplay.includes(',') || repoDisplay.includes(',');
+        if (detailApp) detailApp.textContent = appNumDisplay ? `${v.Application_Name || repoDisplay.split(/[/\\]/).pop() || ''} (${appNumDisplay})` : 'UNMAPPED (Action Required)';
+        if (detailRepo) detailRepo.textContent = repoDisplay || 'UNMAPPED';
+        const techDisplay = v.Technology || 'unknown';
+        if (detailTech) detailTech.textContent = isScannerFinding && v.Scanner_ID ? `${techDisplay} (${v.Scanner_ID})` : techDisplay;
         if (detailSla) detailSla.textContent = v.SLA_Status || 'In SLA';
         if (detailLocation) detailLocation.textContent = `${v.Location_Path || ''} ${v.Line_Number ? `(Line ${v.Line_Number})` : ''}`;
+        if (detailProvenance) {
+            const provParts = [];
+            if (v.Scanner_ID) provParts.push(`Scanner: ${v.Scanner_ID}`);
+            if (v.Scan_ID) provParts.push(`Scan: ${v.Scan_ID}`);
+            if (v.Detection_Method) provParts.push(`Method: ${v.Detection_Method}`);
+            if (v.Package_Name) provParts.push(`Pkg: ${v.Package_Name}${v.Current_Version ? '@' + v.Current_Version : ''}`);
+            detailProvenance.textContent = provParts.length > 0 ? provParts.join(' • ') : (v.Source_Origin || 'CSV Record');
+        }
+        if (repoMappingBanner) {
+            if (missingMapping) {
+                repoMappingBanner.classList.remove('u-hidden');
+                if (repoMappingReasonText) {
+                    repoMappingReasonText.textContent = `Finding '${v.Vulnerability_ID}' lacks validated Application_Number/Repository metadata (SEC-02). Map a local repository to enable Copilot/Pipeline execution.`;
+                }
+            } else {
+                repoMappingBanner.classList.add('u-hidden');
+            }
+        }
         if (detailGuidance) {
             if (v.Remediation_Guidance) {
                 detailGuidance.textContent = v.Remediation_Guidance;
@@ -2196,7 +2446,10 @@
         if (activeRunSummaryStage) activeRunSummaryStage.textContent = isRemediating ? 'Executing 7-Stage Pipeline' : (v.Remediation_Status || 'Ready');
         if (activeRunSummaryFiles) activeRunSummaryFiles.textContent = v.Files_Changed ? v.Files_Changed.split(';').length + ' File(s)' : (v.Location_Path ? '1 File' : '--');
         if (activeRunSummaryTests) activeRunSummaryTests.textContent = v.Test_Status || (v.Final_Validation_Status === 'PASS' ? 'PASS (1/1)' : 'Pending');
-        if (activeRunSummaryRetries) activeRunSummaryRetries.textContent = '0 of 3';
+        const cached = detailsCache.get(v.Vulnerability_ID);
+        const rCount = Number(cached?.retryCount ?? cached?.runState?.retryCount ?? 0);
+        const rMax = Number(cached?.retryEligibility?.maxRetries ?? 3);
+        if (activeRunSummaryRetries) activeRunSummaryRetries.textContent = `${rCount} of ${rMax}`;
         if (activeRunSummaryStatus) activeRunSummaryStatus.textContent = v.Remediation_Status || 'Ready';
         if (activeRunSandboxBackend && currentSandboxState) {
             activeRunSandboxBackend.textContent = currentSandboxState.sandboxAvailable
@@ -2356,10 +2609,62 @@
             }
 
             if (finalGateCard) finalGateCard.style.display = showGate6 ? 'flex' : 'none';
+            const hasFailedRunState = details.runState && (details.runState.status === 'FAILED' || details.runState.status === 'INTERRUPTED' || Boolean(details.failedStage));
+            const showFailurePanel = hasFailure || hasFailedRunState;
+            const retryState = buildRetryUiState(details, isRemediating);
+            if (activeRunSummaryRetries) {
+                activeRunSummaryRetries.textContent = `${retryState.retryCount} of ${retryState.maxRetries}`;
+            }
+
             if (failureRecoveryCard) {
-                failureRecoveryCard.style.display = hasFailure ? 'flex' : 'none';
-                if (hasFailure && failureStageTitle) {
-                    failureStageTitle.textContent = 'Validation Failed at Stage 5 (Bench Testing)';
+                failureRecoveryCard.style.display = showFailurePanel ? 'flex' : 'none';
+                if (showFailurePanel) {
+                    if (failureStageTitle) {
+                        failureStageTitle.textContent = retryState.failedStageTitle;
+                    }
+                    if (failureCategoryBadge) {
+                        failureCategoryBadge.textContent = retryState.failureCategory || 'FAILED';
+                    }
+                    if (failureSummaryText) {
+                        failureSummaryText.textContent = retryState.failureReason;
+                    }
+                    if (btnRetryStage) {
+                        btnRetryStage.disabled = retryState.retryDisabled;
+                        btnRetryStage.title = retryState.retryDisabled
+                            ? (retryState.unavailableReason || 'Retry unavailable')
+                            : `Retry Stage ${retryState.failedStage || ''} (${retryState.retryCount}/${retryState.maxRetries} used)`;
+                    }
+                    if (retryUnavailableReason) {
+                        if (retryState.retryDisabled && retryState.unavailableReason) {
+                            retryUnavailableReason.textContent = retryState.unavailableReason;
+                            retryUnavailableReason.classList.remove('u-hidden');
+                        } else if (!retryState.retryDisabled) {
+                            retryUnavailableReason.textContent = `Retry ${retryState.retryCount + 1} of ${retryState.maxRetries} ready for Stage ${retryState.failedStage || ''}.`;
+                            retryUnavailableReason.classList.remove('u-hidden');
+                        } else {
+                            retryUnavailableReason.classList.add('u-hidden');
+                        }
+                    }
+                    if (btnReviseFix) {
+                        btnReviseFix.disabled = isRemediating;
+                        if (retryState.canReviseFix) {
+                            btnReviseFix.classList.remove('u-hidden');
+                        } else {
+                            btnReviseFix.classList.add('u-hidden');
+                        }
+                    }
+                    if (failureAttemptHistory) {
+                        const history = Array.isArray(details.attemptHistory) ? details.attemptHistory : [];
+                        if (history.length > 0) {
+                            failureAttemptHistory.classList.remove('u-hidden');
+                            failureAttemptHistory.innerHTML = '<div class="u-fw-600 u-mb-4">Preserved Attempt History:</div>' +
+                                history.slice(-3).map(h =>
+                                    `<div class="attempt-history-item"><span>Attempt #${escapeHtml(String(h.attemptNumber || '?'))} (Stage ${escapeHtml(String(h.failedStage || h.stageReached || '?'))})</span><span>${escapeHtml(h.failureCategory || h.status || 'FAILED')}</span></div>`
+                                ).join('');
+                        } else {
+                            failureAttemptHistory.classList.add('u-hidden');
+                        }
+                    }
                 }
             }
         }
@@ -2403,68 +2708,76 @@
 
     function renderTestEvidenceView(details) {
         if (!valContent) return;
-        const val = details.validation;
-        const sec = details.securityReview;
+        const val = details.validation || details.diagnostics || null;
+        const baseVal = details.baselineValidation || null;
+        const reScan = details.reScanVerification || null;
+        const sec = details.securityReview || null;
 
-        if (!val && !sec) {
-            valContent.innerHTML = '<div class="empty-state"><p>Validation evidence pending Stage 5 Bench Testing execution.</p></div>';
+        if (!val && !baseVal && !sec) {
+            valContent.innerHTML = '<div class="empty-state"><p>Validation evidence pending Stage 3/6 Testing execution.</p></div>';
             return;
         }
 
+        const primaryVal = val || baseVal;
+        const summary = computeTestEvidenceSummary(primaryVal, sec, currentSandboxState);
         const sbx = details.sandboxExecution || null;
         const sbom = details.sbomEvidence || null;
-        const sandboxBadgeText = val?.sandboxStatus || sbx?.sandboxStatus || (currentSandboxState?.sandboxStatus || 'SANDBOX UNAVAILABLE');
-        const backendText = val?.backendType || sbx?.backendType || (currentSandboxState?.backendType || 'NONE');
-        const profileText = val?.toolchainProfileId || sbx?.toolchainProfileId || 'Unresolved';
-        const networkText = val?.networkPolicy || sbx?.networkPolicy || 'NO_NETWORK';
-        const depText = val?.dependencyStatus || sbx?.dependencyStatus || 'OFFLINE_NO_RESTORE';
+        const sandboxBadgeText = primaryVal?.sandboxStatus || sbx?.sandboxStatus || summary.sandboxStatus;
+        const backendText = primaryVal?.backendType || sbx?.backendType || summary.backendType;
+        const profileText = primaryVal?.toolchainProfileId || sbx?.toolchainProfileId || summary.profileId;
+        const networkText = primaryVal?.networkPolicy || sbx?.networkPolicy || summary.networkPolicy;
+        const depText = primaryVal?.dependencyStatus || sbx?.dependencyStatus || summary.dependencyStatus;
 
-        const isBlockedOrTimeout = testStatus === 'BLOCKED' || testStatus === 'TIMED OUT' || testStatus === 'CANCELLED' || testStatus === 'SANDBOX UNAVAILABLE';
-        const isNotExecuted = isBlockedOrTimeout || val?.status === 'NOT EXECUTED' || val?.executed === false;
-        const testStatusLabel = isBlockedOrTimeout ? testStatus : (isNotExecuted ? 'NOT EXECUTED' : (val?.status || (val?.buildResult === 'PASS' ? 'PASS' : 'FAIL')));
-        const buildPass = testStatusLabel === 'PASS';
-        const testsPassed = val?.testsPassed ?? 0;
-        const testsFailed = val?.testsFailed ?? 0;
-        const duration = val?.durationMs ? `${(val.durationMs / 1000).toFixed(2)}s` : 'N/A';
-        const score = sec?.score ?? val?.confidenceScore ?? 0;
-        const statusColorClass = buildPass ? 'u-text-success' : (isNotExecuted ? 'u-text-warning' : 'u-text-danger');
-        const scoreTextClass = score >= 90 ? 'u-text-success' : (score >= 70 ? 'u-text-warning' : 'u-text-danger');
-        const scoreBgClass = score >= 90 ? 'legend-bg-success' : (score >= 70 ? 'legend-bg-warning' : 'legend-bg-danger');
+        const statusColorClass = summary.buildPass ? 'u-text-success' : (summary.isNotExecuted ? 'u-text-warning' : 'u-text-danger');
+        const scoreTextClass = summary.score >= 90 ? 'u-text-success' : (summary.score >= 70 ? 'u-text-warning' : 'u-text-danger');
+        const scoreBgClass = summary.score >= 90 ? 'legend-bg-success' : (summary.score >= 70 ? 'legend-bg-warning' : 'legend-bg-danger');
+        const countsUnavailable = summary.isNotExecuted || !summary.countsKnown;
+        const exitCodeDisplay = (primaryVal?.exitCode !== null && primaryVal?.exitCode !== undefined) ? String(primaryVal.exitCode) : 'N/A';
 
         valContent.innerHTML = `
             <div class="evidence-dashboard">
                 <div class="test-metric-row">
                     <div class="test-metric-card">
                         <div class="test-metric-label">Execution Status</div>
-                        <div class="test-metric-val u-font-13 ${statusColorClass}">${escapeHtml(testStatusLabel)}</div>
+                        <div class="test-metric-val u-font-13 ${statusColorClass}">${escapeHtml(summary.statusLabel)}</div>
                     </div>
                     <div class="test-metric-card">
                         <div class="test-metric-label">Tests Passed</div>
-                        <div class="test-metric-val u-text-success">${isNotExecuted ? 'N/A' : testsPassed}</div>
+                        <div class="test-metric-val u-text-success">${countsUnavailable ? 'Unknown' : summary.testsPassed}</div>
                     </div>
                     <div class="test-metric-card">
                         <div class="test-metric-label">Tests Failed</div>
-                        <div class="test-metric-val ${testsFailed > 0 ? 'u-text-danger' : 'u-text-muted'}">${isNotExecuted ? 'N/A' : testsFailed}</div>
+                        <div class="test-metric-val ${summary.testsFailed > 0 ? 'u-text-danger' : 'u-text-muted'}">${countsUnavailable ? 'Unknown' : summary.testsFailed}</div>
                     </div>
                     <div class="test-metric-card">
-                        <div class="test-metric-label">Duration</div>
-                        <div class="test-metric-val">${duration}</div>
+                        <div class="test-metric-label">Duration / Exit</div>
+                        <div class="test-metric-val">${escapeHtml(summary.duration)} (${escapeHtml(exitCodeDisplay)})</div>
                     </div>
+                </div>
+
+                <div class="diagnostic-detail-grid">
+                    <div><strong>Stage &amp; Phase:</strong> <code>${escapeHtml(primaryVal?.stage || (val ? 'Stage 6: Post-Fix Bench Test' : 'Stage 3: Baseline Security Test'))}</code> (${escapeHtml(primaryVal?.testPhase || 'POST_FIX_TEST')})</div>
+                    <div><strong>Command:</strong> <code>${escapeHtml(primaryVal?.command || 'N/A')}</code> | <strong>Repository / Project:</strong> <code>${escapeHtml(primaryVal?.repositoryTested || primaryVal?.workingDirectory || 'N/A')}</code></div>
+                    <div><strong>Failure Category:</strong> <code>${escapeHtml(summary.failCat || 'NONE')}</code> | <strong>Retry Eligible:</strong> <code>${primaryVal?.retryEligible === true ? 'YES' : 'NO'}</code></div>
+                    ${(primaryVal?.rootError || primaryVal?.reason) ? `<div class="u-text-danger u-mt-4"><strong>Root Diagnostic:</strong> ${escapeHtml(primaryVal.rootError || primaryVal.reason)}</div>` : ''}
+                    ${primaryVal?.testReportLocation ? `<div><strong>Test Report Artifact:</strong> <code>${escapeHtml(primaryVal.testReportLocation)}</code></div>` : ''}
+                    ${primaryVal?.suggestedNextAction ? `<div class="u-text-warning u-mt-4"><strong>Suggested Next Action:</strong> ${escapeHtml(primaryVal.suggestedNextAction)}</div>` : ''}
+                    ${baseVal && val ? `<div class="u-mt-4"><strong>Baseline vs Post-Fix:</strong> Baseline=<code>${escapeHtml(baseVal.status || 'N/A')}</code> (${escapeHtml(String(baseVal.testsPassed ?? 0))} passed / ${escapeHtml(String(baseVal.testsFailed ?? 0))} failed) → Post-Fix=<code>${escapeHtml(summary.statusLabel)}</code></div>` : ''}
+                    ${reScan ? `<div><strong>Post-Fix Re-Scan Verification:</strong> <code>${escapeHtml(reScan.status || 'NOT VERIFIED')}</code> — ${escapeHtml(reScan.reason || '')}</div>` : ''}
                 </div>
 
                 <div class="sandbox-meta-strip">
                     <div><strong>Execution Backend:</strong> <code>${escapeHtml(sandboxBadgeText)}</code> (<code>${escapeHtml(backendText)}</code>) | <strong>Toolchain Profile:</strong> <code>${escapeHtml(profileText)}</code></div>
                     <div><strong>Network Policy:</strong> <code>${escapeHtml(networkText)}</code> | <strong>Dependency Policy:</strong> <code>${escapeHtml(depText)}</code>${sbom ? ` | <strong>SBOM:</strong> <code>${escapeHtml(sbom.format || 'CycloneDX/1.5')}</code> (${escapeHtml(sbom.sbomStatus || 'NOT_AVAILABLE')})` : ''}</div>
-                    ${(val?.timedOut || val?.cancelled || val?.reason) && isNotExecuted ? `<div class="u-text-warning"><strong>Execution Notice:</strong> ${escapeHtml(val.reason || 'Validation could not run inside approved sandbox.')}</div>` : ''}
                 </div>
 
                 <div class="score-meter-wrap">
                     <div class="score-meter-label">
                         <span class="u-fw-600">Autonomous Validation Confidence Score</span>
-                        <span class="u-fw-700 ${scoreTextClass}">${score} / 100</span>
+                        <span class="u-fw-700 ${scoreTextClass}">${summary.score} / 100</span>
                     </div>
                     <div class="score-bar-bg">
-                        <div class="score-bar-fill ${scoreBgClass}" data-bar-width="${score}%"></div>
+                        <div class="score-bar-fill ${scoreBgClass}" data-bar-width="${summary.score}%"></div>
                     </div>
                 </div>
 
@@ -2482,10 +2795,10 @@
                     </div>
                 ` : ''}
 
-                ${val?.consoleOutput ? `
+                ${(primaryVal?.stderr || primaryVal?.consoleOutput) ? `
                     <div class="u-mt-8">
-                        <div class="evidence-label-sm">Runner Console Output</div>
-                        <pre class="console-output-pre">${escapeHtml(val.consoleOutput)}</pre>
+                        <div class="evidence-label-sm">Runner Output &amp; Error Diagnostics</div>
+                        <pre class="console-output-pre">${escapeHtml(primaryVal.stderr || primaryVal.consoleOutput)}</pre>
                     </div>
                 ` : ''}
             </div>
@@ -2733,7 +3046,25 @@
             if (scanProgressCard) scanProgressCard.style.display = 'none';
         }, 3000);
 
-        showToast(`Scan completed: ${count} findings discovered`, 'success');
+        const resObj = data.result || {};
+        const scanStatus = data.status || resObj.status || 'Completed';
+        const unverified = Boolean(data.unverifiedCoverage || resObj.unverifiedCoverage || (resObj.errors && resObj.errors.length > 0));
+        if (scanCoverageBanner) {
+            if (scanStatus === 'No Scannable Inputs' || scanStatus === 'Unsupported Repository') {
+                scanCoverageBanner.className = 'scan-coverage-banner';
+                scanCoverageBanner.textContent = `${scanStatus}: ${resObj.unsupportedReason || 'Target repository contains no supported non-empty source files or manifests. Zero synthetic findings generated.'}`;
+            } else if (unverified) {
+                scanCoverageBanner.className = 'scan-coverage-banner error';
+                const errMsgs = (resObj.errors || []).map(e => `${e.scannerId}: ${e.message}`).join(' | ');
+                scanCoverageBanner.textContent = `Incomplete Scan Coverage (${scanStatus}): ${errMsgs || 'One or more scanners failed; 0 findings cannot be treated as clean.'}`;
+            } else {
+                scanCoverageBanner.className = 'scan-coverage-banner u-hidden';
+                scanCoverageBanner.textContent = '';
+            }
+        }
+
+        const toastSeverity = unverified ? 'warning' : (scanStatus === 'No Scannable Inputs' ? 'info' : 'success');
+        showToast(`Scan finished (${scanStatus}): ${count} finding(s) discovered`, toastSeverity);
         postToHost({ command: 'getScanHistory' });
         postToHost({ command: 'requestData' });
     }

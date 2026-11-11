@@ -9,6 +9,26 @@ const fs = require('fs');
  * @param {string} workspaceRoot Allowed workspace root directory
  * @returns {string|null} Canonical absolute path if valid and contained, null if rejected
  */
+function resolveCanonicalWithExistingAncestor(targetPath) {
+    const resolved = path.resolve(targetPath);
+    const canonFn = typeof fs.realpathSync.native === 'function' ? fs.realpathSync.native : fs.realpathSync;
+    if (fs.existsSync(resolved)) {
+        return canonFn(resolved);
+    }
+    const suffixParts = [];
+    let probe = resolved;
+    while (probe && !fs.existsSync(probe)) {
+        const parent = path.dirname(probe);
+        if (parent === probe) break;
+        suffixParts.unshift(path.basename(probe));
+        probe = parent;
+    }
+    if (probe && fs.existsSync(probe)) {
+        return path.join(canonFn(probe), ...suffixParts);
+    }
+    return resolved;
+}
+
 function assertPathWithinWorkspace(candidatePath, workspaceRoot) {
     if (!candidatePath || typeof candidatePath !== 'string' || !workspaceRoot) {
         return null;
@@ -19,29 +39,17 @@ function assertPathWithinWorkspace(candidatePath, workspaceRoot) {
         ? path.resolve(candidatePath)
         : path.resolve(resolvedWs, candidatePath);
 
-    // Relative containment check
-    const rel = path.relative(resolvedWs, resolvedPath);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
-        return null;
-    }
-
-    // Check realpath if file/dir exists to guard against symlink escapes
     try {
-        if (fs.existsSync(resolvedPath)) {
-            const realPath = fs.realpathSync(resolvedPath);
-            let realWs = resolvedWs;
-            try { realWs = fs.realpathSync(resolvedWs); } catch (e) {}
-            const realRel = path.relative(realWs, realPath);
-            if (realRel.startsWith('..') || path.isAbsolute(realRel)) {
-                return null;
-            }
-            return realPath;
+        const realWs = resolveCanonicalWithExistingAncestor(resolvedWs);
+        const realPath = resolveCanonicalWithExistingAncestor(resolvedPath);
+        const realRel = path.relative(realWs, realPath);
+        if (realRel.startsWith('..') || path.isAbsolute(realRel)) {
+            return null;
         }
+        return realPath;
     } catch (e) {
         return null;
     }
-
-    return resolvedPath;
 }
 
 module.exports = {

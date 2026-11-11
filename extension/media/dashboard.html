@@ -214,7 +214,13 @@
                         </svg>
                         <span class="target-label">Target Repo:</span>
                         <span class="target-value" id="displayRepoName">Scanning workspace...</span>
+                        <span class="target-identity-badge u-hidden" id="displayRepoIdentityBadge">UNMAPPED</span>
                         <button class="btn-target-browse" id="btnBrowseRepo">Change</button>
+                    </div>
+
+                    <div class="target-chip csv-chip u-hidden" id="workspaceFolderChip" title="Multi-Root Workspace Folder">
+                        <span class="target-label">Workspace:</span>
+                        <select class="target-csv-select" id="selectWorkspaceFolder" aria-label="Select Workspace Folder"></select>
                     </div>
 
                     <div class="target-divider"></div>
@@ -622,6 +628,14 @@
                                         <span class="badge" id="detailSeverity">--</span>
                                     </div>
 
+                                    <div class="repo-mapping-banner u-hidden" id="repoMappingBanner">
+                                        <div>
+                                            <strong>Repository / Application Identity Required (SEC-02):</strong>
+                                            <span id="repoMappingReasonText">Map this finding to an authorized local repository before remediation.</span>
+                                        </div>
+                                        <button class="btn btn-primary btn-sm" id="btnMapFindingRepository">Map Repository...</button>
+                                    </div>
+
                                     <div class="detail-meta-grid">
                                         <div class="meta-item">
                                             <span class="meta-label">Application</span>
@@ -642,6 +656,10 @@
                                         <div class="meta-item full-width">
                                             <span class="meta-label">File &amp; Line</span>
                                             <span class="meta-val font-mono" id="detailLocation">--</span>
+                                        </div>
+                                        <div class="meta-item full-width">
+                                            <span class="meta-label">Provenance &amp; Scan Context</span>
+                                            <span class="meta-val font-mono" id="detailProvenance">--</span>
                                         </div>
                                     </div>
 
@@ -758,16 +776,21 @@
                                             </svg>
                                             <span id="failureStageTitle">Remediation could not be completed</span>
                                         </div>
-                                        <span class="badge badge-status-failed">Failed</span>
+                                        <span class="badge badge-status-failed" id="failureCategoryBadge">Failed</span>
                                     </div>
                                     <div class="failure-body" id="failureSummaryText">
                                         Validation tests failed during stage execution.
                                     </div>
+                                    <div class="retry-reason-note u-hidden" id="retryUnavailableReason"></div>
                                     <div class="failure-actions">
                                         <button class="btn btn-primary btn-sm" id="btnRetryStage">Retry Stage</button>
+                                        <button class="btn btn-warning btn-sm u-hidden" id="btnReviseFix">Review Failure / Revise Fix</button>
+                                        <button class="btn btn-secondary btn-sm" id="btnViewTestEvidence">Test Diagnostics</button>
+                                        <button class="btn btn-secondary btn-sm" id="btnViewFailureLogs">View Agent Log</button>
                                         <button class="btn btn-secondary btn-sm" id="btnReviewDiffFromFailure">Review
                                             Changes</button>
                                     </div>
+                                    <div class="attempt-history-list u-hidden" id="failureAttemptHistory"></div>
                                 </div>
 
                                 <!-- Evidence Tabs -->
@@ -1033,6 +1056,9 @@
                                 <div class="scan-progress-bar-fill scan-progress-init" id="scanProgressBarFill"></div>
                             </div>
                         </div>
+
+                        <!-- Scan Coverage / Empty / Unsupported Warning Banner -->
+                        <div class="scan-coverage-banner u-hidden" id="scanCoverageBanner"></div>
 
                         <!-- Target Selection & File Chooser -->
                         <div class="scan-scope-card" id="scanTargetSelectionCard">

@@ -6,12 +6,18 @@ const { OUTCOME_STATUS } = require('../../outcomeContract');
 const { SANDBOX_READINESS, discoverEnvironment } = require('../../sandbox/environmentDiscovery');
 const { EXECUTION_POLICY_VERSION, OPERATION_TYPES, TrustedExecutionGateway } = require('../../sandbox/trustedExecutionGateway');
 const { resolveProfileForRepository } = require('../../sandbox/toolchainProfiles');
-const { resolveDotnetProjectFile } = require('../dotnetProjectLocator');
+const { resolveDotnetProjectFile, hasDotnetPackageDependencies } = require('../dotnetProjectLocator');
+
+function extractAdvisoryId(advisoryUrl = '') {
+    const m = String(advisoryUrl || '').match(/(?:GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}|CVE-\d{4}-\d{4,7})/i);
+    return m ? m[0].toUpperCase() : null;
+}
 
 /**
  * NuGet Dependency Auditing Scanner Adapter
  * Detects known vulnerabilities in direct and transitive NuGet package references.
- * Strictly respects offline boundaries and reports AUDIT UNAVAILABLE when feeds are inaccessible.
+ * Strictly respects offline boundaries, never fabricates CVEs/versions,
+ * and reports AUDIT UNAVAILABLE when feeds are inaccessible.
  */
 class NuGetAuditScanner extends ScannerAdapter {
     constructor() {
@@ -57,9 +63,9 @@ class NuGetAuditScanner extends ScannerAdapter {
      * Parses output from `dotnet list package --vulnerable --include-transitive`
      * Handles text table format and checks for feed accessibility failures.
      */
-    parseAuditOutput(stdout, stderr, targetFile, workspaceRoot, scanId) {
-        const combined = stdout + '\n' + stderr;
-        
+    parseAuditOutput(stdout, stderr, targetFile, workspaceRoot, scanId, meta = {}) {
+        const combined = (stdout || '') + '\n' + (stderr || '');
+
         // Detect inaccessible vulnerability audit sources
         const feedErrors = [
             'error NU1900',
@@ -85,39 +91,58 @@ class NuGetAuditScanner extends ScannerAdapter {
 
         const findings = [];
         const lines = combined.split('\n');
+        const effectiveRoot = meta.repositoryRoot || workspaceRoot;
 
         // Pattern: > PackageName   Requested   Resolved   Severity   Advisory URL
-        const pkgLineRegex = />\s+([A-Za-z0-9_.-]+)\s+(\S+)\s+(\S+)\s+(Critical|High|Moderate|Low)\s+(\S+)/i;
+        const pkgLineRegex = />\s+([A-Za-z0-9_.-]+)\s+(\S+)\s+(\S+)\s+(Critical|High|Moderate|Low)\s+(https?:\/\/\S+)/i;
 
         for (const line of lines) {
             const match = line.trim().match(pkgLineRegex);
-            if (match) {
-                const [, packageName, requestedVer, resolvedVer, severityStr, advisoryUrl] = match;
-                
-                let relPath = targetFile;
-                if (path.isAbsolute(targetFile)) {
-                    relPath = path.relative(workspaceRoot, targetFile);
-                }
+            if (!match) continue;
 
-                const finding = new NormalizedFinding({
-                    scanId,
-                    scannerId: this.id,
-                    scannerVersion: this.version,
-                    ruleId: 'NU1901',
-                    title: `Vulnerable Dependency: ${packageName} (${resolvedVer})`,
-                    description: `Package '${packageName}' version ${resolvedVer} contains known security vulnerabilities according to NuGet audit data. Advisory: ${advisoryUrl}`,
-                    severity: severityStr.toUpperCase() === 'MODERATE' ? SEVERITY_LEVELS.MEDIUM : severityStr,
-                    cwe: 'CWE-1395',
-                    confidence: 'High',
-                    filePath: relPath.replace(/\\/g, '/'),
-                    line: 1,
-                    evidence: `Package: ${packageName}, Version: ${resolvedVer}, Severity: ${severityStr}, Advisory: ${advisoryUrl}`,
-                    remediationGuidance: `Upgrade package reference '${packageName}' in ${path.basename(targetFile)} to a patched non-vulnerable version.`,
-                    classificationType: 'CONFIRMED_RULE_VIOLATION'
-                });
+            const [, packageName, requestedVer, resolvedVer, severityStr, advisoryUrl] = match;
+            if (!packageName || !resolvedVer || !advisoryUrl) continue;
 
-                findings.push(finding);
+            let relPath = targetFile || '';
+            if (path.isAbsolute(relPath) && effectiveRoot) {
+                relPath = path.relative(effectiveRoot, relPath);
             }
+            relPath = relPath.replace(/\\/g, '/');
+            if (!relPath) continue;
+
+            const advisoryId = extractAdvisoryId(advisoryUrl);
+            const finding = new NormalizedFinding({
+                scanId,
+                scannerId: this.id,
+                scannerVersion: this.version,
+                ruleId: advisoryId || 'NU1901',
+                title: `Vulnerable Dependency: ${packageName} (${resolvedVer})`,
+                description: `Package '${packageName}' resolved version ${resolvedVer} (requested ${requestedVer}) has a published NuGet security advisory: ${advisoryUrl}`,
+                severity: severityStr.toUpperCase() === 'MODERATE' ? SEVERITY_LEVELS.MEDIUM : severityStr,
+                cwe: 'CWE-1395',
+                confidence: 'High',
+                detectionMethod: 'NUGET_ADVISORY_DATA',
+                filePath: relPath,
+                line: 1,
+                evidence: `Package: ${packageName}, Requested: ${requestedVer}, Resolved: ${resolvedVer}, Severity: ${severityStr}, Advisory: ${advisoryUrl}`,
+                evidenceRef: `${relPath}:1`,
+                remediationGuidance: `Upgrade package reference '${packageName}' in ${path.basename(relPath)} to a patched non-vulnerable version verified against ${advisoryUrl}.`,
+                classificationType: 'CONFIRMED_RULE_VIOLATION',
+                packageName,
+                currentVersion: resolvedVer,
+                fixedVersion: '', // Never invent unverified fixed versions
+                advisoryUrl,
+                repository: meta.repository || '',
+                repositoryRoot: meta.repositoryRoot || '',
+                canonicalRepositoryId: meta.canonicalRepositoryId || '',
+                projectPath: meta.projectPath || relPath,
+                applicationNumber: meta.applicationNumber || '',
+                applicationName: meta.applicationName || '',
+                applicationIdentitySource: meta.applicationIdentitySource || '',
+                technology: 'dotnet'
+            });
+
+            findings.push(finding);
         }
 
         return {
@@ -130,17 +155,21 @@ class NuGetAuditScanner extends ScannerAdapter {
     /**
      * Parses JSON format from `dotnet list package --vulnerable --format json` where supported
      */
-    parseJsonAuditOutput(jsonContent, targetFile, workspaceRoot, scanId) {
+    parseJsonAuditOutput(jsonContent, targetFile, workspaceRoot, scanId, meta = {}) {
         const findings = [];
         try {
             const parsed = typeof jsonContent === 'string' ? JSON.parse(jsonContent) : jsonContent;
             const projects = parsed.projects || [];
+            const effectiveRoot = meta.repositoryRoot || workspaceRoot;
+
             for (const proj of projects) {
                 const projPath = proj.path || targetFile;
-                let relPath = projPath;
-                if (path.isAbsolute(projPath)) {
-                    relPath = path.relative(workspaceRoot, projPath);
+                let relPath = projPath || '';
+                if (path.isAbsolute(relPath) && effectiveRoot) {
+                    relPath = path.relative(effectiveRoot, relPath);
                 }
+                relPath = relPath.replace(/\\/g, '/');
+                if (!relPath) continue;
 
                 const frameworks = proj.frameworks || [];
                 for (const fw of frameworks) {
@@ -151,20 +180,37 @@ class NuGetAuditScanner extends ScannerAdapter {
                     for (const pkg of allPkgs) {
                         const vulns = pkg.vulnerabilities || [];
                         for (const vuln of vulns) {
+                            const advUrl = vuln.advisoryUrl || vuln.advisoryurl;
+                            if (!pkg.id || !pkg.resolvedVersion || !advUrl) continue;
+                            const advisoryId = extractAdvisoryId(advUrl);
                             const finding = new NormalizedFinding({
                                 scanId,
                                 scannerId: this.id,
                                 scannerVersion: this.version,
-                                ruleId: 'NU1901',
+                                ruleId: advisoryId || 'NU1901',
                                 title: `Vulnerable Dependency: ${pkg.id} (${pkg.resolvedVersion})`,
-                                description: `Package '${pkg.id}' contains security advisory: ${vuln.advisoryUrl || 'Known vulnerability'}`,
+                                description: `Package '${pkg.id}' version ${pkg.resolvedVersion} contains security advisory: ${advUrl}`,
                                 severity: vuln.severity || SEVERITY_LEVELS.HIGH,
                                 cwe: 'CWE-1395',
                                 confidence: 'High',
-                                filePath: relPath.replace(/\\/g, '/'),
+                                detectionMethod: 'NUGET_ADVISORY_DATA',
+                                filePath: relPath,
                                 line: 1,
-                                evidence: `Package: ${pkg.id}, Resolved: ${pkg.resolvedVersion}, Severity: ${vuln.severity}, Advisory: ${vuln.advisoryUrl}`,
-                                remediationGuidance: `Upgrade package '${pkg.id}' to a secure version.`
+                                evidence: `Package: ${pkg.id}, Resolved: ${pkg.resolvedVersion}, Severity: ${vuln.severity || 'High'}, Advisory: ${advUrl}`,
+                                evidenceRef: `${relPath}:1`,
+                                remediationGuidance: `Upgrade package '${pkg.id}' to a secure version verified against ${advUrl}.`,
+                                packageName: pkg.id,
+                                currentVersion: pkg.resolvedVersion,
+                                fixedVersion: '',
+                                advisoryUrl: advUrl,
+                                repository: meta.repository || '',
+                                repositoryRoot: meta.repositoryRoot || '',
+                                canonicalRepositoryId: meta.canonicalRepositoryId || '',
+                                projectPath: meta.projectPath || relPath,
+                                applicationNumber: meta.applicationNumber || '',
+                                applicationName: meta.applicationName || '',
+                                applicationIdentitySource: meta.applicationIdentitySource || '',
+                                technology: 'dotnet'
                             });
                             findings.push(finding);
                         }
@@ -180,18 +226,48 @@ class NuGetAuditScanner extends ScannerAdapter {
         const startTime = Date.now();
 
         const projectDir = targetPath || workspaceRoot;
-        const projectFile = resolveDotnetProjectFile(workspaceRoot, projectDir);
+        if (!projectDir || !fs.existsSync(projectDir)) {
+            return {
+                scannerId: this.id,
+                status: SCANNER_STATUS.FAILED,
+                executionPolicy: 'SANDBOX_GATEWAY',
+                findings: [],
+                durationMs: Date.now() - startTime,
+                errors: [`Target path does not exist: '${projectDir}'.`],
+                warnings: [],
+                coverage: '0% (Target path missing)'
+            };
+        }
+
+        const repoContext = options.repoContext || {};
+        const boundaryRoot = repoContext.repositoryRoot || workspaceRoot;
+        const projectFile = resolveDotnetProjectFile(boundaryRoot, projectDir);
 
         if (!projectFile) {
             return {
                 scannerId: this.id,
-                status: SCANNER_STATUS.COMPLETED,
+                status: SCANNER_STATUS.NO_SCANNABLE_INPUTS,
+                noScannableInputs: true,
                 executionPolicy: 'SANDBOX_GATEWAY',
                 findings: [],
                 durationMs: Date.now() - startTime,
                 errors: [],
                 warnings: ['No .NET project or solution found for dependency auditing.'],
-                coverage: '0% (No project detected)'
+                coverage: '0% (No .NET project detected)'
+            };
+        }
+
+        if (!hasDotnetPackageDependencies(projectFile)) {
+            return {
+                scannerId: this.id,
+                status: SCANNER_STATUS.NO_SCANNABLE_INPUTS,
+                noScannableInputs: true,
+                executionPolicy: 'SANDBOX_GATEWAY',
+                findings: [],
+                durationMs: Date.now() - startTime,
+                errors: [],
+                warnings: ['Target .NET manifest declares zero NuGet PackageReference/packages.config entries.'],
+                coverage: '0% (Empty dependency manifest — 0 packages declared)'
             };
         }
 
@@ -220,9 +296,10 @@ class NuGetAuditScanner extends ScannerAdapter {
             };
         }
 
+        const effectiveAppId = repoContext.applicationNumber || options.applicationId || 'UNMAPPED-LOCAL';
         const req = {
             runId: options.runId || scanId,
-            applicationId: options.applicationId || 'APP-NUGET',
+            applicationId: effectiveAppId,
             vulnerabilityId: options.vulnerabilityId || 'VUL-NUGET',
             workspaceRef: projectDirRoot,
             operation: OPERATION_TYPES.NUGET_AUDIT,
@@ -243,13 +320,15 @@ class NuGetAuditScanner extends ScannerAdapter {
 
         const gwRes = await gateway.executeOperation(req, {
             ...options,
-            originalWorkspaceRoot: workspaceRoot
+            originalWorkspaceRoot: boundaryRoot
         });
 
-        if (!gwRes.executed || gwRes.machineStatus === OUTCOME_STATUS.BLOCKED || gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
+        if (!gwRes.executed || gwRes.timedOut || gwRes.cancelled ||
+            gwRes.machineStatus === OUTCOME_STATUS.BLOCKED ||
+            gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
             return {
                 scannerId: this.id,
-                status: SCANNER_STATUS.FAILED,
+                status: gwRes.cancelled ? SCANNER_STATUS.CANCELLED : SCANNER_STATUS.FAILED,
                 sandboxStatus: gwRes.sandboxStatus || SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
                 executionPolicy: 'SANDBOX_GATEWAY',
                 networkPolicy: gwRes.networkPolicy || 'NO_NETWORK',
@@ -261,7 +340,18 @@ class NuGetAuditScanner extends ScannerAdapter {
             };
         }
 
-        const parsed = this.parseAuditOutput(gwRes.stdout || '', gwRes.stderr || '', projectFile, workspaceRoot, scanId);
+        const effectiveRepoRoot = repoContext.repositoryRoot || projectDirRoot;
+        const meta = {
+            repository: repoContext.repository || effectiveRepoRoot,
+            repositoryRoot: effectiveRepoRoot,
+            canonicalRepositoryId: repoContext.canonicalRepositoryId || '',
+            projectPath: path.relative(effectiveRepoRoot, projectFile).replace(/\\/g, '/'),
+            applicationNumber: repoContext.applicationNumber || '',
+            applicationName: repoContext.applicationName || '',
+            applicationIdentitySource: repoContext.applicationIdentitySource || ''
+        };
+
+        const parsed = this.parseAuditOutput(gwRes.stdout || '', gwRes.stderr || '', projectFile, effectiveRepoRoot, scanId, meta);
         if (parsed.inaccessible) {
             return {
                 scannerId: this.id,

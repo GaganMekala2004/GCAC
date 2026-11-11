@@ -6,6 +6,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const { assertPathWithinWorkspace } = require('./pathUtils');
+const { assertPathWithinAuthorizedRoots, isUninitializedGitSubmodule } = require('./repositoryContext');
 
 const EXCLUDED_CONFIDENTIAL_PATTERNS = [
     /(?:^|[\\/])vulnerability[\\/]vulnerabilities\.csv$/i,
@@ -63,12 +64,24 @@ class IsolatedWorkspaceManager {
             throw new IsolatedWorkspaceBlockedError('workspaceRoot is required.');
         }
         this.workspaceRoot = canonicalExistingPath(workspaceRoot);
+        const rawAuth = Array.isArray(options.authorizedRoots) ? options.authorizedRoots : [];
+        this.authorizedRoots = Array.from(new Set([
+            this.workspaceRoot,
+            ...rawAuth.filter(r => typeof r === 'string' && r.trim()).map(r => canonicalExistingPath(r))
+        ]));
         const wsHash = crypto.createHash('sha256').update(this.workspaceRoot, 'utf8').digest('hex').slice(0, 12);
         const rawRunsRoot = options.runsRoot
             ? path.resolve(options.runsRoot)
             : path.join(os.tmpdir(), 'gcac-isolated-runs', wsHash);
         fs.mkdirSync(rawRunsRoot, { recursive: true });
         this.runsRoot = canonicalExistingPath(rawRunsRoot);
+    }
+
+    setAuthorizedRoots(roots = []) {
+        this.authorizedRoots = Array.from(new Set([
+            this.workspaceRoot,
+            ...(Array.isArray(roots) ? roots : []).filter(r => typeof r === 'string' && r.trim()).map(r => canonicalExistingPath(r))
+        ]));
     }
 
     _runGit(cwd, args) {
@@ -114,16 +127,24 @@ class IsolatedWorkspaceManager {
             throw new IsolatedWorkspaceBlockedError('Remote repository URLs and empty paths are prohibited; local workspace repository required.');
         }
 
-        // 2. Validate workspace & resolve approved repository root inside workspaceRoot
+        // 2. Validate workspace & resolve approved repository root inside authorized roots
         if (!fs.existsSync(this.workspaceRoot) || !fs.statSync(this.workspaceRoot).isDirectory()) {
             throw new IsolatedWorkspaceBlockedError(`Workspace root does not exist: ${this.workspaceRoot}`);
         }
-        const rawRepoAbs = canonicalExistingPath(path.isAbsolute(repositoryPath)
-            ? repositoryPath
-            : path.resolve(this.workspaceRoot, repositoryPath));
-        const safeRepoAbs = assertPathWithinWorkspace(rawRepoAbs, this.workspaceRoot);
+        const effectiveAllowedRoots = Array.from(new Set([
+            ...this.authorizedRoots,
+            ...(Array.isArray(params.authorizedRoots) ? params.authorizedRoots.map(r => canonicalExistingPath(r)) : [])
+        ]));
+        const authRepoMatch = assertPathWithinAuthorizedRoots(repositoryPath, effectiveAllowedRoots);
+        const safeRepoAbs = authRepoMatch ? authRepoMatch.canonicalPath : null;
+        const matchedAuthorizedRoot = authRepoMatch ? authRepoMatch.authorizedRoot : this.workspaceRoot;
+
         if (!safeRepoAbs || !fs.existsSync(safeRepoAbs) || !fs.statSync(safeRepoAbs).isDirectory()) {
             throw new IsolatedWorkspaceBlockedError(`Repository path '${repositoryPath}' is missing or outside workspace boundary.`);
+        }
+
+        if (isUninitializedGitSubmodule(safeRepoAbs, matchedAuthorizedRoot)) {
+            throw new IsolatedWorkspaceBlockedError(`Repository '${repositoryPath}' is an uninitialized Git submodule / gitlink without checked-out source files.`);
         }
 
         // 3. Verify Git repository state without running fetch/push/reset/clean
@@ -131,13 +152,13 @@ class IsolatedWorkspaceManager {
         let baseCommitSha;
         try {
             gitTopLevel = canonicalExistingPath(this._runGit(safeRepoAbs, ['rev-parse', '--show-toplevel']));
-            const safeGitTop = assertPathWithinWorkspace(gitTopLevel, this.workspaceRoot);
-            if (!safeGitTop) {
+            const safeGitTopMatch = assertPathWithinAuthorizedRoots(gitTopLevel, effectiveAllowedRoots);
+            if (!safeGitTopMatch) {
                 throw new IsolatedWorkspaceBlockedError(
-                    `Ambiguous Git root '${gitTopLevel}' sits outside approved workspace root '${this.workspaceRoot}'.`
+                    `Ambiguous Git root '${gitTopLevel}' sits outside approved workspace/repository root.`
                 );
             }
-            gitTopLevel = safeGitTop;
+            gitTopLevel = safeGitTopMatch.canonicalPath;
             baseCommitSha = this._runGit(gitTopLevel, ['rev-parse', '--verify', 'HEAD']);
         } catch (err) {
             if (err instanceof IsolatedWorkspaceBlockedError) throw err;

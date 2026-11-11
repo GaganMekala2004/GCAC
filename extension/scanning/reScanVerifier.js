@@ -196,6 +196,7 @@ class ReScanVerifier {
             reScanResult.status === SCANNER_STATUS.UNAVAILABLE ||
             reScanResult.status === SCANNER_STATUS.NOT_INSTALLED ||
             reScanResult.status === SCANNER_STATUS.CANCELLED;
+        const scanNoInputs = reScanResult.status === SCANNER_STATUS.NO_SCANNABLE_INPUTS || reScanResult.noScannableInputs === true;
         const scanHasErrors = Array.isArray(reScanResult.errors) && reScanResult.errors.length > 0;
 
         // 1. Check if the original finding is still present (matching fingerprint OR matching ruleId + target file)
@@ -230,6 +231,9 @@ class ReScanVerifier {
         if (scanFailed) {
             machineStatus = OUTCOME_STATUS.NOT_VERIFIED;
             explanation = `Originating scanner '${scanner.name}' ended in status '${reScanResult.status}': ${(reScanResult.errors || []).join('; ') || 'Scan incomplete.'}`;
+        } else if (scanNoInputs) {
+            machineStatus = OUTCOME_STATUS.INCONCLUSIVE;
+            explanation = `Originating scanner '${scanner.name}' found no scannable non-empty inputs at target during re-scan; cannot certify RESOLVED.`;
         } else if (scanHasErrors) {
             machineStatus = OUTCOME_STATUS.INCONCLUSIVE;
             explanation = `Originating scanner '${scanner.name}' reported errors during re-scan: ${reScanResult.errors.join('; ')}`;

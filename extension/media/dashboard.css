@@ -3551,3 +3551,82 @@ body.theme-dark .nav-item.active svg {
 .sandbox-prereq-list:empty {
     display: none;
 }
+
+.target-identity-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--accent-subtle);
+    color: var(--accent-text);
+    margin-left: 4px;
+}
+
+.repo-mapping-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--warning-border);
+    background: var(--warning-subtle);
+    color: var(--text-primary);
+    font-size: 11px;
+}
+
+.scan-coverage-banner {
+    padding: 9px 12px;
+    margin-bottom: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--warning-border);
+    background: var(--warning-subtle);
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.scan-coverage-banner.error {
+    border-color: var(--danger-border);
+    background: var(--danger-subtle);
+}
+
+.retry-reason-note {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+.attempt-history-list {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border-subtle);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.attempt-history-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 0;
+}
+
+.diagnostic-detail-grid {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface-subtle);
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    word-break: break-word;
+}
+
+.btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}

@@ -145,20 +145,28 @@ function verifyAgentConfigurationIntegrity(options = {}) {
         throw new AgentConfigIntegrityError('Valid workspaceRoot is required for agent configuration verification.', 'INVALID_WORKSPACE');
     }
 
-    const hasGithubDir = fs.existsSync(path.join(workspaceRoot, '.github'));
-    const hasGitDir = fs.existsSync(path.join(workspaceRoot, '.git'));
+    const hasGithubAgents = fs.existsSync(path.join(workspaceRoot, '.github', 'agents'));
+    const hasGithubCopilotInstr = fs.existsSync(path.join(workspaceRoot, '.github', 'copilot-instructions.md'));
+    const hasGithubDir = hasGithubAgents || hasGithubCopilotInstr;
     const mustVerifyWorkspaceFiles = strictWorkspaceCheck !== null
         ? strictWorkspaceCheck === true
-        : (hasGithubDir || hasGitDir);
+        : hasGithubDir;
+
+    // For external repositories without .github agent configs, verify the extensionRoot baseline instead
+    const baselineCheckRoot = mustVerifyWorkspaceFiles
+        ? workspaceRoot
+        : ((extensionRoot && (fs.existsSync(path.join(extensionRoot, '.github', 'agents')) || fs.existsSync(path.join(extensionRoot, '.github', 'copilot-instructions.md'))))
+            ? extensionRoot
+            : null);
 
     const verifiedAgents = [];
     const forbiddenTools = new Set((manifest.forbiddenTools || []).map(t => String(t).toLowerCase()));
     const injectionScreen = new ContentInjectionScreen();
 
-    if (mustVerifyWorkspaceFiles) {
+    if (baselineCheckRoot) {
         // 1. Verify shared instruction file
         const sharedRel = manifest.sharedInstructionPath || '.github/copilot-instructions.md';
-        const sharedAbs = assertPathWithinWorkspace(path.join(workspaceRoot, sharedRel), workspaceRoot);
+        const sharedAbs = assertPathWithinWorkspace(path.join(baselineCheckRoot, sharedRel), baselineCheckRoot);
         if (!sharedAbs || !fs.existsSync(sharedAbs) || fs.lstatSync(sharedAbs).isSymbolicLink()) {
             throw new AgentConfigIntegrityError(
                 `Required shared instruction file '${sharedRel}' is missing, symlinked, or escapes workspace.`,
@@ -178,7 +186,7 @@ function verifyAgentConfigurationIntegrity(options = {}) {
         const expectedFilesSet = new Set();
         for (const agentSpec of manifest.agents) {
             expectedFilesSet.add(path.basename(agentSpec.filePath));
-            const agentAbs = assertPathWithinWorkspace(path.join(workspaceRoot, agentSpec.filePath), workspaceRoot);
+            const agentAbs = assertPathWithinWorkspace(path.join(baselineCheckRoot, agentSpec.filePath), baselineCheckRoot);
             if (!agentAbs || !fs.existsSync(agentAbs) || fs.lstatSync(agentAbs).isSymbolicLink()) {
                 throw new AgentConfigIntegrityError(
                     `Approved agent definition '${agentSpec.filePath}' is missing, symlinked, or outside workspace.`,
@@ -240,7 +248,7 @@ function verifyAgentConfigurationIntegrity(options = {}) {
         }
 
         // 3. Reject unexpected unapproved *.agent.md files in .github/agents/
-        const agentsDir = assertPathWithinWorkspace(path.join(workspaceRoot, '.github', 'agents'), workspaceRoot);
+        const agentsDir = assertPathWithinWorkspace(path.join(baselineCheckRoot, '.github', 'agents'), baselineCheckRoot);
         if (agentsDir && fs.existsSync(agentsDir)) {
             const diskAgents = fs.readdirSync(agentsDir).filter(f => f.endsWith('.agent.md'));
             for (const diskFile of diskAgents) {

@@ -8,21 +8,36 @@ const { ScanController } = require('../extension/scanning/scanController');
 const { FindingsStore } = require('../extension/scanning/findingsStore');
 const { ReScanVerifier } = require('../extension/scanning/reScanVerifier');
 const { assertPathWithinWorkspace } = require('../extension/pathUtils');
+const {
+    canonicalizePath,
+    assertPathWithinAuthorizedRoots,
+    inspectRepositoryTarget,
+    RepositoryContextRegistry
+} = require('../extension/repositoryContext');
+const { buildCopilotRemediationPrompt, resolveSourceFilePath: resolveAuthorizedSourceFilePath } = require('../extension/extension');
 
 let PORT = 3000;
 const workspaceRoot = path.resolve(__dirname, '..');
 const csvPath = path.join(workspaceRoot, 'vulnerability', 'vulnerabilities.csv');
 const mediaDir = path.join(workspaceRoot, 'extension', 'media');
 
+const registry = new RepositoryContextRegistry({ workspaceRoot, extensionRoot: workspaceRoot });
 const findingsStore = new FindingsStore(workspaceRoot);
-const scanController = new ScanController(workspaceRoot, { findingsStore });
+const scanController = new ScanController(workspaceRoot, { findingsStore, registry });
 
-const reScanVerifier = new ReScanVerifier(workspaceRoot, scanController);
-const engine = new RemediationEngine(workspaceRoot, null, { findingsStore, reScanVerifier });
+const reScanVerifier = new ReScanVerifier(scanController);
+const engine = new RemediationEngine(workspaceRoot, null, { findingsStore, reScanVerifier, registry });
 
 let hasUserInitiatedScan = false;
 let activeScanTarget = '';
+let activeRepoContext = null;
 let activeCsv = null;
+
+function getPreviewAuthorizedRoots() {
+    const roots = new Set([canonicalizePath(workspaceRoot)]);
+    for (const r of registry.getAllAuthorizedRepositoryRoots()) roots.add(r);
+    return Array.from(roots);
+}
 
 function isLoopbackHostHeader(hostHeader) {
     if (!hostHeader || typeof hostHeader !== 'string') return true;
@@ -56,48 +71,7 @@ function sendBlockedPreviewAction(res) {
  */
 function resolveSourceFilePath(repository, targetPath) {
     if (!targetPath || typeof targetPath !== 'string' || targetPath.includes('\0')) return null;
-
-    // 1. Direct path
-    const directRel = repository ? path.join(repository, targetPath) : targetPath;
-    const directCandidate = path.isAbsolute(directRel) ? directRel : path.join(workspaceRoot, directRel);
-    const safeDirect = assertPathWithinWorkspace(directCandidate, workspaceRoot);
-    if (safeDirect && fs.existsSync(safeDirect) && fs.statSync(safeDirect).isFile()) {
-        return safeDirect;
-    }
-
-    // 2. Relative to workspace
-    const safeWs = assertPathWithinWorkspace(path.join(workspaceRoot, targetPath), workspaceRoot);
-    if (safeWs && fs.existsSync(safeWs) && fs.statSync(safeWs).isFile()) {
-        return safeWs;
-    }
-
-    // 3. Search within repository folder for the base filename
-    const repoBaseCandidate = repository ? path.join(workspaceRoot, repository) : workspaceRoot;
-    const safeRepoBase = assertPathWithinWorkspace(repoBaseCandidate, workspaceRoot);
-    if (safeRepoBase && fs.existsSync(safeRepoBase) && fs.statSync(safeRepoBase).isDirectory()) {
-        const targetFilename = path.basename(targetPath).toLowerCase();
-        const findRecursive = (dir) => {
-            try {
-                const entries = fs.readdirSync(dir, { withFileTypes: true });
-                for (const entry of entries) {
-                    if (entry.name === 'bin' || entry.name === 'obj' || entry.name === 'node_modules' || entry.name === '.git') continue;
-                    const full = path.join(dir, entry.name);
-                    if (entry.isFile() && entry.name.toLowerCase() === targetFilename) {
-                        return assertPathWithinWorkspace(full, workspaceRoot);
-                    }
-                    if (entry.isDirectory()) {
-                        const res = findRecursive(full);
-                        if (res) return res;
-                    }
-                }
-            } catch (e) { }
-            return null;
-        };
-        const found = findRecursive(safeRepoBase);
-        if (found) return found;
-    }
-
-    return null;
+    return resolveAuthorizedSourceFilePath(workspaceRoot, repository, targetPath, getPreviewAuthorizedRoots());
 }
 
 const server = http.createServer(async (req, res) => {
@@ -145,8 +119,13 @@ const server = http.createServer(async (req, res) => {
                                     window.postMessage({
                                         type: 'CONFIG_UPDATED',
                                         activeRepo: cfg.activeRepo,
+                                        activeRepoPath: cfg.activeRepoPath,
+                                        activeRepoContext: cfg.activeRepoContext,
                                         activeCsv: cfg.activeCsv,
-                                        availableCsvs: cfg.availableCsvs
+                                        availableCsvs: cfg.availableCsvs,
+                                        workspaceFolders: cfg.workspaceFolders,
+                                        isWorkspaceTrusted: cfg.isWorkspaceTrusted,
+                                        hasScanned: cfg.hasScanned
                                     }, '*');
                                 });
                         } else if (msg.command === 'getSandboxStatus') {
@@ -238,17 +217,37 @@ const server = http.createServer(async (req, res) => {
                                     }
                                 });
                         } else if (msg.command === 'launchCopilot') {
-                            window.postMessage({
-                                type: 'COPILOT_LAUNCHED',
-                                prompt: '@vulnerability-orchestrator /remediate-vulnerability ' + msg.vulnerabilityId,
-                                vulnerabilityId: msg.vulnerabilityId,
-                                title: msg.title
-                            }, '*');
-                            window.postMessage({
-                                type: 'ACTION_FEEDBACK',
-                                text: 'Copilot command prepared: @vulnerability-orchestrator /remediate-vulnerability ' + msg.vulnerabilityId,
-                                status: 'info'
-                            }, '*');
+                            fetch('/api/copilot-prompt?id=' + encodeURIComponent(msg.vulnerabilityId || ''))
+                                .then(r => r.json())
+                                .then(res => {
+                                    if (!res.ok) {
+                                        window.postMessage({
+                                            type: 'REPOSITORY_MAPPING_REQUIRED',
+                                            vulnerabilityId: msg.vulnerabilityId,
+                                            reasonCode: res.reasonCode,
+                                            reason: res.reason
+                                        }, '*');
+                                        window.postMessage({ type: 'ACTION_FEEDBACK', text: res.reason, status: 'warning' }, '*');
+                                        return;
+                                    }
+                                    window.postMessage({
+                                        type: 'COPILOT_LAUNCHED',
+                                        prompt: res.query,
+                                        vulnerabilityId: msg.vulnerabilityId,
+                                        title: msg.title,
+                                        findingContext: res.context
+                                    }, '*');
+                                    window.postMessage({ type: 'ACTION_FEEDBACK', text: 'Copilot command prepared: ' + res.query, status: 'info' }, '*');
+                                });
+                        } else if (msg.command === 'retryStage' || msg.command === 'reviseFix' || msg.command === 'mapFindingRepository') {
+                            fetch('/api/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: msg.vulnerabilityId }) })
+                                .then(r => r.json()).then(res => {
+                                    window.postMessage({ type: 'ACTION_FEEDBACK', text: res.error, status: 'error' }, '*');
+                                });
+                        } else if (msg.command === 'getCodeqlStatus') {
+                            fetch('/api/codeql-status')
+                                .then(r => r.json())
+                                .then(st => { window.postMessage({ type: 'CODEQL_STATUS', ...st }, '*'); });
                         } else if (msg.command === 'getScanners') {
                             fetch('/api/scanners')
                                 .then(r => r.json())
@@ -355,15 +354,57 @@ const server = http.createServer(async (req, res) => {
         const available = [
             { fsPath: csvPath, relPath: path.relative(workspaceRoot, csvPath), name: path.basename(csvPath) }
         ];
+        const targetAbs = activeScanTarget
+            ? (path.isAbsolute(activeScanTarget) ? activeScanTarget : path.resolve(workspaceRoot, activeScanTarget))
+            : workspaceRoot;
+        const ctx = activeRepoContext || (fs.existsSync(targetAbs) ? inspectRepositoryTarget(targetAbs, workspaceRoot, registry) : null);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             activeRepo: activeScanTarget || workspaceRoot,
+            activeRepoPath: targetAbs,
+            activeRepoContext: ctx,
             activeCsv: activeCsv || '',
             availableCsvs: available,
+            workspaceFolders: [{ name: path.basename(workspaceRoot), path: canonicalizePath(workspaceRoot) }],
+            isWorkspaceTrusted: true,
             hasScanned: hasUserInitiatedScan,
             simulationMode: true,
             securityNotice: 'Browser preview runs in read-only local mode; remediation approvals and CSV mutations are disabled.'
         }));
+        return;
+    }
+
+    if (url.pathname === '/api/codeql-status') {
+        try {
+            const { CodeQLScanner } = require('../extension/scanning/adapters/codeqlScanner');
+            const codeqlScanner = new CodeQLScanner();
+            const avail = await codeqlScanner.isAvailable(workspaceRoot, workspaceRoot);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ available: avail.available, version: avail.version || '', binaryPath: avail.binaryPath || '', reason: avail.reason || '' }));
+        } catch (err) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ available: false, reason: err.message }));
+        }
+        return;
+    }
+
+    if (url.pathname === '/api/copilot-prompt') {
+        const id = url.searchParams.get('id') || '';
+        const csvData = (activeCsv && fs.existsSync(activeCsv)) ? loadVulnerabilities(activeCsv) : [];
+        const scanned = findingsStore.getFindings({ includeHistorical: true }).map(f => f.toCsvCompatibleRecord ? f.toCsvCompatibleRecord() : f);
+        const all = [...csvData, ...scanned];
+        const found = all.find(f => f.Vulnerability_ID === id);
+        if (!found) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, reasonCode: 'NOT_FOUND', reason: `Finding '${id}' not found.` }));
+            return;
+        }
+        const promptRes = buildCopilotRemediationPrompt(found, activeCsv || '', {
+            authorizedRoots: getPreviewAuthorizedRoots(),
+            registry
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(promptRes));
         return;
     }
 
@@ -411,10 +452,11 @@ const server = http.createServer(async (req, res) => {
                 const body = JSON.parse(bodyStr || '{}');
                 const rawTarget = body.targetRepo || body.targetPath || activeScanTarget || workspaceRoot;
                 const candidate = path.isAbsolute(rawTarget) ? rawTarget : path.resolve(workspaceRoot, rawTarget);
-                const safeTarget = assertPathWithinWorkspace(candidate, workspaceRoot);
+                const matchTarget = assertPathWithinAuthorizedRoots(candidate, getPreviewAuthorizedRoots());
+                const safeTarget = matchTarget ? matchTarget.canonicalPath : null;
                 if (!safeTarget) {
                     res.writeHead(403, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Access denied: scan target outside workspace boundary.' }));
+                    res.end(JSON.stringify({ error: 'Access denied: scan target outside authorized workspace or repository roots.' }));
                     return;
                 }
                 const summary = await scanController.startScan({
@@ -423,6 +465,7 @@ const server = http.createServer(async (req, res) => {
                 });
                 hasUserInitiatedScan = true;
                 activeScanTarget = safeTarget;
+                activeRepoContext = summary.repositoryContext || inspectRepositoryTarget(safeTarget, workspaceRoot, registry);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(summary));
             } catch (err) {
@@ -436,6 +479,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/scan/clear' && req.method === 'POST') {
         hasUserInitiatedScan = false;
         activeScanTarget = '';
+        activeRepoContext = null;
         activeCsv = null;
         findingsStore.clearFindings();
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -451,20 +495,26 @@ const server = http.createServer(async (req, res) => {
                 const body = JSON.parse(bodyStr || '{}');
                 const rel = body.targetPath || '.';
                 const candidate = path.isAbsolute(rel) ? rel : path.resolve(workspaceRoot, rel);
-                const fullPath = assertPathWithinWorkspace(candidate, workspaceRoot);
+                const matchTarget = assertPathWithinAuthorizedRoots(candidate, getPreviewAuthorizedRoots());
+                const fullPath = matchTarget ? matchTarget.canonicalPath : null;
                 if (!fullPath) {
                     res.writeHead(403, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Access denied: scan target outside workspace boundary.' }));
+                    res.end(JSON.stringify({ error: 'Access denied: scan target outside authorized workspace or repository roots.' }));
                     return;
                 }
-                const normalizedRel = path.relative(workspaceRoot, fullPath).replace(/\\/g, '/') || '.';
+                const normalizedRel = assertPathWithinWorkspace(fullPath, workspaceRoot)
+                    ? (path.relative(workspaceRoot, fullPath).replace(/\\/g, '/') || '.')
+                    : fullPath;
                 activeScanTarget = normalizedRel;
+                activeRepoContext = inspectRepositoryTarget(fullPath, workspaceRoot, registry);
                 const isFolder = fs.existsSync(fullPath) ? fs.statSync(fullPath).isDirectory() : true;
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     targetPath: normalizedRel,
+                    canonicalPath: fullPath,
                     isFolder: isFolder,
-                    displayName: path.basename(fullPath) || 'Workspace'
+                    displayName: path.basename(fullPath) || 'Workspace',
+                    repoContext: activeRepoContext
                 }));
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -488,7 +538,10 @@ const server = http.createServer(async (req, res) => {
             return;
         }
         const csvData = (activeCsv && fs.existsSync(activeCsv)) ? loadVulnerabilities(activeCsv) : [];
-        const scanned = findingsStore.getFindings();
+        const scanned = findingsStore.getFindings({
+            repositoryRoot: activeRepoContext?.canonicalRepositoryPath || undefined,
+            includeHistorical: false
+        });
         const adapted = scanned.map(f => f.toCsvCompatibleRecord ? f.toCsvCompatibleRecord() : f);
         const combined = [...csvData, ...adapted];
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -499,6 +552,16 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/details') {
         const id = url.searchParams.get('id');
         const details = loadVulnerabilityDetails(workspaceRoot, id);
+        const liveState = engine.loadRunState(id);
+        if (details && liveState) {
+            details.runState = liveState;
+            details.runId = liveState.runId || details.runId || null;
+            details.failedStage = liveState.failedStage ?? details.failedStage ?? null;
+            details.failureCategory = liveState.failureCategory || details.failureCategory || null;
+            details.failureReason = liveState.failureReason || details.failureReason || null;
+            details.diagnostics = liveState.diagnostics || details.diagnostics || details.validation || null;
+            details.retryEligibility = engine.evaluateRetryEligibility(liveState, { workspaceTrusted: true });
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(details));
         return;
@@ -576,15 +639,16 @@ const server = http.createServer(async (req, res) => {
         const relTargetCheck = targetPath
             ? (path.isAbsolute(targetPath) ? targetPath : path.resolve(workspaceRoot, targetPath))
             : null;
+        const authRoots = getPreviewAuthorizedRoots();
         if (
             !targetPath ||
-            (candidateCheck && !assertPathWithinWorkspace(candidateCheck, workspaceRoot)) ||
-            (relTargetCheck && !assertPathWithinWorkspace(relTargetCheck, workspaceRoot))
+            (candidateCheck && !assertPathWithinAuthorizedRoots(candidateCheck, authRoots)) ||
+            (relTargetCheck && !assertPathWithinAuthorizedRoots(relTargetCheck, authRoots))
         ) {
             res.writeHead(403, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 success: false,
-                error: 'Access denied: source path outside active workspace boundary.'
+                error: 'Access denied: source path outside authorized workspace or repository roots.'
             }));
             return;
         }

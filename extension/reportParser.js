@@ -62,6 +62,20 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
         remediationDecision: null,
         sourceToSinkEvidence: null,
         injectionScreening: null,
+        runState: null,
+        baselineValidation: null,
+        reScanVerification: null,
+        findingContext: null,
+        runId: null,
+        attemptId: null,
+        attemptNumber: 0,
+        retryCount: 0,
+        attemptHistory: [],
+        failedStage: null,
+        failedStageId: null,
+        failureCategory: null,
+        failureReason: null,
+        retryEligibility: null,
         stages: [
             {
                 id: 'classification',
@@ -171,32 +185,32 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
 
             const reportPath = path.join(dir, 'remediation-report.md');
             if (fs.existsSync(reportPath) && !details.reportMarkdown) {
-                try { details.reportMarkdown = fs.readFileSync(reportPath, 'utf-8'); } catch (e) {}
+                try { details.reportMarkdown = fs.readFileSync(reportPath, 'utf-8'); } catch (e) { }
             }
 
             const patchPath = path.join(dir, 'changes.patch');
             if (fs.existsSync(patchPath) && !details.patchDiff) {
-                try { details.patchDiff = fs.readFileSync(patchPath, 'utf-8'); } catch (e) {}
+                try { details.patchDiff = fs.readFileSync(patchPath, 'utf-8'); } catch (e) { }
             }
 
             const findingPath = path.join(dir, 'finding.json');
             if (fs.existsSync(findingPath) && !details.finding) {
-                try { details.finding = JSON.parse(fs.readFileSync(findingPath, 'utf-8')); } catch (e) {}
+                try { details.finding = JSON.parse(fs.readFileSync(findingPath, 'utf-8')); } catch (e) { }
             }
 
             const classPath = path.join(dir, 'classification.json');
             if (fs.existsSync(classPath) && !details.classification) {
-                try { details.classification = JSON.parse(fs.readFileSync(classPath, 'utf-8')); } catch (e) {}
+                try { details.classification = JSON.parse(fs.readFileSync(classPath, 'utf-8')); } catch (e) { }
             }
 
             const valPath = path.join(dir, 'validation.json');
             if (fs.existsSync(valPath) && !details.validation) {
-                try { details.validation = JSON.parse(fs.readFileSync(valPath, 'utf-8')); } catch (e) {}
+                try { details.validation = JSON.parse(fs.readFileSync(valPath, 'utf-8')); } catch (e) { }
             }
 
             const sbxPath = path.join(dir, 'sandbox-execution.json');
             if (fs.existsSync(sbxPath) && !details.sandboxExecution) {
-                try { details.sandboxExecution = JSON.parse(fs.readFileSync(sbxPath, 'utf-8')); } catch (e) {}
+                try { details.sandboxExecution = JSON.parse(fs.readFileSync(sbxPath, 'utf-8')); } catch (e) { }
             }
 
             const sbomPath = path.join(dir, 'sbom.cdx.json');
@@ -211,37 +225,76 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
                         externalSbomCliStatus: getProp('gcac:externalSbomCliStatus') || 'NOT_AVAILABLE',
                         sbomStatus: getProp('gcac:sbomStatus') || (Array.isArray(rawSbom.components) && rawSbom.components.length > 0 ? 'MANIFEST_INVENTORY_ONLY' : 'NOT_AVAILABLE')
                     };
-                } catch (e) {}
+                } catch (e) { }
             }
 
             const secPath = path.join(dir, 'security-review.json');
             if (fs.existsSync(secPath) && !details.securityReview) {
-                try { details.securityReview = JSON.parse(fs.readFileSync(secPath, 'utf-8')); } catch (e) {}
+                try { details.securityReview = JSON.parse(fs.readFileSync(secPath, 'utf-8')); } catch (e) { }
             }
 
             const tracePath = path.join(dir, 'agent-execution-trace.log');
             if (fs.existsSync(tracePath) && !details.traceLog) {
-                try { details.traceLog = fs.readFileSync(tracePath, 'utf-8'); } catch (e) {}
+                try { details.traceLog = fs.readFileSync(tracePath, 'utf-8'); } catch (e) { }
             }
 
             const evidenceRecPath = path.join(dir, 'evidence-record.json');
             if (fs.existsSync(evidenceRecPath) && !details.evidenceRecord) {
-                try { details.evidenceRecord = JSON.parse(fs.readFileSync(evidenceRecPath, 'utf-8')); } catch (e) {}
+                try { details.evidenceRecord = JSON.parse(fs.readFileSync(evidenceRecPath, 'utf-8')); } catch (e) { }
             }
 
             const approvalRecPath = path.join(dir, 'approval-record.json');
             if (fs.existsSync(approvalRecPath) && !details.approvalRecord) {
-                try { details.approvalRecord = JSON.parse(fs.readFileSync(approvalRecPath, 'utf-8')); } catch (e) {}
+                try { details.approvalRecord = JSON.parse(fs.readFileSync(approvalRecPath, 'utf-8')); } catch (e) { }
             }
 
             const decisionPath = path.join(dir, 'remediation-decision.json');
             if (fs.existsSync(decisionPath) && !details.remediationDecision) {
-                try { details.remediationDecision = JSON.parse(fs.readFileSync(decisionPath, 'utf-8')); } catch (e) {}
+                try { details.remediationDecision = JSON.parse(fs.readFileSync(decisionPath, 'utf-8')); } catch (e) { }
             }
 
             const s2sPath = path.join(dir, 'source-to-sink.json');
             if (fs.existsSync(s2sPath) && !details.sourceToSinkEvidence) {
-                try { details.sourceToSinkEvidence = JSON.parse(fs.readFileSync(s2sPath, 'utf-8')); } catch (e) {}
+                try { details.sourceToSinkEvidence = JSON.parse(fs.readFileSync(s2sPath, 'utf-8')); } catch (e) { }
+            }
+
+            const runStatePath = path.join(dir, 'run-state.json');
+            if (fs.existsSync(runStatePath) && !details.runState) {
+                try {
+                    const rs = JSON.parse(fs.readFileSync(runStatePath, 'utf-8'));
+                    details.runState = rs;
+                    details.runId = rs.runId || null;
+                    details.attemptId = rs.attemptId || null;
+                    details.attemptNumber = Number(rs.attemptNumber || 1);
+                    details.retryCount = Number(rs.retryCount || 0);
+                    details.attemptHistory = Array.isArray(rs.attemptHistory) ? rs.attemptHistory : [];
+                    details.failedStage = rs.failedStage ?? null;
+                    details.failedStageId = rs.failedStageId || null;
+                    details.failureCategory = rs.failureCategory || null;
+                    details.failureReason = rs.failureReason || null;
+                    details.retryEligibility = rs.retryEligibility || null;
+                    details.findingContext = rs.findingContext || details.findingContext;
+                    if (!details.validation && rs.postFixValidation) details.validation = rs.postFixValidation;
+                    if (!details.baselineValidation && rs.baselineValidation) details.baselineValidation = rs.baselineValidation;
+                    if (!details.reScanVerification && rs.reScanVerification) details.reScanVerification = rs.reScanVerification;
+                    if (!details.classification && rs.classification) details.classification = rs.classification;
+                    if (!details.securityReview && rs.securityReview) details.securityReview = rs.securityReview;
+                } catch (e) { }
+            }
+
+            const baseValPath = path.join(dir, 'baseline-validation.json');
+            if (fs.existsSync(baseValPath) && !details.baselineValidation) {
+                try { details.baselineValidation = JSON.parse(fs.readFileSync(baseValPath, 'utf-8')); } catch (e) { }
+            }
+
+            const rescanPath = path.join(dir, 're-scan-verification.json');
+            if (fs.existsSync(rescanPath) && !details.reScanVerification) {
+                try { details.reScanVerification = JSON.parse(fs.readFileSync(rescanPath, 'utf-8')); } catch (e) { }
+            }
+
+            const ctxPath = path.join(dir, 'finding-context.json');
+            if (fs.existsSync(ctxPath) && !details.findingContext) {
+                try { details.findingContext = JSON.parse(fs.readFileSync(ctxPath, 'utf-8')); } catch (e) { }
             }
 
             const manifestPath = path.join(dir, 'integrity-manifest.json');
@@ -278,7 +331,7 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
                     details.reportMarkdown = sharedContent;
                 }
                 details.hasEvidence = true;
-            } catch (e) {}
+            } catch (e) { }
         }
     }
 
@@ -363,7 +416,7 @@ function extractEvidenceFromMarkdown(details) {
                 details.traceLog = lines.join('\n');
             }
         }
-        
+
         if (!details.traceLog) {
             // Check for general timestamped logs in markdown
             const timestampLines = md.split('\n')
@@ -382,7 +435,7 @@ function extractEvidenceFromMarkdown(details) {
                     .split('\n')
                     .map(l => l.trim())
                     .filter(l => l.length > 0 && !l.startsWith('| :---') && !l.startsWith('| Stage'));
-                
+
                 const formatted = lines.map((l, i) => {
                     if (l.startsWith('|')) {
                         const parts = l.split('|').map(p => p.trim()).filter(Boolean);
@@ -420,7 +473,7 @@ function extractEvidenceFromMarkdown(details) {
         // Extract console output block
         let consoleOutput = '';
         const consoleMatch = md.match(/### Baseline Test Execution[\s\S]*?```(?:text)?\s*\n([\s\S]*?)```/i) ||
-                             md.match(/### Post-Fix Verification Tests[\s\S]*?```(?:text)?\s*\n([\s\S]*?)```/i);
+            md.match(/### Post-Fix Verification Tests[\s\S]*?```(?:text)?\s*\n([\s\S]*?)```/i);
         if (consoleMatch) {
             consoleOutput = consoleMatch[1].trim();
         }
@@ -498,7 +551,7 @@ function extractEvidenceFromMarkdown(details) {
                 severity: sevMatch ? sevMatch[1].trim() : '',
                 locationPath: locMatch ? locMatch[1].trim() : '',
                 derivedRemediationRoute: routeMatch ? routeMatch[1].trim() : 'SpecializedAction',
-                technology: techMatch ? techMatch[1].trim() : 'dotnet'
+                technology: techMatch ? techMatch[1].trim() : 'unknown'
             };
         }
     }
@@ -561,18 +614,71 @@ function inferStageStatuses(details) {
     // Stage 5: Bench Test
     let benchPassed = false;
     if (validation || report.includes('## Unit Test Agent') || report.includes('Post-Fix Verification Tests') || report.includes('## Post-Fix Test Validation') || trace.includes('unit-test') || trace.includes('[TEST]') || trace.includes('[BENCH_TEST]')) {
-        if (validation?.status === 'NOT EXECUTED') {
+        const valStatus = String(validation?.status || '').toUpperCase();
+        const machine = String(validation?.machineStatus || '').toUpperCase();
+        const cat = String(validation?.failureCategory || '').toUpperCase();
+        const countsKnown = validation?.countsKnown !== false;
+        const testsPassed = validation?.testsPassed ?? (validation?.testExecution?.passedCount ?? 0);
+        const testsFailed = validation?.testsFailed ?? (validation?.testExecution?.failedCount ?? 0);
+        const testsTotal = validation?.testsTotal ?? (testsPassed + testsFailed);
+
+        const isHardFailure = machine === 'FAILED' || machine === 'TIMED_OUT' || machine === 'CANCELLED' || machine === 'BLOCKED'
+            || cat === 'TESTS_FAILED' || cat === 'BUILD_FAILED' || cat === 'RESTORE_FAILED'
+            || cat === 'NO_TESTS_DISCOVERED' || cat === 'PARSE_FAILED' || cat === 'EXECUTION_BLOCKED'
+            || cat === 'TIMED_OUT' || cat === 'CANCELLED';
+        const isNotExecuted = validation?.executed === false || valStatus === 'NOT EXECUTED'
+            || valStatus === 'SANDBOX UNAVAILABLE' || valStatus === 'COULD NOT RUN'
+            || machine === 'UNTESTED' || machine === 'COULD_NOT_RUN';
+
+        if (isHardFailure) {
+            benchPassed = false;
+            stages[4].status = 'failed';
+            const rootMsg = validation?.rootError || validation?.summary || `Stage failed (${cat || valStatus || 'FAILED'})`;
+            stages[4].summary = (cat === 'TESTS_FAILED' && countsKnown && testsTotal > 0)
+                ? `Post-fix tests failed (${testsPassed} passed, ${testsFailed} failed). ${validation?.rootError ? validation.rootError : ''}`.trim()
+                : rootMsg;
+        } else if (isNotExecuted) {
             stages[4].status = 'pending';
-            stages[4].summary = validation.summary || 'NOT EXECUTED — Required runtime unavailable.';
+            stages[4].summary = validation?.rootError || validation?.summary || 'NOT EXECUTED — Required sandbox or test runtime unavailable.';
             benchPassed = false;
         } else {
-            const testsPassed = validation?.testsPassed ?? (validation?.testExecution?.passedCount ?? 0);
-            const testsFailed = validation?.testsFailed ?? (validation?.testExecution?.failedCount ?? 0);
-            const exitZero = validation?.exitCode === 0 || validation?.buildResult === 'PASS' || validation?.status === 'PASS';
-            benchPassed = exitZero && testsFailed === 0;
+            const exitZero = validation?.exitCode === 0 || validation?.buildResult === 'PASS' || valStatus === 'PASS';
+            benchPassed = exitZero && testsFailed === 0 && testsTotal > 0;
 
             stages[4].status = benchPassed ? 'completed' : 'failed';
-            stages[4].summary = `Targeted unit tests ${benchPassed ? 'passed' : 'failed'} (${testsPassed} passed, ${testsFailed} failed).`;
+            stages[4].summary = benchPassed
+                ? `Targeted unit tests passed (${testsPassed} passed, ${testsFailed} failed).`
+                : (validation?.rootError || validation?.summary || (countsKnown ? `Targeted unit tests failed (${testsPassed} passed, ${testsFailed} failed).` : 'Post-fix verification did not pass.'));
+        }
+    }
+
+    // Propagate explicit failed/interrupted runState stage if no downstream stage already marked failed
+    if (details.runState && (details.runState.status === 'FAILED' || details.runState.status === 'INTERRUPTED')) {
+        const engineFailStage = Number(details.runState.failedStage || 0);
+        const reasonText = details.runState.failureReason || details.runState.failureCategory || details.runState.status;
+        if (engineFailStage === 1) {
+            stages[0].status = 'failed';
+            stages[0].summary = `Classification failed: ${reasonText}`;
+        } else if (engineFailStage === 2) {
+            stages[1].status = 'failed';
+            stages[1].summary = `Code Analysis / RCA failed: ${reasonText}`;
+        } else if (engineFailStage === 3) {
+            stages[2].status = 'failed';
+            stages[2].summary = `Baseline testing failed/blocked: ${reasonText}`;
+        } else if (engineFailStage === 4) {
+            stages[3].status = 'failed';
+            stages[3].summary = `Human approval / patch proposal blocked: ${reasonText}`;
+        } else if (engineFailStage === 5) {
+            stages[2].status = 'failed';
+            stages[2].summary = `Isolated patch application failed: ${reasonText}`;
+        } else if (engineFailStage === 6 || engineFailStage === 7) {
+            stages[4].status = 'failed';
+            if (!stages[4].summary || stages[4].summary.includes('Create/update unit tests')) {
+                stages[4].summary = reasonText;
+            }
+        } else if (engineFailStage === 8) {
+            stages[5].status = 'failed';
+            stages[5].summary = `Final audit gate failed: ${reasonText}`;
         }
     }
 
@@ -684,7 +790,7 @@ function loadAllReports(workspaceRoot) {
     const seenIds = new Set();
     const sharedOutputDir = path.join(workspaceRoot, 'output');
     const remOutputDir = path.join(workspaceRoot, 'remediation-output');
-    
+
     // 1. Scan output/ directory for shared markdown reports
     if (fs.existsSync(sharedOutputDir)) {
         const files = fs.readdirSync(sharedOutputDir);
@@ -698,7 +804,7 @@ function loadAllReports(workspaceRoot) {
                     const idMatch = file.match(/([a-zA-Z0-9]+-[a-zA-Z0-9]+-[0-9]+)/i) || file.match(/(vul_poc_\d+|gcas_e2e_\d+)/i);
                     const vulnId = idMatch ? idMatch[1].toUpperCase().replace(/_/g, '-') : file.replace('.md', '');
                     seenIds.add(vulnId);
-                    
+
                     reports.push({
                         fileName: file,
                         filePath: fullPath,
@@ -708,7 +814,7 @@ function loadAllReports(workspaceRoot) {
                         modifiedAt: stats.mtime.toISOString(),
                         preview: content.substring(0, 300)
                     });
-                } catch (e) {}
+                } catch (e) { }
             }
         }
     }
@@ -726,7 +832,7 @@ function loadAllReports(workspaceRoot) {
                             const content = fs.readFileSync(reportPath, 'utf-8');
                             const stats = fs.statSync(reportPath);
                             const titleMatch = content.match(/^#\s+(.*)$/m);
-                            
+
                             if (!seenIds.has(vulnId)) {
                                 seenIds.add(vulnId);
                                 reports.push({
@@ -739,11 +845,11 @@ function loadAllReports(workspaceRoot) {
                                     preview: content.substring(0, 300)
                                 });
                             }
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     return reports;
@@ -751,6 +857,7 @@ function loadAllReports(workspaceRoot) {
 
 module.exports = {
     loadVulnerabilityDetails,
+    inferStageStatuses,
     extractTimingsFromTrace,
     loadAllReports,
     isReportMatchForVulnerability

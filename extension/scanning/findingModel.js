@@ -2,7 +2,8 @@ const crypto = require('crypto');
 
 /**
  * Normalized Finding Model for GCAC Vulnerability Remediation Hub
- * Conforms to Milestone B Specifications and SARIF 2.1.0 interoperability.
+ * Conforms to Milestone B Specifications, Phase 1-3 Security Controls,
+ * and Canonical Finding-to-Repository Context Contract (GCAC-FINDING-CTX-1.0).
  */
 
 const SEVERITY_LEVELS = Object.freeze({
@@ -22,7 +23,8 @@ const SCANNER_STATUS = Object.freeze({
     PARTIAL: 'Partial',
     FAILED: 'Failed',
     CANCELLED: 'Cancelled',
-    UNAVAILABLE: 'Unavailable'
+    UNAVAILABLE: 'Unavailable',
+    NO_SCANNABLE_INPUTS: 'No Scannable Inputs'
 });
 
 const VERIFICATION_STATUS = Object.freeze({
@@ -32,6 +34,26 @@ const VERIFICATION_STATUS = Object.freeze({
     NOT_VERIFIED: 'NOT VERIFIED',
     REGRESSION_DETECTED: 'REGRESSION DETECTED'
 });
+
+/**
+ * Infers language/technology stack from file extension when explicit technology isn't supplied.
+ */
+function inferTechnologyFromFilePath(filePath, fallbackTech = '') {
+    const p = String(filePath || '').toLowerCase();
+    if (p.endsWith('.cs') || p.endsWith('.csproj') || p.endsWith('.sln') || p.endsWith('packages.config')) {
+        return 'dotnet';
+    }
+    if (p.endsWith('.java') || p.endsWith('pom.xml') || p.endsWith('.gradle') || p.endsWith('.properties')) {
+        return 'java-spring';
+    }
+    if (/\.(?:js|ts|jsx|tsx|mjs|cjs)$/i.test(p) || p.endsWith('package.json')) {
+        return 'nodejs';
+    }
+    if (p.endsWith('.py') || p.endsWith('requirements.txt')) {
+        return 'python';
+    }
+    return fallbackTech || 'unknown';
+}
 
 /**
  * Generates a deterministic, location-resilient finding fingerprint.
@@ -92,6 +114,7 @@ function maskSensitiveEvidence(text) {
  */
 class NormalizedFinding {
     constructor(data = {}) {
+        this.contextSchemaVersion = data.contextSchemaVersion || 'GCAC-FINDING-CTX-1.0';
         this.scannerId = data.scannerId || 'unknown';
         this.scannerVersion = data.scannerVersion || '1.0.0';
         this.ruleId = data.ruleId || 'GENERIC-SECURITY';
@@ -99,20 +122,38 @@ class NormalizedFinding {
         this.description = data.description || '';
         this.severity = this._normalizeSeverity(data.severity);
         this.confidence = data.confidence || null; // 'High' | 'Medium' | 'Low' | null
+        this.detectionMethod = data.detectionMethod || (data.classificationType === 'POTENTIAL_SECRET_REVIEW' ? 'HEURISTIC_PATTERN' : 'ANALYZER_RULE');
         this.cwe = data.cwe || null; // e.g. 'CWE-798', 'CWE-89'
         this.filePath = (data.filePath || '').replace(/\\/g, '/');
         this.line = typeof data.line === 'number' ? data.line : (parseInt(data.line, 10) || null);
         this.column = typeof data.column === 'number' ? data.column : (parseInt(data.column, 10) || null);
         this.evidence = maskSensitiveEvidence(data.evidence || '');
+        this.evidenceRef = data.evidenceRef || (this.filePath ? `${this.filePath}:${this.line || 1}` : '');
         this.remediationGuidance = data.remediationGuidance || '';
-        this.scanId = data.scanId || 'scan-session';
+        this.scanId = data.scanId || '';
         this.timestamp = data.timestamp || new Date().toISOString();
         this.findingFingerprint = data.findingFingerprint || data.fingerprint || generateFindingFingerprint(this.ruleId, this.filePath, data.rawCodeContext || data.evidence);
         this.findingId = data.findingId || `SCAN-${this.ruleId}-${this.findingFingerprint.substring(0, 8).toUpperCase()}`;
         this.status = data.status || 'Detected'; // 'Detected' | 'Remediating' | 'Resolved' | 'Still Present'
         this.rawSourceReference = data.rawSourceReference || null;
         this.sourceClassification = data.sourceClassification || 'LocalScanner';
+
+        // Canonical repository & application provenance (never invent fake enterprise IDs!)
         this.repository = data.repository || '';
+        this.repositoryRoot = data.repositoryRoot || '';
+        this.canonicalRepositoryId = data.canonicalRepositoryId || '';
+        this.projectPath = (data.projectPath || '').replace(/\\/g, '/');
+        this.applicationNumber = data.applicationNumber || data.Application_Number || '';
+        this.applicationName = data.applicationName || data.Application_Name || '';
+        this.applicationIdentitySource = data.applicationIdentitySource || '';
+        this.technology = data.technology || data.Technology || inferTechnologyFromFilePath(this.projectPath || this.filePath, '');
+        this.packageName = data.packageName || '';
+        this.currentVersion = data.currentVersion || data.Current_Version || '';
+        this.fixedVersion = data.fixedVersion || data.Fixed_Version || '';
+        this.advisoryUrl = data.advisoryUrl || '';
+        this.isHistorical = Boolean(data.isHistorical);
+        this.lastSeenScanId = data.lastSeenScanId || this.scanId || '';
+
         this.classificationType = data.classificationType || 'CONFIRMED_RULE_VIOLATION'; // 'CONFIRMED_RULE_VIOLATION' | 'POTENTIAL_SECRET_REVIEW' | 'INFORMATIONAL_OBSERVATION'
     }
 
@@ -133,42 +174,59 @@ class NormalizedFinding {
 
     /**
      * Converts to compatible CSV row object matching the GCAC vulnerabilities.csv schema
-     * so that existing Copilot orchestration and reporting can consume it seamlessly.
+     * and preserving canonical finding-to-repository provenance metadata.
      */
     toCsvCompatibleRecord() {
+        const repoDisplay = this.repository || this.repositoryRoot || '';
+        const repoBase = repoDisplay ? repoDisplay.replace(/\\/g, '/').split('/').filter(Boolean).pop() : '';
+        const inferredTech = this.technology || inferTechnologyFromFilePath(this.projectPath || this.filePath, 'unknown');
+
         return {
             Vulnerability_ID: this.findingId,
+            Context_Schema_Version: this.contextSchemaVersion || 'GCAC-FINDING-CTX-1.0',
             Source_Type: 'SCANNER',
+            Source_Origin: 'LocalScanner',
             Scanner_ID: this.scannerId,
             Scanner_Version: this.scannerVersion,
+            Scan_ID: this.scanId || '',
+            Detection_Method: this.detectionMethod || 'ANALYZER_RULE',
             Finding_Fingerprint: this.findingFingerprint,
-            Application_Number: 'APP-SCAN-001',
-            Application_Name: this.repository ? this.repository.split('/').pop() : 'Local Repository',
+            Application_Number: this.applicationNumber || '',
+            Application_Name: this.applicationName || repoBase || 'Unmapped Local Repository',
+            Application_Identity_Source: this.applicationIdentitySource || '',
             Severity: this.severity ? this.severity.toString().toUpperCase() : 'MEDIUM',
             SLA_Status: 'In SLA',
             Finding_Date: this.timestamp.split('T')[0],
             CVE_ID: this.cwe || this.ruleId,
             Title: this.title,
             Detailed_Name: `${this.ruleId} - ${this.title}`,
-            Current_Version: '',
-            Fixed_Version: '',
+            Package_Name: this.packageName || '',
+            Current_Version: this.currentVersion || '',
+            Fixed_Version: this.fixedVersion || '',
+            Advisory_URL: this.advisoryUrl || '',
             Remediation_Guidance: this.remediationGuidance || 'Review finding details and remediate using recommended security practice.',
             Location_Path: this.filePath,
             Line_Number: this.line ? this.line.toString() : '1',
+            Evidence_Ref: this.evidenceRef || (this.filePath ? `${this.filePath}:${this.line || 1}` : ''),
             Source_Classification: this.sourceClassification,
-            Technology: 'dotnet',
-            Repository: this.repository,
+            Technology: inferredTech,
+            Repository: this.repository || '',
+            Repository_Root: this.repositoryRoot || '',
+            Canonical_Repository_ID: this.canonicalRepositoryId || '',
+            Project_Path: this.projectPath || '',
+            Is_Historical: this.isHistorical ? 'true' : 'false',
+            Last_Seen_Scan_ID: this.lastSeenScanId || this.scanId || '',
             Internet_Facing: 'false',
             Product_Owner: 'Security Team',
             Primary_Manager: 'Engineering Lead',
-            Requires_Human_Review: this.classificationType === 'POTENTIAL_SECRET_REVIEW' ? 'true' : 'false',
+            Requires_Human_Review: (this.classificationType === 'POTENTIAL_SECRET_REVIEW' || !this.repository || !this.applicationNumber) ? 'true' : 'false',
             Agent_Code_Analysis_Output: this.description,
             Agent_Unit_Test_Output: '',
             Agent_Remediation_Output: '',
             Agent_Regression_Output: '',
             Agent_Final_Validation_Output: '',
             Agent_Documentation_Output: '',
-            Remediation_Status: this.status === 'Resolved' ? 'Remediated' : 'Pending',
+            Remediation_Status: this.status === 'Resolved' ? 'Remediated' : (this.status === 'Detected' ? 'Pending' : (this.status || 'Pending')),
             Final_Validation_Status: 'Pending',
             Final_Confidence_Score: '0',
             Test_Status: 'Pending',
@@ -201,10 +259,16 @@ class NormalizedFinding {
             properties: {
                 findingId: this.findingId,
                 scannerId: this.scannerId,
+                scanId: this.scanId,
                 confidence: this.confidence,
+                detectionMethod: this.detectionMethod,
                 cwe: this.cwe,
                 fingerprint: this.findingFingerprint,
-                classificationType: this.classificationType
+                classificationType: this.classificationType,
+                repository: this.repository,
+                repositoryRoot: this.repositoryRoot,
+                canonicalRepositoryId: this.canonicalRepositoryId,
+                applicationNumber: this.applicationNumber
             }
         };
     }
@@ -214,6 +278,7 @@ module.exports = {
     SEVERITY_LEVELS,
     SCANNER_STATUS,
     VERIFICATION_STATUS,
+    inferTechnologyFromFilePath,
     generateFindingFingerprint,
     maskSensitiveEvidence,
     NormalizedFinding
