@@ -149,6 +149,12 @@ const server = http.createServer(async (req, res) => {
                                         availableCsvs: cfg.availableCsvs
                                     }, '*');
                                 });
+                        } else if (msg.command === 'getSandboxStatus') {
+                            fetch('/api/sandbox-status')
+                                .then(r => r.json())
+                                .then(sbx => {
+                                    window.postMessage({ type: 'SANDBOX_STATUS_UPDATED', ...sbx }, '*');
+                                });
                         } else if (msg.command === 'requestData' || msg.command === 'refresh') {
                             fetch('/api/vulnerabilities')
                                 .then(r => r.json())
@@ -310,6 +316,38 @@ const server = http.createServer(async (req, res) => {
         js = browserShim + '\n' + js;
         res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
         res.end(js);
+        return;
+    }
+
+    if (url.pathname === '/api/sandbox-status') {
+        const { discoverEnvironment } = require('../extension/sandbox/environmentDiscovery');
+        const { loadAndVerifyToolchainRegistry, isTemplateDigestProfile } = require('../extension/sandbox/toolchainProfiles');
+        const env = discoverEnvironment(workspaceRoot);
+        let approvedProfiles = [];
+        let hasTemplateDigests = false;
+        try {
+            const reg = loadAndVerifyToolchainRegistry();
+            hasTemplateDigests = Boolean(reg.hasTemplateDigests);
+            approvedProfiles = reg.profiles.map(p => ({
+                profileId: p.profileId,
+                supportedStack: p.supportedStack,
+                toolchainVersion: p.toolchainVersion,
+                networkPolicy: p.networkPolicy,
+                digestStatus: p.digestStatus || (isTemplateDigestProfile(p) ? 'TEMPLATE_PLACEHOLDER' : 'VERIFIED_IMAGE_DIGEST')
+            }));
+        } catch {}
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            sandboxAvailable: Boolean(env.sandboxAvailable),
+            sandboxStatus: env.sandboxAvailable ? 'SANDBOX READY' : 'SANDBOX UNAVAILABLE',
+            backendType: env.sandboxAvailable ? 'CONTAINER_SANDBOX' : 'NONE',
+            selectedRuntime: env.selectedRuntime || 'None',
+            osPlatform: `${env.os.platform} (${env.os.arch})`,
+            approvedProfiles,
+            hasTemplateDigests,
+            prerequisites: env.prerequisites || [],
+            limitations: env.limitations || []
+        }));
         return;
     }
 

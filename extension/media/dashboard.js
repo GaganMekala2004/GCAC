@@ -382,6 +382,15 @@
     const activeRunSummaryTests = document.getElementById('activeRunSummaryTests');
     const activeRunSummaryRetries = document.getElementById('activeRunSummaryRetries');
     const activeRunSummaryStatus = document.getElementById('activeRunSummaryStatus');
+    const activeRunSandboxBackend = document.getElementById('activeRunSandboxBackend');
+    const activeRunToolchainPolicy = document.getElementById('activeRunToolchainPolicy');
+    const sandboxStatusDot = document.getElementById('sandboxStatusDot');
+    const sandboxStatusHeadline = document.getElementById('sandboxStatusHeadline');
+    const sandboxBackendMeta = document.getElementById('sandboxBackendMeta');
+    const sandboxProfilesList = document.getElementById('sandboxProfilesList');
+    const sandboxPrereqsList = document.getElementById('sandboxPrereqsList');
+    const btnRefreshSandboxStatus = document.getElementById('btnRefreshSandboxStatus');
+    let currentSandboxState = null;
 
     // DOM Elements - Review Queue View
     const queueTotalBadge = document.getElementById('queueTotalBadge');
@@ -469,6 +478,7 @@
 
         // Load initial config and data from extension host
         postToHost({ command: 'getConfig' });
+        postToHost({ command: 'getSandboxStatus' });
         postToHost({ command: 'requestData' });
         postToHost({ command: 'loadReports' });
     }
@@ -1084,6 +1094,9 @@
         if (btnSettingsBrowseCsv) {
             btnSettingsBrowseCsv.addEventListener('click', () => postToHost({ command: 'selectCsv' }));
         }
+        if (btnRefreshSandboxStatus) {
+            btnRefreshSandboxStatus.addEventListener('click', () => postToHost({ command: 'getSandboxStatus' }));
+        }
         if (selectTargetCsv) {
             selectTargetCsv.addEventListener('change', () => {
                 const val = selectTargetCsv.value;
@@ -1117,6 +1130,10 @@
                         availableCsvs: message.availableCsvs || []
                     };
                     renderConfigContext();
+                    break;
+
+                case 'SANDBOX_STATUS_UPDATED':
+                    renderSandboxStatus(message);
                     break;
 
                 case 'INIT_DATA':
@@ -1317,6 +1334,12 @@
                 }
                 if (evt.validation && currentDetails) {
                     currentDetails.validation = evt.validation;
+                    if (activeRunSandboxBackend && evt.validation.sandboxStatus) {
+                        activeRunSandboxBackend.textContent = `${evt.validation.sandboxStatus} (${evt.validation.backendType || 'NONE'})`;
+                    }
+                    if (activeRunToolchainPolicy && (evt.validation.toolchainProfileId || evt.validation.networkPolicy)) {
+                        activeRunToolchainPolicy.textContent = `${evt.validation.toolchainProfileId || 'N/A'} / ${evt.validation.networkPolicy || 'NO_NETWORK'}`;
+                    }
                     renderTestEvidenceView(currentDetails);
                 }
                 break;
@@ -2175,7 +2198,60 @@
         if (activeRunSummaryTests) activeRunSummaryTests.textContent = v.Test_Status || (v.Final_Validation_Status === 'PASS' ? 'PASS (1/1)' : 'Pending');
         if (activeRunSummaryRetries) activeRunSummaryRetries.textContent = '0 of 3';
         if (activeRunSummaryStatus) activeRunSummaryStatus.textContent = v.Remediation_Status || 'Ready';
+        if (activeRunSandboxBackend && currentSandboxState) {
+            activeRunSandboxBackend.textContent = currentSandboxState.sandboxAvailable
+                ? `CONTAINER (${currentSandboxState.selectedRuntime || 'container'})`
+                : 'SANDBOX UNAVAILABLE (FAIL-CLOSED)';
+        }
+        if (activeRunToolchainPolicy) {
+            activeRunToolchainPolicy.textContent = v.Technology ? `${v.Technology} / NO_NETWORK` : 'NO_NETWORK';
+        }
         if (activeRunStatusPill) activeRunStatusPill.textContent = isRemediating ? 'In Progress' : (v.Remediation_Status || 'Idle');
+    }
+
+    function renderSandboxStatus(info) {
+        if (!info) return;
+        currentSandboxState = info;
+        const ready = Boolean(info.sandboxAvailable);
+        const statusText = ready ? 'SANDBOX READY' : 'SANDBOX UNAVAILABLE';
+
+        if (sandboxStatusDot) {
+            sandboxStatusDot.className = 'sandbox-dot ' + (ready ? 'ready' : 'unavailable');
+        }
+        if (sandboxStatusHeadline) {
+            sandboxStatusHeadline.textContent = ready
+                ? `${statusText} • Runtime: ${info.selectedRuntime || 'container'} (Container isolation ready; host kernel shared)`
+                : `${statusText} • Governed builds/tests blocked (no silent host-shell fallback)`;
+        }
+        if (sandboxBackendMeta) {
+            sandboxBackendMeta.innerHTML =
+                `<strong>Backend:</strong> <code>${escapeHtml(info.backendType || 'NONE')}</code> | ` +
+                `<strong>OS/Arch:</strong> <code>${escapeHtml(info.osPlatform || 'unknown')}</code> | ` +
+                `<strong>Default Egress:</strong> <code>NO_NETWORK</code><br>` +
+                `<span>Boundary: TrustedExecutionGateway controls extension subprocesses; native Copilot Chat tools are separate.</span>`;
+        }
+        if (sandboxProfilesList) {
+            const profiles = Array.isArray(info.approvedProfiles) ? info.approvedProfiles : [];
+            if (info.profileManifestError) {
+                sandboxProfilesList.innerHTML = `<li class="u-text-danger">Toolchain profile verification failed: ${escapeHtml(info.profileManifestError)}</li>`;
+            } else if (profiles.length > 0) {
+                sandboxProfilesList.innerHTML = profiles.map(p => {
+                    const digBadge = p.digestStatus === 'TEMPLATE_PLACEHOLDER'
+                        ? '<span class="u-text-danger">Template Digest</span>'
+                        : 'Pinned Digest';
+                    return `<li>✓ <code>${escapeHtml(p.profileId)}</code> (${escapeHtml(p.toolchainVersion)}, Network: <code>${escapeHtml(p.networkPolicy)}</code>, Digest: ${digBadge})</li>`;
+                }).join('');
+            }
+        }
+        if (sandboxPrereqsList) {
+            const prereqs = Array.isArray(info.prerequisites) ? info.prerequisites : [];
+            sandboxPrereqsList.innerHTML = prereqs.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+        }
+        if (activeRunSandboxBackend) {
+            activeRunSandboxBackend.textContent = ready
+                ? `CONTAINER (${info.selectedRuntime || 'container'})`
+                : 'SANDBOX UNAVAILABLE (FAIL-CLOSED)';
+        }
     }
 
     // --------------------------------------------------------------------------
@@ -2335,9 +2411,18 @@
             return;
         }
 
-        const isNotExecuted = val?.status === 'NOT EXECUTED' || val?.executed === false;
-        const testStatus = isNotExecuted ? 'NOT EXECUTED' : (val?.status || (val?.buildResult === 'PASS' ? 'PASS' : 'FAIL'));
-        const buildPass = testStatus === 'PASS';
+        const sbx = details.sandboxExecution || null;
+        const sbom = details.sbomEvidence || null;
+        const sandboxBadgeText = val?.sandboxStatus || sbx?.sandboxStatus || (currentSandboxState?.sandboxStatus || 'SANDBOX UNAVAILABLE');
+        const backendText = val?.backendType || sbx?.backendType || (currentSandboxState?.backendType || 'NONE');
+        const profileText = val?.toolchainProfileId || sbx?.toolchainProfileId || 'Unresolved';
+        const networkText = val?.networkPolicy || sbx?.networkPolicy || 'NO_NETWORK';
+        const depText = val?.dependencyStatus || sbx?.dependencyStatus || 'OFFLINE_NO_RESTORE';
+
+        const isBlockedOrTimeout = testStatus === 'BLOCKED' || testStatus === 'TIMED OUT' || testStatus === 'CANCELLED' || testStatus === 'SANDBOX UNAVAILABLE';
+        const isNotExecuted = isBlockedOrTimeout || val?.status === 'NOT EXECUTED' || val?.executed === false;
+        const testStatusLabel = isBlockedOrTimeout ? testStatus : (isNotExecuted ? 'NOT EXECUTED' : (val?.status || (val?.buildResult === 'PASS' ? 'PASS' : 'FAIL')));
+        const buildPass = testStatusLabel === 'PASS';
         const testsPassed = val?.testsPassed ?? 0;
         const testsFailed = val?.testsFailed ?? 0;
         const duration = val?.durationMs ? `${(val.durationMs / 1000).toFixed(2)}s` : 'N/A';
@@ -2351,7 +2436,7 @@
                 <div class="test-metric-row">
                     <div class="test-metric-card">
                         <div class="test-metric-label">Execution Status</div>
-                        <div class="test-metric-val u-font-13 ${statusColorClass}">${escapeHtml(testStatus)}</div>
+                        <div class="test-metric-val u-font-13 ${statusColorClass}">${escapeHtml(testStatusLabel)}</div>
                     </div>
                     <div class="test-metric-card">
                         <div class="test-metric-label">Tests Passed</div>
@@ -2365,6 +2450,12 @@
                         <div class="test-metric-label">Duration</div>
                         <div class="test-metric-val">${duration}</div>
                     </div>
+                </div>
+
+                <div class="sandbox-meta-strip">
+                    <div><strong>Execution Backend:</strong> <code>${escapeHtml(sandboxBadgeText)}</code> (<code>${escapeHtml(backendText)}</code>) | <strong>Toolchain Profile:</strong> <code>${escapeHtml(profileText)}</code></div>
+                    <div><strong>Network Policy:</strong> <code>${escapeHtml(networkText)}</code> | <strong>Dependency Policy:</strong> <code>${escapeHtml(depText)}</code>${sbom ? ` | <strong>SBOM:</strong> <code>${escapeHtml(sbom.format || 'CycloneDX/1.5')}</code> (${escapeHtml(sbom.sbomStatus || 'NOT_AVAILABLE')})` : ''}</div>
+                    ${(val?.timedOut || val?.cancelled || val?.reason) && isNotExecuted ? `<div class="u-text-warning"><strong>Execution Notice:</strong> ${escapeHtml(val.reason || 'Validation could not run inside approved sandbox.')}</div>` : ''}
                 </div>
 
                 <div class="score-meter-wrap">

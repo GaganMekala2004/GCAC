@@ -1,12 +1,19 @@
-const { spawn, execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { execFileSync } = require('child_process');
 const { OUTCOME_STATUS } = require('./outcomeContract');
 const {
     ContentInjectionScreen,
     TRUST_CLASSES,
     SCREEN_OUTCOME
 } = require('./contentInjectionScreen');
+const { SANDBOX_READINESS } = require('./sandbox/environmentDiscovery');
+const {
+    EXECUTION_POLICY_VERSION,
+    OPERATION_TYPES,
+    TrustedExecutionGateway
+} = require('./sandbox/trustedExecutionGateway');
+const { resolveProfileForRepository, ToolchainProfileError } = require('./sandbox/toolchainProfiles');
 
 /**
  * Deterministic Test Runner for GCAC Vulnerability Remediation
@@ -230,109 +237,146 @@ function redactSensitiveOutput(text) {
  * @param {object} options Optional execution parameters { timeoutMs, cancellationToken }
  * @returns {Promise<object>} Structured execution result
  */
-function executeRealTestRunner(executable, args, cwd, options = {}) {
-    return new Promise((resolve) => {
-        const startTime = new Date();
-        const startTimeIso = startTime.toISOString();
-
-        // 1. Enforce executable allowlist
-        if (!ALLOWED_EXECUTABLES.has(executable)) {
-            const endTime = new Date();
-            resolve({
-                executed: false,
-                status: 'NOT EXECUTED',
-                machineStatus: OUTCOME_STATUS.BLOCKED,
-                reason: `Unauthorized test runner executable: '${executable}'`,
-                executable,
-                command: `${executable} ${args.join(' ')}`,
-                workingDirectory: cwd,
-                startTime: startTimeIso,
-                endTime: endTime.toISOString(),
-                durationMs: 0,
-                exitCode: null,
-                testsTotal: 0,
-                testsPassed: 0,
-                testsFailed: 0,
-                stdout: '',
-                stderr: `Executable '${executable}' is not in the approved security allowlist.`,
-                summary: `NOT EXECUTED — Unauthorized executable '${executable}'`
-            });
-            return;
+function mapToolAndArgsToOperation(executable, args = []) {
+    const firstArg = String(args[0] || '').toLowerCase();
+    if (executable === 'dotnet') {
+        const operation = firstArg === 'build' ? OPERATION_TYPES.DOTNET_BUILD : OPERATION_TYPES.DOTNET_TEST;
+        const extraArgs = [];
+        for (let i = 1; i < args.length; i++) {
+            const tok = String(args[i] ?? '');
+            if (tok === '--verbosity') {
+                const next = String(args[i + 1] || '').toLowerCase();
+                if (next === 'normal' || next === 'minimal') {
+                    i++;
+                    continue;
+                }
+            }
+            if (tok === '--nologo' || tok === '--no-restore') continue;
+            extraArgs.push(tok);
         }
-
-        // 2. Check executable availability on system PATH
-        if (!isExecutableAvailable(executable)) {
-            const endTime = new Date();
-            resolve({
-                executed: false,
-                status: 'NOT EXECUTED',
-                machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
-                reason: 'Required runtime unavailable',
-                executable,
-                command: `${executable} ${args.join(' ')}`,
-                workingDirectory: cwd,
-                startTime: startTimeIso,
-                endTime: endTime.toISOString(),
-                durationMs: 0,
-                exitCode: null,
-                testsTotal: 0,
-                testsPassed: 0,
-                testsFailed: 0,
-                stdout: '',
-                stderr: `NOT EXECUTED — Required runtime unavailable: '${executable}' not found in system PATH.`,
-                summary: `NOT EXECUTED — Required runtime unavailable: '${executable}' not found in PATH.`
-            });
-            return;
+        return { operation, extraArgs };
+    }
+    if (executable === 'mvn') {
+        const operation = firstArg === 'compile' ? OPERATION_TYPES.MAVEN_COMPILE : OPERATION_TYPES.MAVEN_TEST;
+        const extraArgs = [];
+        for (let i = 1; i < args.length; i++) {
+            const tok = String(args[i] ?? '');
+            if (tok === '-B' || tok === '-o') continue;
+            extraArgs.push(tok);
         }
+        return { operation, extraArgs };
+    }
+    const extraArgs = [];
+    for (let i = 1; i < args.length; i++) {
+        const tok = String(args[i] ?? '');
+        if (tok === '--ignore-scripts' || tok === '--offline') continue;
+        extraArgs.push(tok);
+    }
+    return { operation: OPERATION_TYPES.NPM_TEST, extraArgs };
+}
 
-        // 3. Verify working directory exists
-        if (!cwd || !fs.existsSync(cwd)) {
-            const endTime = new Date();
-            resolve({
-                executed: false,
-                status: 'NOT EXECUTED',
-                machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
-                reason: 'Working directory not found',
-                executable,
-                command: `${executable} ${args.join(' ')}`,
-                workingDirectory: cwd,
-                startTime: startTimeIso,
-                endTime: endTime.toISOString(),
-                durationMs: 0,
-                exitCode: null,
-                testsTotal: 0,
-                testsPassed: 0,
-                testsFailed: 0,
-                stdout: '',
-                stderr: `Working directory does not exist on disk: '${cwd}'`,
-                summary: `NOT EXECUTED — Working directory not found: ${cwd}`
-            });
-            return;
-        }
+/**
+ * Safely executes an approved test/build operation via TrustedExecutionGateway.
+ * Never falls back silently to host shell execution when sandbox is unavailable.
+ * @param {string} executable Allowlisted executable ('dotnet', 'mvn', 'npm')
+ * @param {string[]} args Command arguments
+ * @param {string} cwd Working directory
+ * @param {object} options Optional execution parameters { timeoutMs, cancellationToken, executionGateway, sandboxBackend, envReport, finding }
+ * @returns {Promise<object>} Structured execution result
+ */
+async function executeRealTestRunner(executable, args = [], cwd, options = {}) {
+    const startTime = new Date();
+    const startTimeIso = startTime.toISOString();
+    const safeArgs = Array.isArray(args) ? args : [];
 
-        // 4. Execute safely without shell interpolation
-        const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
-        let stdout = '';
-        let stderr = '';
-        let killed = false;
+    // 1. Enforce executable allowlist (preserves Phase 1/2 security assertion)
+    if (!ALLOWED_EXECUTABLES.has(executable)) {
+        const endTime = new Date();
+        return {
+            executed: false,
+            passed: false,
+            status: 'NOT EXECUTED',
+            sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
+            machineStatus: OUTCOME_STATUS.BLOCKED,
+            reason: `Unauthorized test runner executable: '${executable}'`,
+            executable,
+            command: `${executable} ${safeArgs.join(' ')}`,
+            workingDirectory: cwd,
+            startTime: startTimeIso,
+            endTime: endTime.toISOString(),
+            durationMs: 0,
+            exitCode: null,
+            testsTotal: 0,
+            testsPassed: 0,
+            testsFailed: 0,
+            stdout: '',
+            stderr: `Executable '${executable}' is not in the approved security allowlist.`,
+            summary: `NOT EXECUTED — Unauthorized executable '${executable}'`
+        };
+    }
 
-        let child;
+    // 2. Verify working directory exists
+    if (!cwd || !fs.existsSync(cwd)) {
+        const endTime = new Date();
+        return {
+            executed: false,
+            passed: false,
+            status: 'NOT EXECUTED',
+            sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
+            machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
+            reason: 'Working directory not found',
+            executable,
+            command: `${executable} ${safeArgs.join(' ')}`,
+            workingDirectory: cwd,
+            startTime: startTimeIso,
+            endTime: endTime.toISOString(),
+            durationMs: 0,
+            exitCode: null,
+            testsTotal: 0,
+            testsPassed: 0,
+            testsFailed: 0,
+            stdout: '',
+            stderr: `Working directory does not exist on disk: '${cwd}'`,
+            summary: `NOT EXECUTED — Working directory not found: ${cwd}`
+        };
+    }
+
+    // 3. Resolve approved declarative toolchain profile (no host fallback)
+    const workspaceRoot = options.workspaceRoot || cwd;
+    const gateway = options.executionGateway || new TrustedExecutionGateway({
+        workspaceRoot,
+        backend: options.sandboxBackend || null,
+        envReport: options.envReport || null,
+        profilesPath: options.profilesPath,
+        lifecycleStateDir: options.lifecycleStateDir || null
+    });
+
+    let profile;
+    if (options.toolchainProfileId) {
+        profile = {
+            profileId: options.toolchainProfileId,
+            supportedStack: executable === 'dotnet' ? 'dotnet' : executable === 'mvn' ? 'java-maven' : 'nodejs',
+            networkPolicy: options.networkPolicy || 'NO_NETWORK',
+            outputArtifactPaths: [],
+            runtimeLimits: { timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS, memoryMb: 2048, cpus: 2, pidsLimit: 128 }
+        };
+    } else {
         try {
-            child = spawn(executable, args, {
-                cwd,
-                shell: false,
-                env: { ...process.env, CI: 'true', DOTNET_CLI_TELEMETRY_OPTOUT: '1' },
-                stdio: ['ignore', 'pipe', 'pipe']
-            });
+            const techHint = options.finding?.Technology || (executable === 'dotnet' ? 'dotnet' : executable === 'mvn' ? 'java-maven' : 'nodejs');
+            profile = resolveProfileForRepository(cwd, { Technology: techHint }, options.profilesPath);
         } catch (err) {
             const endTime = new Date();
-            resolve({
+            const code = err instanceof ToolchainProfileError ? err.code : 'TOOLCHAIN_PROFILE_BLOCKED';
+            return {
                 executed: false,
-                status: 'NOT EXECUTED',
-                machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
-                reason: `Process spawn error: ${err.message}`,
+                passed: false,
+                status: 'BLOCKED',
+                sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
+                machineStatus: OUTCOME_STATUS.BLOCKED,
+                reasonCode: code,
+                reason: err.message,
                 executable,
-                command: `${executable} ${args.join(' ')}`,
+                command: `${executable} ${safeArgs.join(' ')}`,
                 workingDirectory: cwd,
                 startTime: startTimeIso,
                 endTime: endTime.toISOString(),
@@ -343,170 +387,149 @@ function executeRealTestRunner(executable, args, cwd, options = {}) {
                 testsFailed: 0,
                 stdout: '',
                 stderr: err.message,
-                summary: `NOT EXECUTED — Failed to spawn ${executable}: ${err.message}`
-            });
-            return;
-        }
-
-        const timer = setTimeout(() => {
-            killed = true;
-            try { child.kill('SIGTERM'); } catch (e) {}
-        }, timeoutMs);
-
-        const MAX_OUTPUT = 256 * 1024; // 256 KB max per stream to avoid buffer overflow
-
-        child.stdout.on('data', (chunk) => {
-            if (stdout.length < MAX_OUTPUT) stdout += chunk.toString();
-        });
-
-        child.stderr.on('data', (chunk) => {
-            if (stderr.length < MAX_OUTPUT) stderr += chunk.toString();
-        });
-
-        child.on('error', (err) => {
-            clearTimeout(timer);
-            const endTime = new Date();
-            resolve({
-                executed: false,
-                status: 'NOT EXECUTED',
-                machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
-                reason: `Execution failed: ${err.message}`,
-                executable,
-                command: `${executable} ${args.join(' ')}`,
-                workingDirectory: cwd,
-                startTime: startTimeIso,
-                endTime: endTime.toISOString(),
-                durationMs: endTime - startTime,
-                exitCode: null,
-                testsTotal: 0,
-                testsPassed: 0,
-                testsFailed: 0,
-                stdout: redactSensitiveOutput(stdout),
-                stderr: redactSensitiveOutput(stderr || err.message),
-                summary: `NOT EXECUTED — Execution error: ${err.message}`
-            });
-        });
-
-        child.on('close', (code) => {
-            clearTimeout(timer);
-            const endTime = new Date();
-            const durationMs = endTime - startTime;
-
-            if (killed) {
-                resolve({
-                    executed: true,
-                    status: 'FAIL',
-                    machineStatus: OUTCOME_STATUS.FAILED,
-                    reason: `Execution timed out after ${timeoutMs}ms`,
-                    executable,
-                    command: `${executable} ${args.join(' ')}`,
-                    workingDirectory: cwd,
-                    startTime: startTimeIso,
-                    endTime: endTime.toISOString(),
-                    durationMs,
-                    exitCode: code,
-                    testsTotal: 0,
-                    testsPassed: 0,
-                    testsFailed: 1,
-                    stdout: redactSensitiveOutput(stdout),
-                    stderr: `Execution timed out after ${timeoutMs}ms`,
-                    summary: `FAIL — Execution timed out after ${timeoutMs}ms`
-                });
-                return;
-            }
-
-            // Parse test counts and pass/fail status cleanly (zero fabricated counts)
-            let parsed = {
-                status: code === 0 ? 'UNTESTED' : 'FAIL',
-                machineStatus: code === 0 ? OUTCOME_STATUS.UNTESTED : OUTCOME_STATUS.FAILED,
-                testsPassed: 0,
-                testsFailed: 0,
-                testsTotal: 0
+                summary: `BLOCKED (${code}) — ${err.message}`
             };
-            if (executable === 'dotnet') {
-                parsed = parseDotnetOutput(stdout, stderr, code);
-            } else if (executable === 'mvn') {
-                parsed = parseMavenOutput(stdout, stderr, code);
-            } else if (executable === 'npm') {
-                parsed = parseNpmOutput(stdout, stderr, code);
-            }
+        }
+    }
 
-            const cleanOut = redactSensitiveOutput(stdout);
-            const cleanErr = redactSensitiveOutput(stderr);
-            const combinedClean = (cleanOut + (cleanErr ? '\n' + cleanErr : '')).trim();
+    // 4. Construct typed ExecutionRequest and dispatch strictly through TrustedExecutionGateway
+    const { operation, extraArgs } = mapToolAndArgsToOperation(executable, safeArgs);
+    const chosenOp = options.operation || operation;
+    const finding = options.finding || {};
+    const runId = options.runId || `run-${Date.now().toString(36)}`;
+    const appId = options.applicationId || finding.Application_Number || 'APP-DEFAULT';
+    const vulId = options.vulnerabilityId || finding.Vulnerability_ID || 'VUL-DEFAULT';
 
-            const injectionScreen = options.injectionScreen || new ContentInjectionScreen();
-            const screenOutputRes = injectionScreen.screen({
-                text: combinedClean,
-                contentSource: `testRunner:${executable}`,
-                trustClass: TRUST_CLASSES.UNTRUSTED_BUILD_TEST_OUTPUT,
-                runId: options.runId || 'test-runner',
-                filePath: cwd
-            });
+    const request = {
+        runId,
+        applicationId: String(appId),
+        vulnerabilityId: String(vulId),
+        workspaceRef: cwd,
+        operation: chosenOp,
+        toolchainProfileId: profile.profileId,
+        requestedExecutable: executable,
+        inputs: Array.isArray(options.inputs)
+            ? options.inputs
+            : (finding.Location_Path ? [String(finding.Location_Path)] : []),
+        expectedOutputPaths: Array.isArray(profile.outputArtifactPaths) ? profile.outputArtifactPaths : [],
+        extraArgs,
+        policyVersion: EXECUTION_POLICY_VERSION,
+        networkPolicy: options.networkPolicy || profile.networkPolicy || 'NO_NETWORK',
+        isControlledRestoreOperation: options.isControlledRestoreOperation === true,
+        requestedFeeds: options.requestedFeeds || [],
+        resourcePolicy: {
+            timeoutMs: options.timeoutMs || profile.runtimeLimits?.timeoutMs || DEFAULT_TIMEOUT_MS,
+            memoryMb: options.memoryMb || profile.runtimeLimits?.memoryMb || 2048,
+            cpus: options.cpus || profile.runtimeLimits?.cpus || 2,
+            pidsLimit: options.pidsLimit || profile.runtimeLimits?.pidsLimit || 128
+        }
+    };
 
-            if (screenOutputRes.outcome === SCREEN_OUTCOME.BLOCK || screenOutputRes.outcome === SCREEN_OUTCOME.QUARANTINE) {
-                resolve({
-                    executed: true,
-                    passed: false,
-                    status: 'BLOCKED',
-                    machineStatus: OUTCOME_STATUS.BLOCKED,
-                    reason: `Untrusted test output blocked by ContentInjectionScreen (${screenOutputRes.ruleId}): ${screenOutputRes.reason}`,
-                    injectionScreening: screenOutputRes.record,
-                    executable,
-                    command: `${executable} ${args.join(' ')}`,
-                    workingDirectory: cwd,
-                    startTime: startTimeIso,
-                    endTime: endTime.toISOString(),
-                    durationMs,
-                    exitCode: code,
-                    testsTotal: 0,
-                    testsPassed: 0,
-                    testsFailed: 0,
-                    stdout: cleanOut,
-                    stderr: cleanErr,
-                    consoleOutput: combinedClean,
-                    summary: `BLOCKED — Malicious instruction/marker detected in test output (${screenOutputRes.ruleId})`
-                });
-                return;
-            }
-
-            let summary;
-            let reason;
-            if (parsed.machineStatus === OUTCOME_STATUS.PASSED) {
-                summary = `PASS — Tests passed (${parsed.testsPassed}/${parsed.testsTotal}), Exit Code: ${code}`;
-                reason = 'All assertions passed';
-            } else if (parsed.machineStatus === OUTCOME_STATUS.UNTESTED) {
-                summary = `UNTESTED — Process exited 0 but zero tests executed (${parsed.testsPassed}/${parsed.testsTotal})`;
-                reason = 'Zero tests executed where validation requires test coverage';
-            } else {
-                summary = `FAIL — Test run failed (Passed: ${parsed.testsPassed}, Failed: ${parsed.testsFailed}), Exit Code: ${code}`;
-                reason = parsed.compilationFailed ? 'Compilation failed' : 'Test assertions failed';
-            }
-
-            resolve({
-                executed: true,
-                passed: parsed.machineStatus === OUTCOME_STATUS.PASSED,
-                status: parsed.status,
-                machineStatus: parsed.machineStatus,
-                reason,
-                injectionScreening: screenOutputRes.record,
-                executable,
-                command: `${executable} ${args.join(' ')}`,
-                workingDirectory: cwd,
-                startTime: startTimeIso,
-                endTime: endTime.toISOString(),
-                durationMs,
-                exitCode: code,
-                testsTotal: parsed.testsTotal,
-                testsPassed: parsed.testsPassed,
-                testsFailed: parsed.testsFailed,
-                stdout: cleanOut,
-                stderr: cleanErr,
-                consoleOutput: combinedClean,
-                summary
-            });
-        });
+    const gwRes = await gateway.executeOperation(request, {
+        ...options,
+        originalWorkspaceRoot: workspaceRoot
     });
+
+    // Preserve explicit cancel / timeout / blocked / could_not_run classifications cleanly
+    if (gwRes.timedOut || gwRes.machineStatus === OUTCOME_STATUS.TIMED_OUT) {
+        return {
+            ...gwRes,
+            executed: true,
+            passed: false,
+            status: 'TIMED OUT',
+            machineStatus: OUTCOME_STATUS.TIMED_OUT,
+            testsTotal: 0,
+            testsPassed: 0,
+            testsFailed: 0,
+            summary: `TIMED OUT — ${gwRes.reason || 'Sandbox execution exceeded timeout limit.'}`
+        };
+    }
+
+    if (gwRes.cancelled || gwRes.machineStatus === OUTCOME_STATUS.CANCELLED) {
+        return {
+            ...gwRes,
+            executed: false,
+            passed: false,
+            status: 'CANCELLED',
+            machineStatus: OUTCOME_STATUS.CANCELLED,
+            testsTotal: 0,
+            testsPassed: 0,
+            testsFailed: 0,
+            summary: `CANCELLED — ${gwRes.reason || 'Sandbox execution cancelled by operator/user.'}`
+        };
+    }
+
+    if (gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
+        return {
+            ...gwRes,
+            executed: false,
+            passed: false,
+            status: 'COULD NOT RUN',
+            machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
+            testsTotal: 0,
+            testsPassed: 0,
+            testsFailed: 0,
+            summary: `COULD NOT RUN — ${gwRes.reason || 'Required dependencies or artifacts unavailable offline.'}`
+        };
+    }
+
+    if (!gwRes.executed || gwRes.machineStatus === OUTCOME_STATUS.BLOCKED) {
+        return {
+            ...gwRes,
+            executed: false,
+            passed: false,
+            status: gwRes.reasonCode === SANDBOX_READINESS.SANDBOX_UNAVAILABLE ? 'SANDBOX UNAVAILABLE' : 'BLOCKED',
+            machineStatus: OUTCOME_STATUS.BLOCKED,
+            testsTotal: 0,
+            testsPassed: 0,
+            testsFailed: 0
+        };
+    }
+
+    // 5. Parse real stdout/stderr emitted by the sandboxed execution
+    const stdout = gwRes.stdout || '';
+    const stderr = gwRes.stderr || '';
+    const code = gwRes.exitCode;
+    let parsed = {
+        status: code === 0 ? 'UNTESTED' : 'FAIL',
+        machineStatus: code === 0 ? OUTCOME_STATUS.UNTESTED : OUTCOME_STATUS.FAILED,
+        testsPassed: 0,
+        testsFailed: 0,
+        testsTotal: 0
+    };
+    if (executable === 'dotnet') {
+        parsed = parseDotnetOutput(stdout, stderr, code);
+    } else if (executable === 'mvn') {
+        parsed = parseMavenOutput(stdout, stderr, code);
+    } else if (executable === 'npm') {
+        parsed = parseNpmOutput(stdout, stderr, code);
+    }
+
+    let summary;
+    let reason;
+    if (parsed.machineStatus === OUTCOME_STATUS.PASSED) {
+        summary = `PASS — Tests passed (${parsed.testsPassed}/${parsed.testsTotal}) via ${gwRes.backendType}, Exit Code: ${code}`;
+        reason = 'All assertions passed inside isolated execution backend';
+    } else if (parsed.machineStatus === OUTCOME_STATUS.UNTESTED) {
+        summary = `UNTESTED — Sandbox process exited 0 but zero tests executed (${parsed.testsPassed}/${parsed.testsTotal})`;
+        reason = 'Zero tests executed where validation requires test coverage';
+    } else {
+        summary = `FAIL — Test run failed (Passed: ${parsed.testsPassed}, Failed: ${parsed.testsFailed}), Exit Code: ${code}`;
+        reason = parsed.compilationFailed ? 'Compilation failed inside sandbox' : 'Test assertions failed inside sandbox';
+    }
+
+    return {
+        ...gwRes,
+        executed: true,
+        passed: parsed.machineStatus === OUTCOME_STATUS.PASSED,
+        status: parsed.status,
+        machineStatus: parsed.machineStatus,
+        reason,
+        testsTotal: parsed.testsTotal,
+        testsPassed: parsed.testsPassed,
+        testsFailed: parsed.testsFailed,
+        summary
+    };
 }
 
 /**
@@ -525,13 +548,18 @@ async function runBaselineTests(finding, workspaceRoot, options = {}) {
             executed: false,
             passed: false,
             status: 'NOT EXECUTED',
+            sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
             machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
             reason: 'No compatible test runner detected',
             summary: 'NOT EXECUTED — No test runner detected for technology ' + (finding.Technology || 'unknown')
         };
     }
 
-    return await executeRealTestRunner(runner.tool, runner.args, repoFull, options);
+    return await executeRealTestRunner(runner.tool, runner.args, repoFull, {
+        ...options,
+        workspaceRoot,
+        finding
+    });
 }
 
 /**
@@ -550,13 +578,18 @@ async function runPostFixTests(finding, workspaceRoot, options = {}) {
             executed: false,
             passed: false,
             status: 'NOT EXECUTED',
+            sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
             machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
             reason: 'No compatible test runner detected',
             summary: 'NOT EXECUTED — No test runner detected for technology ' + (finding.Technology || 'unknown')
         };
     }
 
-    return await executeRealTestRunner(runner.tool, runner.args, repoFull, options);
+    return await executeRealTestRunner(runner.tool, runner.args, repoFull, {
+        ...options,
+        workspaceRoot,
+        finding
+    });
 }
 
 /**

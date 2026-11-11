@@ -243,6 +243,7 @@ class SecretsConfigScanner extends ScannerAdapter {
         return {
             scannerId: this.id,
             status: SCANNER_STATUS.COMPLETED,
+            executionPolicy: 'READ_ONLY_STATIC_POLICY',
             findings: allFindings,
             durationMs: Date.now() - startTime,
             errors,

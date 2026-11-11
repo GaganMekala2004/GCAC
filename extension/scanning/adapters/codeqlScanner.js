@@ -406,6 +406,7 @@ class CodeQLScanner extends ScannerAdapter {
             return {
                 scannerId:  this.id,
                 status:     SCANNER_STATUS.NOT_INSTALLED,
+                executionPolicy: 'READ_ONLY_STATIC_POLICY',
                 findings:   [],
                 durationMs: Date.now() - startTime,
                 errors:     [],
@@ -525,6 +526,7 @@ class CodeQLScanner extends ScannerAdapter {
         return {
             scannerId:  this.id,
             status,
+            executionPolicy: 'READ_ONLY_STATIC_POLICY',
             findings,
             durationMs: Date.now() - startTime,
             errors,

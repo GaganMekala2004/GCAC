@@ -10,6 +10,9 @@ const crypto = require('crypto');
 const { loadVulnerabilities, updateVulnerabilityRow } = require('./csvParser');
 const { loadVulnerabilityDetails, loadAllReports } = require('./reportParser');
 const { RemediationEngine } = require('./remediationEngine');
+const { discoverEnvironment } = require('./sandbox/environmentDiscovery');
+const { TrustedExecutionGateway } = require('./sandbox/trustedExecutionGateway');
+const { loadAndVerifyToolchainRegistry, isTemplateDigestProfile } = require('./sandbox/toolchainProfiles');
 const { llmClient } = require('./llmClient');
 const { assertPathWithinWorkspace } = require('./pathUtils');
 const { ScanController } = require('./scanning/scanController');
@@ -64,8 +67,57 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'cancelScan',
     'reScanFinding',
     'getCodeqlStatus',
-    'installCodeql'
+    'installCodeql',
+    'getSandboxStatus',
+    'recoverSandboxInstances'
 ]);
+
+function getSandboxUiSnapshot(workspaceRoot, gateway = null) {
+    let env;
+    try {
+        env = discoverEnvironment(workspaceRoot);
+    } catch (err) {
+        env = {
+            sandboxAvailable: false,
+            sandboxStatus: 'SANDBOX_UNAVAILABLE',
+            selectedRuntime: null,
+            os: { platform: process.platform, arch: process.arch },
+            prerequisites: [err.message],
+            limitations: ['Environment discovery failed.']
+        };
+    }
+
+    let approvedProfiles = [];
+    let profileManifestError = null;
+    let hasTemplateDigests = false;
+    try {
+        const reg = loadAndVerifyToolchainRegistry();
+        hasTemplateDigests = Boolean(reg.hasTemplateDigests);
+        approvedProfiles = reg.profiles.map(p => ({
+            profileId: p.profileId,
+            supportedStack: p.supportedStack,
+            toolchainVersion: p.toolchainVersion,
+            networkPolicy: p.networkPolicy,
+            digestStatus: p.digestStatus || (isTemplateDigestProfile(p) ? 'TEMPLATE_PLACEHOLDER' : 'VERIFIED_IMAGE_DIGEST')
+        }));
+    } catch (err) {
+        profileManifestError = err.message;
+    }
+
+    return {
+        sandboxAvailable: Boolean(env.sandboxAvailable),
+        sandboxStatus: env.sandboxAvailable ? 'SANDBOX READY' : 'SANDBOX UNAVAILABLE',
+        backendType: env.sandboxAvailable ? 'CONTAINER_SANDBOX' : 'NONE',
+        selectedRuntime: env.selectedRuntime || 'None',
+        osPlatform: `${env.os?.platform || process.platform} (${env.os?.arch || process.arch})`,
+        approvedProfiles,
+        hasTemplateDigests,
+        profileManifestError,
+        prerequisites: env.prerequisites || [],
+        limitations: env.limitations || [],
+        recentDecisions: gateway ? gateway.getAuditDecisions().slice(-10) : []
+    };
+}
 
 /**
  * Combines imported CSV records with active local scanner findings
@@ -235,6 +287,11 @@ function activate(context) {
         findingsStore,
         reScanVerifier
     });
+
+    // Safe non-mutating crash recovery of stale sandbox instances on activation
+    if (typeof engine.recoverOrphanedSandboxes === 'function') {
+        engine.recoverOrphanedSandboxes().catch(() => {});
+    }
 
     if (vscode.workspace && typeof vscode.workspace.onDidGrantWorkspaceTrust === 'function') {
         vscode.workspace.onDidGrantWorkspaceTrust(() => {
@@ -603,6 +660,28 @@ async function handleWebviewMessage(message, webview) {
                 activeCsv: currentCsvPath,
                 availableCsvs: availableCsvs
             });
+            webview.postMessage({
+                type: 'SANDBOX_STATUS_UPDATED',
+                ...getSandboxUiSnapshot(currentWorkspaceRoot, engine?.executionGateway)
+            });
+            break;
+        }
+
+        case 'getSandboxStatus': {
+            webview.postMessage({
+                type: 'SANDBOX_STATUS_UPDATED',
+                ...getSandboxUiSnapshot(currentWorkspaceRoot, engine?.executionGateway)
+            });
+            break;
+        }
+
+        case 'recoverSandboxInstances': {
+            const rec = engine ? await engine.recoverOrphanedSandboxes() : { recovered: [] };
+            webview.postMessage({
+                type: 'SANDBOX_STATUS_UPDATED',
+                ...getSandboxUiSnapshot(currentWorkspaceRoot, engine?.executionGateway),
+                recoveredCount: rec.recovered?.length || 0
+            });
             break;
         }
 
@@ -768,6 +847,10 @@ async function handleWebviewMessage(message, webview) {
                 hasScanned: hasUserInitiatedScan
             });
             webview.postMessage({ type: 'INIT_DATA', vulnerabilities: list, preloadedDetails: preloaded });
+            webview.postMessage({
+                type: 'SANDBOX_STATUS_UPDATED',
+                ...getSandboxUiSnapshot(currentWorkspaceRoot, engine?.executionGateway)
+            });
             break;
         }
 

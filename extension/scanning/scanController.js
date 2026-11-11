@@ -29,6 +29,10 @@ class ScanController {
         this.workspaceRoot = workspaceRoot;
         this.findingsStore = options.findingsStore || new FindingsStore(workspaceRoot);
         this.isWorkspaceTrusted = options.isWorkspaceTrusted !== undefined ? options.isWorkspaceTrusted : true;
+        this.executionGateway = options.executionGateway || null;
+        this.sandboxBackend = options.sandboxBackend || null;
+        this.envReport = options.envReport || null;
+        this.profilesPath = options.profilesPath || undefined;
 
         // Register approved local scanners
         this.scanners = new Map();
@@ -74,7 +78,12 @@ class ScanController {
             if (seen.has(scanner.id)) continue;
             seen.add(scanner.id);
             try {
-                const avail = await scanner.isAvailable();
+                const avail = await scanner.isAvailable({
+                    workspaceRoot: this.workspaceRoot,
+                    executionGateway: this.executionGateway,
+                    sandboxBackend: this.sandboxBackend,
+                    envReport: this.envReport
+                });
                 result.push({
                     id: scanner.id,
                     name: scanner.name,
@@ -203,7 +212,11 @@ class ScanController {
             try {
                 const result = await scanner.scan(this.workspaceRoot, targetFullPath, {
                     scanId,
-                    timeoutMs: 60000
+                    timeoutMs: 60000,
+                    executionGateway: scanRequest.executionGateway || this.executionGateway,
+                    sandboxBackend: scanRequest.sandboxBackend || this.sandboxBackend,
+                    envReport: scanRequest.envReport || this.envReport,
+                    profilesPath: scanRequest.profilesPath || this.profilesPath
                 });
 
                 scannerResults.push(result);

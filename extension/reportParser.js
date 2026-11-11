@@ -194,6 +194,26 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
                 try { details.validation = JSON.parse(fs.readFileSync(valPath, 'utf-8')); } catch (e) {}
             }
 
+            const sbxPath = path.join(dir, 'sandbox-execution.json');
+            if (fs.existsSync(sbxPath) && !details.sandboxExecution) {
+                try { details.sandboxExecution = JSON.parse(fs.readFileSync(sbxPath, 'utf-8')); } catch (e) {}
+            }
+
+            const sbomPath = path.join(dir, 'sbom.cdx.json');
+            if (fs.existsSync(sbomPath) && !details.sbomEvidence) {
+                try {
+                    const rawSbom = JSON.parse(fs.readFileSync(sbomPath, 'utf-8'));
+                    const props = rawSbom?.metadata?.properties || [];
+                    const getProp = (k) => props.find(p => p.name === k)?.value || null;
+                    details.sbomEvidence = {
+                        format: `${rawSbom.bomFormat || 'CycloneDX'}/${rawSbom.specVersion || '1.5'}`,
+                        componentCount: Array.isArray(rawSbom.components) ? rawSbom.components.length : 0,
+                        externalSbomCliStatus: getProp('gcac:externalSbomCliStatus') || 'NOT_AVAILABLE',
+                        sbomStatus: getProp('gcac:sbomStatus') || (Array.isArray(rawSbom.components) && rawSbom.components.length > 0 ? 'MANIFEST_INVENTORY_ONLY' : 'NOT_AVAILABLE')
+                    };
+                } catch (e) {}
+            }
+
             const secPath = path.join(dir, 'security-review.json');
             if (fs.existsSync(secPath) && !details.securityReview) {
                 try { details.securityReview = JSON.parse(fs.readFileSync(secPath, 'utf-8')); } catch (e) {}
