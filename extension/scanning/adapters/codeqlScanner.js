@@ -4,6 +4,7 @@ const { execFileSync, spawn } = require('child_process');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+const { randomUUID } = require('crypto');
 const { ScannerAdapter } = require('../scannerAdapter');
 const { NormalizedFinding, SCANNER_STATUS, SEVERITY_LEVELS, inferTechnologyFromFilePath } = require('../findingModel');
 const { findExecutableOnPath } = require('../../sandbox/environmentDiscovery');
@@ -238,7 +239,7 @@ class CodeQLScanner extends ScannerAdapter {
         const findings = [];
         try {
             const sarif = typeof sarifContent === 'string' ? JSON.parse(sarifContent) : sarifContent;
-            const effectiveRoot = meta.repositoryRoot || workspaceRoot;
+            const effectiveRoot = meta.sourceRoot || meta.repositoryRoot || workspaceRoot;
 
             for (const run of (sarif.runs || [])) {
                 const driver = run.tool?.driver || {};
@@ -287,6 +288,8 @@ class CodeQLScanner extends ScannerAdapter {
                     } else if (path.isAbsolute(normalizedPath) && effectiveRoot) {
                         normalizedPath = path.relative(effectiveRoot, normalizedPath).replace(/\\/g, '/');
                     }
+
+                    if (meta.sourcePathPrefix) normalizedPath = path.posix.join(meta.sourcePathPrefix, normalizedPath);
 
                     const remGuidance = ruleDef.help?.text
                         || ruleDef.help?.markdown
@@ -412,23 +415,32 @@ class CodeQLScanner extends ScannerAdapter {
         }
 
         const codeqlBin  = avail.binaryPath || this._resolvedBinary;
-        const timeoutMs  = options.timeoutMs || 300000;
+        const timeoutMs  = Number.isFinite(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : 300000;
         const { language, suite, buildMode } = langInfo;
 
-        const stamp       = Date.now();
+        const stamp       = randomUUID();
         const tempDbDir   = path.join(os.tmpdir(), `gcac-codeql-db-${stamp}`);
         const sarifOutput = path.join(os.tmpdir(), `gcac-codeql-${stamp}.sarif`);
 
+        const stagedSourceRoot = path.join(os.tmpdir(), `gcac-codeql-source-${stamp}`);
         this.status = SCANNER_STATUS.RUNNING;
         let externalProcessNs = 0n;
         let parsingNs = 0n;
 
         try {
+            // Buildless extraction may restore packages and write obj files.
+            // A disposable copy prevents interference with concurrent adapters.
+            fs.mkdirSync(stagedSourceRoot);
+            const excluded = new Set(['.git', 'node_modules', 'bin', 'obj', 'output', 'remediation-output']);
+            fs.cpSync(scanTarget, fs.statSync(scanTarget).isDirectory() ? stagedSourceRoot : path.join(stagedSourceRoot, path.basename(scanTarget)), {
+                recursive: true,
+                filter: source => !fs.lstatSync(source).isSymbolicLink() && (source === scanTarget || !excluded.has(path.basename(source)))
+            });
             const createArgs = [
                 'database', 'create',
                 tempDbDir,
                 `--language=${language}`,
-                `--source-root=${scanTarget}`,
+                `--source-root=${stagedSourceRoot}`,
                 '--overwrite',
                 '--no-run-unnecessary-builds'
             ];
@@ -481,9 +493,16 @@ class CodeQLScanner extends ScannerAdapter {
             const repoContext = options.repoContext || {};
             const effectiveRepoRoot = repoContext.repositoryRoot || (fs.statSync(scanTarget).isDirectory() ? scanTarget : path.dirname(scanTarget));
             const sarifRaw = await fs.promises.readFile(sarifOutput, 'utf-8');
+            const sarif = JSON.parse(sarifRaw);
+            if (!Array.isArray(sarif.runs) || sarif.runs.length === 0 || sarif.runs.some(run =>
+                !Array.isArray(run.results) || run.invocations?.some(invocation => invocation.executionSuccessful === false))) {
+                throw new Error('CodeQL SARIF is incomplete or records unsuccessful execution; coverage cannot be verified.');
+            }
             const findings = this.parseSarif(sarifRaw, effectiveRepoRoot, scanId, {
                 repository: repoContext.repository || effectiveRepoRoot,
                 repositoryRoot: effectiveRepoRoot,
+                sourceRoot: stagedSourceRoot,
+                sourcePathPrefix: path.relative(effectiveRepoRoot, fs.statSync(scanTarget).isDirectory() ? scanTarget : path.dirname(scanTarget)).replace(/\\/g, '/'),
                 canonicalRepositoryId: repoContext.canonicalRepositoryId || '',
                 applicationNumber: repoContext.applicationNumber || '',
                 applicationName: repoContext.applicationName || '',
@@ -544,6 +563,7 @@ class CodeQLScanner extends ScannerAdapter {
             this.activeProcess = null;
             try { if (fs.existsSync(tempDbDir))   fs.rmSync(tempDbDir,   { recursive: true, force: true }); } catch {}
             try { if (fs.existsSync(sarifOutput)) fs.unlinkSync(sarifOutput); } catch {}
+            try { if (fs.existsSync(stagedSourceRoot)) fs.rmSync(stagedSourceRoot, { recursive: true, force: true }); } catch {}
         }
     }
 
@@ -589,7 +609,10 @@ class CodeQLScanner extends ScannerAdapter {
             const child = spawn(bin, safeArgs, {
                 stdio: ['ignore', 'ignore', 'pipe'],
                 windowsHide: true,
-                shell: false
+                shell: false,
+                // Extractors launch dotnet/java descendants. Terminating only
+                // the CLI leaves those processes holding stderr open forever.
+                detached: process.platform !== 'win32'
             });
             this.activeProcess = child;
 
@@ -604,9 +627,16 @@ class CodeQLScanner extends ScannerAdapter {
                 if (finished) return;
                 if (reason === 'timeout') timedOut = true;
                 if (reason === 'cancel') cancelled = true;
-                try { child.kill('SIGTERM'); } catch {}
+                const killTree = signal => {
+                    try {
+                        if (process.platform === 'win32') {
+                            execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { shell: false, windowsHide: true, stdio: 'ignore', timeout: 5000 });
+                        } else process.kill(-child.pid, signal);
+                    } catch { try { child.kill(signal); } catch {} }
+                };
+                killTree('SIGTERM');
                 forceKillTimer = setTimeout(() => {
-                    try { child.kill('SIGKILL'); } catch {}
+                    killTree('SIGKILL');
                 }, 400);
                 if (forceKillTimer.unref) forceKillTimer.unref();
             };

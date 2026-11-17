@@ -1,0 +1,58 @@
+{
+  "scenario": "defective",
+  "findingId": "DEV-CRYPTO-DEFECTIVE",
+  "runId": "c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b",
+  "executionMode": "LOCAL_DEVELOPMENT",
+  "localOutcome": "FAILED",
+  "verifiedRemediation": false,
+  "baseline": {
+    "total": 3,
+    "failed": 2
+  },
+  "postFix": {
+    "total": 3,
+    "failed": 2
+  },
+  "reScan": "REGRESSION_DETECTED",
+  "stages": [
+    {
+      "number": 1,
+      "status": "completed"
+    },
+    {
+      "number": 2,
+      "status": "completed"
+    },
+    {
+      "number": 3,
+      "status": "completed"
+    },
+    {
+      "number": 4,
+      "status": "completed"
+    },
+    {
+      "number": 5,
+      "status": "completed"
+    },
+    {
+      "number": 6,
+      "status": "failed"
+    },
+    {
+      "number": 7,
+      "status": "failed"
+    },
+    {
+      "number": 8,
+      "status": "deferred_in_dev_mode"
+    },
+    {
+      "number": 9,
+      "status": "failed"
+    }
+  ],
+  "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+  "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+  "originalUnchanged": true
+}

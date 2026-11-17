@@ -407,6 +407,62 @@ class TrustedExecutionGateway {
             };
         }
 
+        // Guard against executing unprovisioned template toolchain profiles in real container runtimes
+        const { ContainerSandboxBackend } = require('./containerSandboxBackend');
+        const isRealLocalContainer = (backend instanceof ContainerSandboxBackend) ||
+            (backend && typeof backend.execFileFn === 'function' && typeof backend.buildContainerRunArgs === 'function');
+
+        if (isRealLocalContainer && options.allowTemplateDigests !== true && (isTemplateDigestProfile(profile) || profile.digestStatus === 'TEMPLATE_PLACEHOLDER')) {
+            const blockMsg = `UNPROVISIONED_TOOLCHAIN_PROFILE: Toolchain profile '${profile.profileId}' uses template placeholder digest '${profile.imageDigest}' (status: TEMPLATE_PLACEHOLDER). Only verified, provisioned toolchain profiles can execute in the container sandbox. Container auto-pull is strictly disabled by enterprise security policy.`;
+            this.lifecycleManager.transition(instance.instanceId, SANDBOX_LIFECYCLE_STATES.BLOCKED, blockMsg, {
+                reasonCode: 'TOOLCHAIN_IMAGE_UNAVAILABLE'
+            });
+            this._recordAuditDecision({
+                runId: request.runId,
+                instanceId: instance.instanceId,
+                vulnerabilityId: request.vulnerabilityId,
+                operation: request.operation,
+                toolchainProfileId: profile.profileId,
+                decision: 'DENIED',
+                reasonCode: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
+                reason: blockMsg,
+                backendType: avail.backendType
+            });
+            return {
+                executed: false,
+                passed: false,
+                status: 'COULD NOT RUN',
+                sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
+                machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
+                failureCategory: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
+                reasonCode: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
+                reason: blockMsg,
+                prerequisites: avail.prerequisites || [],
+                instanceId: instance.instanceId,
+                runId: request.runId,
+                operationId: request.operation,
+                backendType: avail.backendType || BACKEND_TYPES.NONE,
+                toolchainProfileId: profile.profileId,
+                toolchainProfileHash: profile.profileSha256,
+                imageDigest: profile.imageDigest,
+                networkPolicy: netPolicy.policyMode,
+                dependencyStatus: depGov.dependencyStatus,
+                executable,
+                approvedArgs,
+                command: `${executable} ${approvedArgs.join(' ')}`,
+                testsTotal: 0,
+                testsPassed: 0,
+                testsFailed: 0,
+                exitCode: null,
+                durationMs: 0,
+                stdout: '',
+                stderr: blockMsg,
+                lifecycleHistory: instance.history,
+                gatewayBoundaryNote: this.gatewayBoundaryNote,
+                summary: `COULD NOT RUN (TOOLCHAIN_IMAGE_UNAVAILABLE) — ${blockMsg}`
+            };
+        }
+
         // Prepare sandbox environment
         let preparedEnv;
         try {
@@ -503,8 +559,9 @@ class TrustedExecutionGateway {
         });
 
         // Support cancellation token
+        let cancellationSubscription;
         if (options.cancellationToken && typeof options.cancellationToken.onCancel === 'function') {
-            options.cancellationToken.onCancel(() => {
+            cancellationSubscription = options.cancellationToken.onCancel(() => {
                 backend.cancelOperation(instance.instanceId).catch(() => {});
             });
         }
@@ -518,6 +575,7 @@ class TrustedExecutionGateway {
                 args: approvedArgs
             });
         } finally {
+            cancellationSubscription?.dispose?.();
             const cleanRes = await backend.cleanup(instance.instanceId);
             if (cleanRes && cleanRes.cleaned === false) {
                 this.lifecycleManager.transition(instance.instanceId, SANDBOX_LIFECYCLE_STATES.CLEANUP_FAILED, cleanRes.error || 'Cleanup failed.');
@@ -595,6 +653,7 @@ class TrustedExecutionGateway {
             stderr: cleanErr,
             consoleOutput: combinedClean,
             outputArtifactHashes: execResult.outputArtifactHashes || {},
+            outputArtifacts: execResult.outputArtifacts || {},
             injectionScreening: screenRes.record,
             lifecycleHistory: this.lifecycleManager.getInstance(instance.instanceId)?.history || [],
             gatewayBoundaryNote: this.gatewayBoundaryNote

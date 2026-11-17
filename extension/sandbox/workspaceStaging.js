@@ -24,7 +24,6 @@ const EXCLUDED_DIR_NAMES = new Set([
     'workspaces',
     'node_modules',
     'bin',
-    'obj',
     'TestResults'
 ]);
 
@@ -74,11 +73,16 @@ function isExcludedRelativePath(relPath, options = {}) {
     for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
         if (seg === '.git' && options.allowGitMetadata === true) continue;
-        if (i < segments.length - 1 && EXCLUDED_DIR_NAMES.has(seg)) {
+        if (seg === 'obj') {
+            if (i === segments.length - 1) continue;
+            const sub = segments.slice(i + 1).join('/');
+            if (/^(?:project\.assets\.json|project\.nuget\.cache|[^/]+\.nuget\.(?:g\.props|g\.targets|dgspec\.json))$/i.test(sub)) {
+                continue;
+            }
             return true;
         }
+        if (EXCLUDED_DIR_NAMES.has(seg)) return true;
         if (i === segments.length - 1) {
-            if (EXCLUDED_DIR_NAMES.has(seg)) return true;
             if (EXCLUDED_FILE_PATTERNS.some(rx => rx.test(seg))) return true;
         }
     }
@@ -216,10 +220,39 @@ class WorkspaceStagingManager {
                 } else if (entry.isFile()) {
                     fs.mkdirSync(path.dirname(destAbs), { recursive: true });
                     const buf = fs.readFileSync(srcAbs);
-                    fs.writeFileSync(destAbs, buf);
+                    let writeBuf = buf;
+                    if (entry.name === 'project.assets.json' || entry.name.endsWith('.nuget.g.props') || entry.name.endsWith('.nuget.g.targets')) {
+                        try {
+                            const str = buf.toString('utf8');
+                            // Restore metadata may come from a scanner's disposable package
+                            // directory, not the user's default NuGet cache. Rebase every
+                            // recorded package folder in the staged copy only.
+                            const assetsPath = path.join(srcDir, 'project.assets.json');
+                            let packageRoots = [];
+                            if (fs.existsSync(assetsPath)) {
+                                packageRoots = Object.keys(JSON.parse(fs.readFileSync(assetsPath, 'utf8')).packageFolders || {});
+                            }
+                            const hostNuget = path.join(os.homedir(), '.nuget', 'packages');
+                            let updated = str;
+                            for (const root of packageRoots.sort((a, b) => b.length - a.length)) {
+                                const prefix = root.replace(/[\\/]+$/, '');
+                                if (prefix) updated = updated.split(prefix).join('/sandbox-cache/nuget');
+                            }
+                            if (hostNuget && updated.includes(hostNuget)) {
+                                updated = updated.split(hostNuget).join('/sandbox-cache/nuget');
+                            }
+                            if (updated.includes('/root/.nuget/packages')) {
+                                updated = updated.split('/root/.nuget/packages').join('/sandbox-cache/nuget');
+                            }
+                            if (updated !== str) {
+                                writeBuf = Buffer.from(updated, 'utf8');
+                            }
+                        } catch {}
+                    }
+                    fs.writeFileSync(destAbs, writeBuf);
                     stagedFiles.push(rel);
                     hashAccumulator.update(rel + ':');
-                    hashAccumulator.update(buf);
+                    hashAccumulator.update(writeBuf);
                 }
             }
         };

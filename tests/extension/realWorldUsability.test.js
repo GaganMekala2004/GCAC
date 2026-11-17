@@ -492,7 +492,7 @@ async function run() {
 
             // Construct disposable repo + mocked sandbox backend to verify all failure outcomes
             const diagRepo = initDisposableGitRepo(path.join(tmpBase, 'diag-dotnet-repo'), {
-                'Diag.csproj': '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>',
+                'Diag.csproj': '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><IsTestProject>true</IsTestProject></PropertyGroup></Project>',
                 'TestResults/sample.trx': '<TestRun />'
             });
             const readyEnv = {
@@ -544,7 +544,7 @@ async function run() {
                 stdout: 'Passed!  - Failed:     0, Passed:     3, Skipped:     0, Total:     3',
                 stderr: ''
             });
-            assert.strictEqual(passRes.passed, true);
+            assert.strictEqual(passRes.passed, true, passRes.rootError || passRes.summary);
             assert.strictEqual(passRes.machineStatus, OUTCOME_STATUS.PASSED);
 
             // 2. Tests Failed (counts known, not retryEligible for blind rerun, baseline vs post-fix distinct)
@@ -556,7 +556,7 @@ async function run() {
             assert.strictEqual(failPostRes.failureCategory, FAILURE_CATEGORIES.TESTS_FAILED);
             assert.strictEqual(failPostRes.retryEligible, false);
             assert.strictEqual(failPostRes.countsKnown, true);
-            assert(failPostRes.testReportLocation && failPostRes.testReportLocation.endsWith('sample.trx'));
+            assert.strictEqual(failPostRes.testReportLocation, null, 'A stale workspace report must not be attributed to the current gateway execution');
 
             const failBaseRes = await runScenario({
                 exitCode: 1,
@@ -617,7 +617,8 @@ async function run() {
                 stdout: 'Unexpected runner panic without standard summary line',
                 stderr: ''
             });
-            assert.strictEqual(parseFailRes.failureCategory, FAILURE_CATEGORIES.PARSE_FAILED);
+            assert.strictEqual(parseFailRes.failureCategory, FAILURE_CATEGORIES.EXECUTION_FAILED);
+            assert(parseFailRes.rootError.includes('panic'));
             assert.strictEqual(parseFailRes.countsKnown, false);
 
             // 9. SANDBOX_UNAVAILABLE -> fail closed (no host fallback)
@@ -665,7 +666,7 @@ async function run() {
         {
             const retryWs = initDisposableGitRepo(path.join(tmpBase, 'retry-ws'), {
                 'Controllers/OrderController.cs': 'using Microsoft.Data.SqlClient;\npublic class OrderController { public string Find(string q) { var cmd = new SqlCommand("SELECT * FROM Orders WHERE Id = \'" + q + "\'"); return cmd.CommandText; } }\n',
-                'App.csproj': '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>'
+                'App.csproj': '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><IsTestProject>true</IsTestProject></PropertyGroup></Project>'
             });
             fs.mkdirSync(path.join(retryWs, 'vulnerability'), { recursive: true });
             const retryCsv = path.join(retryWs, 'vulnerability', 'vulnerabilities.csv');
@@ -757,7 +758,7 @@ async function run() {
             await assert.rejects(() => engine.executePipeline('VUL-RETRY-001'), /timed out/i);
 
             const failedState = engine.loadRunState('VUL-RETRY-001');
-            assert.strictEqual(failedState.status, 'FAILED');
+            assert.strictEqual(failedState.status, 'BLOCKED');
             assert.strictEqual(failedState.failedStage, 3);
             assert.strictEqual(failedState.failureCategory, 'TIMED_OUT');
             assert.strictEqual(failedState.retryEligibility.retryEligible, true);

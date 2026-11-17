@@ -384,7 +384,12 @@ function verifyPostApplyMatchesProposal(approvalRecord, actualAppliedFiles = [],
     };
 }
 
+function resolveApprovalIntent(command, prompt = '') {
+    const explicit = command || String(prompt).trim().match(/^\/?(final-approve|approve)\b/i)?.[1]?.toLowerCase();
+    return explicit === 'final-approve' ? 'STAGE8' : explicit === 'approve' ? 'STAGE4' : null;
+}
 module.exports = {
+    resolveApprovalIntent,
     APPROVAL_SCHEMA_VERSION,
     APPROVAL_POLICY_VERSION,
     DEFAULT_APPROVAL_TTL_MS,

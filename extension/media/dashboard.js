@@ -1323,6 +1323,7 @@
             switch (message.type) {
                 case 'CONFIG_UPDATED':
                     currentConfig = {
+                        executionMode: message.executionMode || 'ENTERPRISE',
                         activeRepo: message.activeRepo || '',
                         activeRepoPath: message.activeRepoPath || '',
                         activeRepoContext: message.activeRepoContext || null,
@@ -1500,7 +1501,7 @@
         const repoCtx = currentConfig.activeRepoContext;
 
         if (displayRepoName) {
-            displayRepoName.textContent = repoBaseName;
+            displayRepoName.textContent = currentConfig.executionMode === 'LOCAL_DEVELOPMENT' ? `${repoBaseName} [LOCAL_DEVELOPMENT]` : repoBaseName;
             displayRepoName.title = currentConfig.activeRepoPath || currentConfig.activeRepo || 'No repository selected';
         }
         if (displayRepoIdentityBadge) {
@@ -1747,13 +1748,13 @@
                 isRemediating = false;
                 if (headerRunIndicator) headerRunIndicator.style.display = 'none';
                 if (navActiveRunPulse) navActiveRunPulse.style.display = 'none';
-                if (activeRunSummaryStage) activeRunSummaryStage.textContent = evt.failedStage ? `Failed at Stage ${evt.failedStage}` : 'Failed';
+                if (activeRunSummaryStage) activeRunSummaryStage.textContent = evt.failedStage ? `${evt.executionState === 'BLOCKED' ? 'Blocked' : 'Failed'} at Stage ${evt.failedStage}` : (evt.executionState === 'BLOCKED' ? 'Blocked' : 'Failed');
                 if (activeRunSummaryStatus) activeRunSummaryStatus.textContent = evt.failureCategory || 'Failed';
                 if (idx >= 0) {
-                    setStageStatus(idx, 'failed', evt.reason || evt.failureCategory || 'Execution failed.');
+                    setStageStatus(idx, evt.executionState === 'BLOCKED' ? 'blocked' : 'failed', evt.reason || evt.failureCategory || 'Execution failed.');
                 } else if (evt.failedStage && currentDetails?.stages) {
                     const fallbackIdx = Math.min(currentDetails.stages.length - 1, Math.max(0, evt.failedStage - 1));
-                    setStageStatus(fallbackIdx, 'failed', evt.reason || evt.failureCategory || 'Execution failed.');
+                    setStageStatus(fallbackIdx, evt.executionState === 'BLOCKED' ? 'blocked' : 'failed', evt.reason || evt.failureCategory || 'Execution failed.');
                 }
                 if (selectedVulnerability) {
                     postToHost({ command: 'loadDetails', vulnerabilityId: selectedVulnerability.Vulnerability_ID });
@@ -2667,19 +2668,23 @@
                 let icon = stageNum;
                 if (status === 'completed') icon = '✓';
                 else if (status === 'failed') { icon = '✕'; hasFailure = true; allDone = false; }
-                else if (status === 'blocked') { icon = '!'; allDone = false; }
+                else if (status === 'blocked' || status === 'blocked_by_prerequisite') { icon = '!'; allDone = false; }
                 else if (status === 'awaiting_review') {
                     icon = '!';
                     allDone = false;
                     if (stage.id === 'human-gate') showGate4 = true;
                     if (stage.id === 'final-human-gate') showGate6 = true;
-                } else if (status === 'in_progress' || status === 'active' || status === 'pending') {
+                } else if (status === 'in_progress' || status === 'active' || status === 'pending' || status === 'not_started') {
                     allDone = false;
                 }
 
                 const rawName = String(stage.name || stage.label || `Stage ${stageNum}`);
                 const displayName = /^Stage\s+\d+/i.test(rawName) ? rawName : `Stage ${stageNum}: ${rawName}`;
-                const badgeLabel = status === 'blocked' ? 'BLOCKED' : (status === 'active' ? 'ACTIVE' : status.replace('_', ' ').toUpperCase());
+                const badgeLabel = status === 'blocked' ? 'BLOCKED'
+                    : status === 'blocked_by_prerequisite' ? 'BLOCKED BY PREREQUISITE'
+                    : status === 'not_started' ? 'NOT STARTED'
+                    : status === 'active' ? 'ACTIVE'
+                    : status.replace(/_/g, ' ').toUpperCase();
 
                 li.innerHTML = `
                     <div class="step-number">${icon}</div>
@@ -2694,6 +2699,16 @@
                 pipelineStepper.appendChild(li);
             });
 
+            const isStage3Blocked = details.stages?.[2]?.status === 'blocked' ||
+                details.stages?.[2]?.status === 'failed' ||
+                details.failedStage === 3 ||
+                details.runState?.stages?.[2]?.status === 'blocked' ||
+                details.runState?.stages?.[2]?.status === 'failed' ||
+                details.runState?.status === 'BLOCKED';
+            if (isStage3Blocked) {
+                showGate4 = false;
+            }
+
             const valFailed = hasFailure || details.findingState === 'VALIDATION_FAILED' || details.findingState === 'COULD_NOT_RUN' ||
                 details.approvalDecision === 'BLOCKED_STAGE8' || details.securityValidationOutcome === 'FAILED';
             if (valFailed) showGate6 = false;
@@ -2703,9 +2718,11 @@
                     copilotHandoffBanner.className = 'scan-coverage-banner u-mb-8';
                     copilotHandoffBanner.textContent = details.handoff?.note ||
                         'HANDED_OFF_TO_COPILOT / AWAITING_VERIFIED_RESULT: Copilot Chat opened. Run @vulnerability-orchestrator in Copilot Chat, then click Sync Status if needed.';
-                } else if (details.terminalBanner && valFailed) {
+                } else if (details.terminalBanner && (valFailed || isStage3Blocked)) {
                     copilotHandoffBanner.className = 'scan-coverage-banner error u-mb-8';
-                    copilotHandoffBanner.textContent = details.terminalBanner;
+                    copilotHandoffBanner.textContent = details.terminalBanner +
+                        ((details.failureCategory || details.runState?.failureCategory) === 'PATCH_INVALID'
+                            ? ' No approval request exists: proposal validation failed. Generate a valid proposal before Stage 4 approval becomes available.' : '');
                 } else {
                     copilotHandoffBanner.className = 'scan-coverage-banner u-hidden u-mb-8';
                     copilotHandoffBanner.textContent = '';
@@ -2714,11 +2731,16 @@
 
             // Overall status badge
             if (pipelineOverallStatus) {
+                const isOverallBlocked = details.status === 'BLOCKED' || details.workflowLifecycle === 'BLOCKED' || isStage3Blocked;
                 if (details.workflowLifecycle === 'HANDED_OFF_TO_COPILOT' || details.findingState === 'AWAITING_VERIFIED_RESULT') {
                     pipelineOverallStatus.textContent = 'Awaiting Verified Result';
                     pipelineOverallStatus.className = 'badge badge-status-review';
+                } else if (isOverallBlocked) {
+                    pipelineOverallStatus.textContent = 'Blocked';
+                    pipelineOverallStatus.className = 'badge badge-status-blocked';
                 } else if (valFailed) {
-                    pipelineOverallStatus.textContent = details.findingState === 'COULD_NOT_RUN' ? 'Could Not Run' : 'Validation Failed';
+                    pipelineOverallStatus.textContent = details.findingState === 'COULD_NOT_RUN' ? 'Could Not Run'
+                        : details.securityValidationOutcome === 'FAILED' || details.findingState === 'VALIDATION_FAILED' ? 'Validation Failed' : 'Execution Failed';
                     pipelineOverallStatus.className = 'badge badge-status-failed';
                 } else if (allDone && details.formalClosure === 'RESOLVED_CLOSED') {
                     pipelineOverallStatus.textContent = 'Remediated';
@@ -2739,22 +2761,31 @@
             if (humanGateCard) {
                 humanGateCard.style.display = showGate4 ? 'flex' : 'none';
                 if (showGate4 && gate4PatchSummary) {
+                    const hasVerifiedDiff = Boolean(details.proposedDiffSha256 && /^[0-9a-f]{64}$/i.test(details.proposedDiffSha256));
+                    const diffHash = hasVerifiedDiff ? details.proposedDiffSha256 : (details.approvalRecord?.proposedDiffSha256 || null);
+                    const authState = details.approvalRecord?.reviewerAuthorizationStatus || 'AUTHENTICATION_NOT_VERIFIED';
+
                     gate4PatchSummary.innerHTML = `
                         <div class="gate4-patch-box">
+                            ${!hasVerifiedDiff ? '<div class="badge badge-status-blocked u-mb-4">[NON-APPROVABLE DRAFT RECOMMENDATION]</div>' : ''}
                             <div><strong>Root Cause:</strong> ${escapeHtml(selectedVulnerability?.Agent_Code_Analysis_Output || 'Untrusted input parameter concatenated directly into raw query.')}</div>
-                            <div class="u-mt-4"><strong>Proposed Fix:</strong> ${escapeHtml(selectedVulnerability?.Remediation_Guidance || 'Use parameterized query placeholder.')}</div>
+                            <div class="u-mt-4"><strong>${hasVerifiedDiff ? 'Proposed Fix' : 'Draft Recommendation (Non-Approvable)'}:</strong> ${escapeHtml(selectedVulnerability?.Remediation_Guidance || 'Use parameterized query placeholder.')}</div>
                             <div class="u-mt-4"><strong>Target File:</strong> <code>${escapeHtml(selectedVulnerability?.Location_Path || 'Source.cs')}</code> (Line ${escapeHtml(selectedVulnerability?.Line_Number || '1')})</div>
                         </div>
                     `;
                     if (gate4TrustMeta) {
-                        const diffHash = details.approvalRecord?.proposedDiffSha256 || 'Diff-bound upon Stage 4 pause';
-                        const authState = details.approvalRecord?.reviewerAuthorizationStatus || 'AUTHENTICATION_NOT_VERIFIED';
                         gate4TrustMeta.className = 'gate4-trust-meta u-mt-6';
                         gate4TrustMeta.innerHTML = `
-                            <div><strong>Diff SHA-256:</strong> <code>${escapeHtml(diffHash)}</code></div>
+                            <div><strong>Diff SHA-256:</strong> <code>${escapeHtml(diffHash || 'NONE (No verified diff generated — Approval Blocked)')}</code></div>
                             <div><strong>Reviewer Identity:</strong> <code>${escapeHtml(authState)}</code> (Local PoC Mode)</div>
                             <div><strong>Control Boundary:</strong> Extension approval enforces app-controlled patch apply only; native Copilot tool calls are not intercepted.</div>
                         `;
+                    }
+                    if (btnApprove) {
+                        btnApprove.disabled = !hasVerifiedDiff;
+                        if (!hasVerifiedDiff) {
+                            btnApprove.title = 'NON-APPROVABLE: Mandatory patch diff not generated or verified';
+                        }
                     }
                 }
             }
@@ -2842,8 +2873,18 @@
                 : '<div class="empty-state"><p>No audit report generated yet. Run remediation to produce Shared Markdown evidence.</p></div>';
         }
 
+        if (details.runState?.executionMode === 'LOCAL_DEVELOPMENT' && details.runState.localOutcome && activeRunSummaryStatus) activeRunSummaryStatus.textContent = `LOCAL_DEVELOPMENT — ${details.runState.localOutcome}`;
         renderDiffView(details.patchDiff);
         renderTestEvidenceView(details);
+        if (valContent && details.runState?.executionMode === 'LOCAL_DEVELOPMENT' && details.runState.failedStage === 3 &&
+            ['UNTESTED', 'COULD_NOT_RUN'].includes(details.baselineValidation?.machineStatus) &&
+            ['NO_TESTS_DISCOVERED', 'TEST_PROJECT_NOT_FOUND', 'TEST_RESULTS_MISSING', 'RESTORE_FAILED'].includes(details.baselineValidation?.failureCategory)) {
+            const acknowledge = document.createElement('button');
+            acknowledge.className = 'btn btn-secondary';
+            acknowledge.textContent = 'Acknowledge Development Baseline Exception';
+            acknowledge.addEventListener('click', () => postToHost({ command: 'acknowledgeDevelopmentBaseline', vulnerabilityId: details.vulnerabilityId || details.findingId || selectedVulnerability?.Vulnerability_ID }));
+            valContent.appendChild(acknowledge);
+        }
         renderTraceLogView(details.traceLog);
 
         if (activeRunsStepper) {
@@ -3051,7 +3092,7 @@
     function renderReviewQueueView() {
         if (!reviewQueueCardsList) return;
 
-        const queueItems = allVulnerabilities.filter(v => (v.Requires_Human_Review || '').toLowerCase() === 'true' || (v.Remediation_Status || '').toLowerCase().includes('review'));
+        const queueItems = allVulnerabilities.filter(v => v.GCAC_Approval_Eligible === true);
         if (queueTotalBadge) queueTotalBadge.textContent = `${queueItems.length} Finding${queueItems.length === 1 ? '' : 's'} Requiring Authorization`;
 
         if (queueItems.length === 0) {

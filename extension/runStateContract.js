@@ -1,3 +1,4 @@
+const { isBaselineEligible } = require('./baselineEligibility');
 'use strict';
 
 const fs = require('fs');
@@ -33,6 +34,7 @@ const WORKFLOW_LIFECYCLE = Object.freeze({
     WAITING_APPROVAL: 'WAITING_APPROVAL',
     COMPLETED: 'COMPLETED',
     CANCELLED: 'CANCELLED',
+    BLOCKED: 'BLOCKED',
     ERROR: 'ERROR'
 });
 
@@ -132,6 +134,26 @@ function mapLegacyStatusToLifecycle(state = {}) {
         securityValidationOutcome = VALIDATION_OUTCOME.NOT_VERIFIED;
     }
 
+    if (rawStatus === 'MANUAL_REVIEW' || state.isManualReview) {
+        return { workflowLifecycle: WORKFLOW_LIFECYCLE.BLOCKED, securityValidationOutcome: VALIDATION_OUTCOME.NOT_EXECUTED,
+            approvalDecision: APPROVAL_DECISION.NOT_REQUESTED, formalClosure: FORMAL_CLOSURE.OPEN, findingState: FINDING_STATE.OPEN };
+    }
+
+    if (rawStatus === 'BLOCKED' || state.failureCategory === 'TOOLCHAIN_IMAGE_UNAVAILABLE') {
+        workflowLifecycle = WORKFLOW_LIFECYCLE.BLOCKED;
+        securityValidationOutcome = VALIDATION_OUTCOME.NOT_EXECUTED;
+        approvalDecision = APPROVAL_DECISION.BLOCKED_STAGE4;
+        formalClosure = FORMAL_CLOSURE.COULD_NOT_RUN;
+        findingState = FINDING_STATE.COULD_NOT_RUN;
+        return {
+            workflowLifecycle,
+            securityValidationOutcome,
+            approvalDecision,
+            formalClosure,
+            findingState
+        };
+    }
+
     if (!state.workflowLifecycle) {
         if (rawStatus === 'HANDED_OFF_TO_COPILOT' || rawStatus === 'AWAITING_VERIFIED_RESULT') {
             workflowLifecycle = WORKFLOW_LIFECYCLE.HANDED_OFF_TO_COPILOT;
@@ -214,11 +236,17 @@ function mapLegacyStatusToLifecycle(state = {}) {
 }
 
 function deriveTerminalBanner(state = {}) {
+    if (state.executionMode === 'LOCAL_DEVELOPMENT' && state.localOutcome) return `LOCAL_DEVELOPMENT — ${state.localOutcome}`;
     const wf = state.workflowLifecycle;
     const val = state.securityValidationOutcome;
     const closure = state.formalClosure;
     const finding = state.findingState;
 
+    if (state.isManualReview || state.status === 'MANUAL_REVIEW') return 'Manual Architectural / Security Review Required';
+    if (state.failureCategory === 'TOOLCHAIN_IMAGE_UNAVAILABLE') {
+        return 'Workflow Blocked — Toolchain Image Unavailable';
+    }
+    if (wf === WORKFLOW_LIFECYCLE.BLOCKED) return 'Workflow Blocked — Prerequisites Not Satisfied';
     if (wf === WORKFLOW_LIFECYCLE.HANDED_OFF_TO_COPILOT || finding === FINDING_STATE.AWAITING_VERIFIED_RESULT) {
         return 'Handed Off to Copilot — Awaiting Verified Result';
     }
@@ -312,6 +340,33 @@ function normalizeCanonicalRunState(raw = {}, findingId = '') {
         handoff: raw.handoff || null,
         updatedAt: raw.updatedAt || new Date().toISOString()
     };
+    if (raw.baselineValidation && !isBaselineEligible(raw.baselineValidation) &&
+        !raw.stage4Approved && (normalized.stages[3].status === 'active' ||
+        normalized.approvalDecision === APPROVAL_DECISION.PENDING_STAGE4)) {
+        normalized.workflowLifecycle = WORKFLOW_LIFECYCLE.BLOCKED;
+        normalized.status = 'BLOCKED';
+        normalized.approvalDecision = APPROVAL_DECISION.BLOCKED_STAGE4;
+        normalized.securityValidationOutcome = VALIDATION_OUTCOME.NOT_EXECUTED;
+        normalized.stages[2].status = 'blocked';
+        normalized.stages[3].status = 'blocked_by_prerequisite';
+        for (let i = 4; i < normalized.stages.length; i++) normalized.stages[i].status = 'not_started';
+    }
+    // Recover the missing display marker on older verified Stage 8 pauses.
+    // This does not grant approval or change any validation evidence.
+    if (normalized.approvalDecision === APPROVAL_DECISION.PENDING_STAGE8 &&
+        normalized.securityValidationOutcome === VALIDATION_OUTCOME.PASSED &&
+        raw.stage4Approved && raw.patchAppliedAtStage5 && raw.evidenceChecklist?.finalSignOffAllowed === true) {
+        normalized.stages[7].status = 'awaiting_review';
+        normalized.stages[7].summary = 'Validation passed. Final human sign-off required.';
+        normalized.stages[8].status = 'not_started';
+    }
+    if (normalized.workflowLifecycle === WORKFLOW_LIFECYCLE.COMPLETED &&
+        normalized.formalClosure === FORMAL_CLOSURE.RESOLVED_CLOSED &&
+        normalized.approvalDecision === APPROVAL_DECISION.APPROVED_STAGE8 &&
+        normalized.securityValidationOutcome === VALIDATION_OUTCOME.PASSED && normalized.stages[7].status === 'completed') {
+        normalized.stages[8].status = 'completed';
+        normalized.stages[8].summary = 'Local verification evidence finalized. Remote publication is recorded separately.';
+    }
     normalized.terminalBanner = deriveTerminalBanner(normalized);
     return normalized;
 }
@@ -347,8 +402,10 @@ class RunStateManager {
         canonical.terminalBanner = deriveTerminalBanner(canonical);
 
         const tmp = `${p}.${process.pid}.${Date.now()}.tmp`;
-        fs.writeFileSync(tmp, JSON.stringify(canonical, null, 2), 'utf8');
-        fs.renameSync(tmp, p);
+        require('./evidenceLedger').writeStateWithIntegrity(path.dirname(p), () => {
+            fs.writeFileSync(tmp, JSON.stringify(canonical, null, 2), 'utf8');
+            fs.renameSync(tmp, p);
+        });
         return canonical;
     }
 

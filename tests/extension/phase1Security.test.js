@@ -230,7 +230,7 @@ async function run() {
                 proposedDiffSha256: 'deadbeef00000000000000000000000000000000000000000000000000000000',
                 classification: { category: 'Command Injection', route: 'DotNetSourceFix', severity: 'High' },
                 rca: { summary: 'test' },
-                baselineValidation: { status: 'PASS', passed: true, testsTotal: 1 },
+                baselineValidation: { status: 'PASS', machineStatus: 'PASSED', executed: true, countsKnown: true, exitCode: 0, passed: true, testsTotal: 1, testsPassed: 1, testsFailed: 0 },
                 patchDiff: '--- a/Pay.cs\n+++ b/Pay.cs\n@@ -1 +1 @@\n-// fixed\n+// stale'
             });
             const llmMod = require('../../extension/llmClient').llmClient;
@@ -245,7 +245,7 @@ async function run() {
                     proposedDiffSha256: '1111111111111111111111111111111111111111111111111111111111111111',
                     classification: { category: 'Command Injection', route: 'DotNetSourceFix', severity: 'High' },
                     rca: { summary: 'test' },
-                    baselineValidation: { status: 'PASS', passed: true, testsTotal: 1 },
+                    baselineValidation: { status: 'PASS', machineStatus: 'PASSED', executed: true, countsKnown: true, exitCode: 0, passed: true, testsTotal: 1, testsPassed: 1, testsFailed: 0 },
                     patchDiff: '+++ changed patch diff body'
                 });
                 await assert.rejects(
@@ -265,7 +265,7 @@ async function run() {
                     classification: { category: 'Command Injection', route: 'DotNetSourceFix', severity: 'High' },
                     governance: { originalScannerSeverity: 'HIGH' },
                     rca: { summary: 'test' },
-                    baselineValidation: { status: 'PASS', passed: true, testsTotal: 1 },
+                    baselineValidation: { status: 'PASS', machineStatus: 'PASSED', executed: true, countsKnown: true, exitCode: 0, passed: true, testsTotal: 1, testsPassed: 1, testsFailed: 0 },
                     patchDiff: supDiff
                 });
                 llmMod.getAvailableModels = async () => [{ name: 'mock-copilot', id: 'mock-copilot' }];
@@ -356,7 +356,7 @@ async function run() {
                 return [];
             };
             await assert.rejects(
-                () => testClient.generateCompletion(`Leak ${ghToken}`, { outboundGate: gate, runId: 'r-llm' }),
+                () => testClient.generateCompletion(`Leak -----BEGIN PRIVATE KEY----- incomplete block`, { outboundGate: gate, runId: 'r-llm' }),
                 (err) => err instanceof OutboundContextBlockedError
             );
             assert.strictEqual(modelLookupCalled, false, 'Blocked payload must halt before querying vscode.lm models');
@@ -575,6 +575,8 @@ async function run() {
                 const ctx = { extensionUri: { fsPath: ${JSON.stringify(workspaceRoot)} }, subscriptions: [] };
                 ext.activate(ctx);
                 assert(typeof commands['gcac.scanRepository'] === 'function', 'gcac.scanRepository command missing');
+                assert(typeof commands['gcac.approveRemediation'] === 'function', 'Chat approval button handler missing');
+                assert(typeof commands['gcac.approveFinalGate'] === 'function', 'Final sign-off button handler missing');
                 assert(typeof chatHandlers['gcac.vulnerability-orchestrator'] === 'function', 'gcac.vulnerability-orchestrator chat participant missing');
                 (async () => {
                     let welcomeMd = '';

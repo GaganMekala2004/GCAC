@@ -1,0 +1,12 @@
+{
+  "allowed": true,
+  "status": "SCOPE_VERIFIED",
+  "modified": [],
+  "added": [],
+  "deleted": [],
+  "renamed": [],
+  "symlinkChanges": [],
+  "filesChanged": [],
+  "actualGitDiff": "diff --git a/src/PaymentsAPI/appsettings.json b/src/PaymentsAPI/appsettings.json\nindex 918395e..1671670 100644\n--- a/src/PaymentsAPI/appsettings.json\n+++ b/src/PaymentsAPI/appsettings.json\n@@ -5,7 +5,7 @@\n     }\n   },\n   \"PaymentGateway\": {\n-    \"ApiKey\": \"sk_live_99887766554433221100aabbccddeeff\",\n+    \"ApiKey\": \"${PAYMENT_GATEWAY_API_KEY}\",\n     \"Endpoint\": \"https://api.paymentgateway.internal/v1\"\n   }\n }\n\\ No newline at end of file\n",
+  "testWeakeningLimitations": "Automated test-weakening checks detect syntactic indicators (skip attributes, deleted test methods/assertions, and trivial Assert.True(true)/assert(true) replacements). Semantic test weakening—such as altering test input fixtures so an exploit payload is no longer exercised or mocking away a vulnerable function—cannot be reliably guaranteed without human diff inspection."
+}

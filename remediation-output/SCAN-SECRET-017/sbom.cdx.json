@@ -1,0 +1,105 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:04bbf3d4-0df5-4460-9493-5282148073b5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-16T16:22:37.033Z",
+    "tools": [
+      {
+        "vendor": "GCAC",
+        "name": "gcac-manifest-sbom-extractor",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "APP-1001",
+      "bomRef": "APP-1001"
+    },
+    "properties": [
+      {
+        "name": "gcac:runId",
+        "value": "04bbf3d4-0df5-4460-9493-5282148073b5"
+      },
+      {
+        "name": "gcac:vulnerabilityId",
+        "value": "SCAN-SECRET-017"
+      },
+      {
+        "name": "gcac:imageDigest",
+        "value": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb"
+      },
+      {
+        "name": "gcac:externalSbomCliStatus",
+        "value": "NOT_AVAILABLE"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "System.Data.SqlClient",
+      "version": "4.9.1",
+      "purl": "pkg:nuget/System.Data.SqlClient@4.9.1",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "src/PaymentsAPI/PaymentsAPI.csproj"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Microsoft.NET.Test.Sdk",
+      "version": "17.11.1",
+      "purl": "pkg:nuget/Microsoft.NET.Test.Sdk@17.11.1",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "tests/PaymentsAPI.Tests/PaymentsAPI.Tests.csproj"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "xunit",
+      "version": "2.9.2",
+      "purl": "pkg:nuget/xunit@2.9.2",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "tests/PaymentsAPI.Tests/PaymentsAPI.Tests.csproj"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "xunit.runner.visualstudio",
+      "version": "2.8.2",
+      "purl": "pkg:nuget/xunit.runner.visualstudio@2.8.2",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "tests/PaymentsAPI.Tests/PaymentsAPI.Tests.csproj"
+        }
+      ]
+    }
+  ]
+}

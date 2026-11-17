@@ -1,3 +1,4 @@
+const { isStage4ConsentEligible } = require('./baselineEligibility');
 let vscode = null;
 try {
     vscode = require('vscode');
@@ -10,6 +11,7 @@ const crypto = require('crypto');
 const { loadVulnerabilities, updateVulnerabilityRow } = require('./csvParser');
 const { loadVulnerabilityDetails, loadAllReports } = require('./reportParser');
 const { RemediationEngine } = require('./remediationEngine');
+const { GitHubPublication } = require('./githubPublication');
 const { discoverEnvironment } = require('./sandbox/environmentDiscovery');
 const { TrustedExecutionGateway } = require('./sandbox/trustedExecutionGateway');
 const { loadAndVerifyToolchainRegistry, isTemplateDigestProfile } = require('./sandbox/toolchainProfiles');
@@ -29,6 +31,7 @@ const { FindingsStore } = require('./scanning/findingsStore');
 const { ReScanVerifier } = require('./scanning/reScanVerifier');
 const {
     recordApprovalDecision,
+    resolveApprovalIntent,
     COPILOT_APPROVAL_LIMITATION_DISCLOSURE
 } = require('./approvalGovernance');
 const { RunStateManager } = require('./runStateContract');
@@ -77,6 +80,7 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'reviseFix',
     'mapFindingRepository',
     'approveRemediation',
+    'acknowledgeDevelopmentBaseline',
     'rejectRemediation',
     'approveFinalGate',
     'rejectFinalGate',
@@ -171,6 +175,59 @@ function resolveAuthorizedTarget(candidateTarget) {
     return null;
 }
 
+function githubPublicationService() {
+    return new GitHubPublication({ getToken: async () => {
+        const session = await vscode.authentication?.getSession('github', ['repo'], { createIfNone: true });
+        if (!session?.accessToken) throw new Error('GitHub sign-in is required to publish the reviewed pull request.');
+        return session.accessToken;
+    } });
+}
+async function requestPublicationConsent(vulnerabilityId) {
+    const state = engine.loadRunState(vulnerabilityId);
+    const plan = state?.publicationPlan;
+    if (state?.formalClosure === 'RESOLVED_CLOSED') return {};
+    if (plan?.status === 'READY') {
+        const answer = await vscode.window.showWarningMessage(
+            `Final sign-off will push the reviewed isolated branch ${plan.branch} and create a draft PR in ${plan.owner}/${plan.repository}, targeting ${plan.baseBranch}. Diff SHA-256: ${state.proposedDiffSha256}. It will not merge the PR.`,
+            { modal: true }, 'Approve and create draft PR');
+        if (answer !== 'Approve and create draft PR') throw new Error('Final sign-off cancelled; no remote action performed.');
+        return { publishPullRequest: true };
+    }
+    const answer = await vscode.window.showWarningMessage(
+        `${plan?.reason || 'GitHub publication is not configured.'} No pull request will be created.`,
+        { modal: true }, 'Close local evidence only');
+    if (answer !== 'Close local evidence only') throw new Error('Final sign-off cancelled. Configure a GitHub origin before preparing a new publication plan.');
+    return {};
+}
+
+async function requestLocalDiffConsent(vulnerabilityId) {
+    if (!engine?.isLocalDevelopment) return {};
+    const state = engine.loadRunState(vulnerabilityId);
+    if (!state?.proposedDiffSha256 || !state.patchDiff) throw new Error('No real proposed diff is available for local consent.');
+    await vscode.commands.executeCommand('gcac.viewDiff', vulnerabilityId);
+    const answer = await vscode.window.showInformationMessage(
+        `LOCAL_DEVELOPMENT: Apply this exact diff in the isolated worktree? Finding ${vulnerabilityId}; run ${state.runId}; SHA-256 ${state.proposedDiffSha256}. Local consent is not enterprise authentication. Native Copilot tools remain outside GCAC interception.`,
+        { modal: true }, 'Apply this diff');
+    if (answer !== 'Apply this diff') throw new Error('Local developer declined or cancelled exact-diff consent.');
+    return { approvedRunId: state.runId, approvedDiffSha256: state.proposedDiffSha256 };
+}
+
+async function acknowledgeLocalBaseline(vulnerabilityId, onProgress) {
+    if (!engine?.isLocalDevelopment || !vscode.workspace.isTrusted) throw new Error('Trusted LOCAL_DEVELOPMENT mode is required.');
+    const state = engine.loadRunState(vulnerabilityId);
+    const { canAcknowledgeMissingBaseline } = require('./executionMode');
+    if (!canAcknowledgeMissingBaseline(state?.baselineValidation)) throw new Error('This baseline requires technical correction; a development exception is unavailable.');
+    const answer = await vscode.window.showWarningMessage(
+        `DEVELOPMENT BASELINE EXCEPTION: ${state.baselineValidation.rootError || state.baselineValidation.summary}. Continue to proposal review without claiming baseline validation succeeded? No patch will be applied until separate exact-diff consent.`,
+        { modal: true }, 'Acknowledge missing baseline');
+    if (answer !== 'Acknowledge missing baseline') return;
+    const rationale = await vscode.window.showInputBox({ prompt: 'Record why this disposable development run may proceed without baseline tests.', ignoreFocusOut: true });
+    if (!rationale?.trim()) return;
+    return engine.acknowledgeDevelopmentBaselineException(vulnerabilityId, { acknowledged: true, rationale }, {
+        workspaceTrusted: true, authorizedRoots: buildAuthorizedRoots(), onProgress
+    });
+}
+
 function buildConfigPayload(extra = {}) {
     const wsFolders = getWorkspaceFoldersSnapshot();
     const activeTargetAbs = currentScanTarget
@@ -186,6 +243,7 @@ function buildConfigPayload(extra = {}) {
         : 0;
     return {
         type: 'CONFIG_UPDATED',
+        executionMode: engine?.executionMode || 'ENTERPRISE',
         activeRepo: currentScanTarget || currentWorkspaceRoot,
         activeRepoPath: activeTargetAbs,
         activeRepoContext,
@@ -252,11 +310,18 @@ function getSandboxUiSnapshot(workspaceRoot, gateway = null) {
  * @returns {object[]}
  */
 function getCombinedFindings(csvPath, store, options = {}) {
+    const canonicalRows = rows => rows.map(row => {
+        const state = engine?.loadRunState ? engine.loadRunState(row.Vulnerability_ID) : null;
+        return { ...row, GCAC_Approval_Eligible: isStage4ConsentEligible(state),
+            GCAC_Run_ID: state?.runId || null, GCAC_Execution_Mode: state?.executionMode || engine?.executionMode || 'ENTERPRISE',
+            GCAC_Local_Outcome: state?.localOutcome || null,
+            ...(state?.localOutcome ? { Remediation_Status: state.localOutcome } : {}) };
+    });
     const csvList = (csvPath && fs.existsSync(csvPath)) ? loadVulnerabilities(csvPath) : [];
     for (const r of csvList) {
         if (!r.Source_Origin) r.Source_Origin = 'CSV';
     }
-    if (!store) return csvList;
+    if (!store) return canonicalRows(csvList);
     try {
         const scannedList = store.toCsvCompatibleRecords({
             repositoryRoot: options.repositoryRoot || undefined,
@@ -266,9 +331,9 @@ function getCombinedFindings(csvPath, store, options = {}) {
         for (const r of scannedList) {
             r.Source_Origin = 'LocalScanner';
         }
-        return [...csvList, ...scannedList];
+        return canonicalRows([...csvList, ...scannedList]);
     } catch (e) {
-        return csvList;
+        return canonicalRows(csvList);
     }
 }
 
@@ -428,6 +493,7 @@ function activate(context) {
 
     engine = new RemediationEngine(currentWorkspaceRoot, currentCsvPath, {
         extensionRoot: extensionRootPath,
+        publicationService: githubPublicationService(),
         findingsStore,
         reScanVerifier,
         registry,
@@ -467,6 +533,79 @@ function activate(context) {
     );
 
     // 2. Register Dashboard Panel Command (Full Editor tab)
+    context.subscriptions.push(vscode.commands.registerCommand('gcac.openRemediatedSource', async (reference) => {
+        const state = reference?.vulnerabilityId && engine?.loadRunState(reference.vulnerabilityId);
+        if (!state?.patchAppliedAtStage5 || state.runId !== reference.runId) {
+            vscode.window.showErrorMessage('No applied source exists for this run.'); return;
+        }
+        const file = assertPathWithinWorkspace(state.isolatedTargetFile || state.sourceFilePath, state.isolatedWorkspace?.worktreeDir);
+        if (!file || !fs.existsSync(file)) { vscode.window.showErrorMessage('The isolated remediated source is unavailable.'); return; }
+        const document = await vscode.workspace.openTextDocument(file);
+        await vscode.window.showTextDocument(document, { preview: false });
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('gcac.reviewCryptoMigration', async (id) => {
+        try {
+            if (vscode.workspace?.isTrusted === false) throw new Error('Trust the workspace before reviewing a source migration.');
+            const choice = await vscode.window.showQuickPick([
+                'No legacy ciphertext: review a new AES-GCM contract',
+                'Legacy ciphertext must remain readable'
+            ], { title: 'Cryptographic migration compatibility', placeHolder: 'Choose the actual data compatibility requirement' });
+            if (!choice) return;
+            if (choice.startsWith('Legacy')) {
+                vscode.window.showInformationMessage('Legacy compatibility requires a versioned dual-reader/data migration design. Automated editing remains blocked until that contract is specified.');
+                return;
+            }
+            const state = engine.loadRunState(id);
+            const answer = await vscode.window.showWarningMessage(
+                `Review migration for ${id}, source SHA-256 ${state?.baseTargetSha256}: AES-256-GCM; 32-byte key; caller supplies a unique 12-byte nonce; output is version byte 1, nonce, 16-byte tag, ciphertext. Existing callers must adopt this contract. You confirm there is no legacy ciphertext to preserve. Round-trip and tamper-rejection tests are mandatory. This does not approve the eventual code diff.`,
+                { modal: true }, 'Approve migration contract');
+            if (answer !== 'Approve migration contract') return;
+            engine.approveCryptoMigrationContract(id, { acknowledged: true, legacyData: 'NONE' });
+            await vscode.commands.executeCommand('workbench.action.chat.open', { query: `@vulnerability-orchestrator /remediate-vulnerability ${id}`, isPartialQuery: false });
+        } catch (error) { vscode.window.showErrorMessage(error.message); }
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('gcac.approveFinalGate', async (proposal) => {
+        const state = proposal?.vulnerabilityId && engine?.loadRunState(proposal.vulnerabilityId);
+        if (!state || state.runId !== proposal.runId || state.proposedDiffSha256 !== proposal.proposedDiffSha256 || state.approvalDecision !== 'PENDING_STAGE8') {
+            vscode.window.showErrorMessage('GCAC: Final sign-off requires the current validated proposal awaiting Stage 8.');
+            return;
+        }
+        await vscode.commands.executeCommand('workbench.action.chat.open', { query: `@vulnerability-orchestrator /final-approve ${proposal.vulnerabilityId} run "${state.runId}" diff "${state.proposedDiffSha256}"`, isPartialQuery: false });
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('gcac.approveRemediation', async (proposal) => {
+        const state = proposal?.vulnerabilityId && engine?.loadRunState(proposal.vulnerabilityId);
+        if (!state || state.runId !== proposal.runId || state.proposedDiffSha256 !== proposal.proposedDiffSha256) {
+            vscode.window.showErrorMessage('GCAC: This approval button belongs to an older proposal. Review the current proposal before approving.');
+            return;
+        }
+        await vscode.commands.executeCommand('workbench.action.chat.open', { query: `@vulnerability-orchestrator /approve ${proposal.vulnerabilityId} run "${state.runId}" diff "${state.proposedDiffSha256}"`, isPartialQuery: false });
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('gcac.cancelRemediation', async (id) => {
+        const findingId = typeof id === 'string' ? id : await vscode.window.showInputBox({ prompt: 'Finding ID of the active run to cancel' });
+        if (findingId && engine) vscode.window.showInformationMessage(engine.cancelRun(findingId) ? 'Cancellation requested for the owned GCAC run.' : 'No active GCAC run for this finding.');
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('gcac.registerDevelopmentRepository', async () => {
+        try {
+            if (!engine?.isLocalDevelopment || !vscode.workspace.isTrusted) throw new Error('Start VS Code with GCAC_EXECUTION_MODE=LOCAL_DEVELOPMENT and trust the workspace first.');
+            const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Select disposable development repository' });
+            if (!picked?.[0]) return;
+            const repo = picked[0].fsPath;
+            const answer = await vscode.window.showWarningMessage(`Register ${repo} as a trusted, disposable development repository? It must not be a production deployment. GCAC will not push, publish, or merge.`, { modal: true }, 'Register disposable repository');
+            if (answer !== 'Register disposable repository') return;
+            registry.registerDevelopmentRepository(repo, { acknowledged: true, trusted: true, disposable: true });
+            syncAuthorizedRoots();
+            broadcast(buildConfigPayload());
+        } catch (err) { vscode.window.showErrorMessage(`GCAC: ${err.message}`); }
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('gcac.acknowledgeDevelopmentBaseline', async (id) => {
+        try {
+            const findingId = typeof id === 'string' ? id : await vscode.window.showInputBox({ prompt: 'Finding ID for the development baseline exception' });
+            if (!findingId) return;
+            await acknowledgeLocalBaseline(findingId, event => broadcast({ type: 'REMEDIATION_PROGRESS', event }));
+            broadcast({ type: 'DETAILS_LOADED', details: loadVulnerabilityDetails(currentWorkspaceRoot, findingId) });
+        } catch (err) { vscode.window.showErrorMessage(`GCAC: ${err.message}`); }
+    }));
+
     context.subscriptions.push(
         vscode.commands.registerCommand('gcac.openDashboard', () => {
             if (currentPanel) {
@@ -675,11 +814,21 @@ function activate(context) {
                 }
 
                 const lowerPrompt = prompt.toLowerCase();
-                const isApproveCmd = command === 'approve' || lowerPrompt.startsWith('approve') || lowerPrompt.includes('/approve');
-                const isFinalApproveCmd = command === 'final-approve' || lowerPrompt.startsWith('final-approve') || lowerPrompt.includes('/final-approve') || lowerPrompt.includes('signoff');
+                const approvalIntent = resolveApprovalIntent(command, prompt);
+                const isApproveCmd = approvalIntent === 'STAGE4';
+                const isFinalApproveCmd = approvalIntent === 'STAGE8';
 
                 const isHumanApproved = isApproveCmd || isFinalApproveCmd;
                 const isFinalApproved = isFinalApproveCmd;
+                if (isHumanApproved) {
+                    const boundRun = prompt.match(/\brun\s+"([^"]+)"/i)?.[1];
+                    const boundDiff = prompt.match(/\bdiff\s+"([a-f0-9]{64})"/i)?.[1];
+                    const current = engine.loadRunState(vulnId);
+                    if ((boundRun && current?.runId !== boundRun) || (boundDiff && current?.proposedDiffSha256 !== boundDiff)) {
+                        response.markdown('This approval belongs to an older run or diff. Review the current proposal before approving.');
+                        return;
+                    }
+                }
 
                 // Extract optional repository hint if explicitly supplied inside prompt
                 const repoArgMatch = prompt.match(/in\s+repository\s+"([^"]+)"/i);
@@ -721,7 +870,12 @@ function activate(context) {
                         } catch { }
                     };
 
+                    const localConsent = isHumanApproved && !isFinalApproved ? await requestLocalDiffConsent(vulnId) : {};
+                    const publicationConsent = isFinalApproved ? await requestPublicationConsent(vulnId) : {};
                     const result = await engine.executePipeline(vulnId, {
+                        ...localConsent,
+                        ...publicationConsent,
+                        cancellationToken: token,
                         isHumanApproved,
                         isFinalApproved,
                         origin: 'COPILOT_CHAT_PARTICIPANT',
@@ -736,11 +890,28 @@ function activate(context) {
                         }
                     });
                     syncWebviewAfterRun();
+                    const sourceState = engine.loadRunState(vulnId);
+                    if (sourceState?.patchAppliedAtStage5 && typeof response.button === 'function') {
+                        response.button({ command: 'gcac.openRemediatedSource', title: 'Open actual remediated source',
+                            arguments: [{ vulnerabilityId: vulnId, runId: sourceState.runId }] });
+                    }
 
                     if (result.isAwaitingApproval || (result.isAwaitingFinalApproval && !result.finalGateBlocked)) {
                         response.markdown(formatGateMarkdown(vulnId, result));
+                        if (result.isAwaitingApproval && typeof response.button === 'function') {
+                            response.button({ command: 'gcac.approveRemediation', title: 'Approve reviewed Stage 4 patch',
+                                arguments: [{ vulnerabilityId: vulnId, runId: result.runId, proposedDiffSha256: result.proposedDiffSha256 }] });
+                        }
+                        if (result.isAwaitingFinalApproval && !result.finalGateBlocked && typeof response.button === 'function') {
+                            response.button({ command: 'gcac.approveFinalGate', title: 'Review and confirm Stage 8 sign-off',
+                                arguments: [{ vulnerabilityId: vulnId, runId: result.runId,
+                                    proposedDiffSha256: result.proposedDiffSha256 || engine.loadRunState(vulnId)?.proposedDiffSha256 }] });
+                        }
                     } else {
                         response.markdown(formatTerminalConclusionMarkdown(vulnId, result));
+                        if (result.isManualReview && result.remediationDecision?.vulnerabilityType === 'WEAK_CRYPTO_MIGRATION' && typeof response.button === 'function') {
+                            response.button({ command: 'gcac.reviewCryptoMigration', title: 'Review crypto migration contract', arguments: [vulnId] });
+                        }
                     }
                 } catch (err) {
                     try {
@@ -748,6 +919,9 @@ function activate(context) {
                         broadcast({ type: 'DETAILS_LOADED', details: refreshed });
                     } catch { }
                     response.markdown(formatErrorMarkdown('Pipeline Execution Stopped', err.message));
+                    if (err.failureCategory === 'PATCH_INVALID') {
+                        response.markdown('\nNo Stage 4 approval request was created because the proposed edits could not be validated. Approval becomes available only after a valid diff and passing baseline exist.\n');
+                    }
                 }
             });
             context.subscriptions.push(participant);
@@ -928,6 +1102,7 @@ async function handleWebviewMessage(message, webview) {
     if (!engine) {
         engine = new RemediationEngine(currentWorkspaceRoot, currentCsvPath, {
             extensionRoot: extensionRootPath,
+            publicationService: githubPublicationService(),
             findingsStore,
             reScanVerifier,
             registry,
@@ -1750,6 +1925,14 @@ async function handleWebviewMessage(message, webview) {
             break;
         }
 
+        case 'acknowledgeDevelopmentBaseline': {
+            try {
+                await acknowledgeLocalBaseline(message.vulnerabilityId, event => broadcast({ type: 'REMEDIATION_PROGRESS', event }));
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: message.vulnerabilityId }, webview);
+            } catch (err) { webview.postMessage({ type: 'ACTION_FEEDBACK', text: err.message, status: 'error' }); }
+            break;
+        }
+
         case 'approveRemediation': {
             if (vscode.workspace && !vscode.workspace.isTrusted) {
                 vscode.window.showErrorMessage('GCAC: Remediation actions are disabled in Restricted Mode.');
@@ -1758,8 +1941,38 @@ async function handleWebviewMessage(message, webview) {
 
             try {
                 syncAuthorizedRoots();
+                const existingRunState = engine?.loadRunState ? engine.loadRunState(message.vulnerabilityId) : null;
+                if (engine?.activeRuns?.has(message.vulnerabilityId)) {
+                    webview.postMessage({ type: 'ACTION_FEEDBACK', text: 'This run is already executing. Approval was not submitted again.', status: 'info' });
+                    return;
+                }
+                if (existingRunState?.approvalRecord?.consumedAtStage5 && existingRunState.patchAppliedAtStage5) {
+                    webview.postMessage({ type: 'ACTION_FEEDBACK', text: 'Stage 4 was already applied. Review the current validation result or Stage 8 sign-off; the patch will not be applied again.', status: 'info' });
+                    await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: message.vulnerabilityId }, webview);
+                    return;
+                }
+                if (existingRunState && (existingRunState.workflowLifecycle === 'BLOCKED' || existingRunState.status === 'BLOCKED' || existingRunState.stages?.[2]?.status === 'blocked')) {
+                    vscode.window.showErrorMessage(`GCAC: Approval blocked. Stage 3 baseline testing did not succeed for ${message.vulnerabilityId}.`);
+                    webview.postMessage({
+                        type: 'ACTION_FEEDBACK',
+                        text: `Approval blocked: Stage 3 baseline did not run or is blocked. Resolve prerequisites before approving.`,
+                        status: 'error'
+                    });
+                    return;
+                }
+                if (!existingRunState || !existingRunState.proposedDiffSha256 || !existingRunState.patchDiff || !/^[a-f0-9]{64}$/i.test(existingRunState.proposedDiffSha256)) {
+                    vscode.window.showErrorMessage(`GCAC: Approval blocked. No verified diff SHA-256 digest exists for ${message.vulnerabilityId}.`);
+                    webview.postMessage({
+                        type: 'ACTION_FEEDBACK',
+                        text: `Approval blocked: No verified diff SHA-256 digest exists.`,
+                        status: 'error'
+                    });
+                    return;
+                }
+                const localConsent = await requestLocalDiffConsent(message.vulnerabilityId);
                 vscode.window.showInformationMessage(`Stage 4 Gate authorized for ${message.vulnerabilityId}. Executing genuine testing...`);
                 await engine.executePipeline(message.vulnerabilityId, {
+                    ...localConsent,
                     isHumanApproved: true,
                     isFinalApproved: false,
                     authorizedRoots: buildAuthorizedRoots(),
@@ -1820,7 +2033,9 @@ async function handleWebviewMessage(message, webview) {
             try {
                 syncAuthorizedRoots();
                 vscode.window.showInformationMessage(`Final Gate authorized for ${message.vulnerabilityId}. Finalizing documentation...`);
+                const publicationConsent = await requestPublicationConsent(message.vulnerabilityId);
                 await engine.executePipeline(message.vulnerabilityId, {
+                    ...publicationConsent,
                     isHumanApproved: true,
                     isFinalApproved: true,
                     authorizedRoots: buildAuthorizedRoots(),

@@ -608,6 +608,19 @@ class RepositoryContextRegistry {
         return entry;
     }
 
+    registerDevelopmentRepository(repoPath, acknowledgement = {}) {
+        if (acknowledgement.trusted !== true || acknowledgement.disposable !== true || acknowledgement.acknowledged !== true) {
+            throw new Error('Explicit acknowledgement of a trusted disposable development repository is required.');
+        }
+        const existing = this.registerLocalRepository(repoPath);
+        const entry = { ...existing, development: { trusted: true, disposable: true, acknowledgedAt: new Date().toISOString() } };
+        this.localMappings.set(canonicalizePath(repoPath).toLowerCase(), entry);
+        // Unlike automatic discovery, explicit enrollment must not silently fail persistence.
+        fs.mkdirSync(path.dirname(this.localRegistryPath), { recursive: true });
+        fs.writeFileSync(this.localRegistryPath, JSON.stringify(Array.from(this.localMappings.values()), null, 2), 'utf8');
+        return entry;
+    }
+
     resolveOrRegisterRepository(repoPath, metadata = {}) {
         return this.registerLocalRepository(repoPath, metadata);
     }

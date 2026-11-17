@@ -1,0 +1,36 @@
+{
+  "instanceId": "gcac-5f1a2fbac73e",
+  "runId": "21762d65-d2e7-43d6-84bb-d2afc517aa5f",
+  "vulnerabilityId": "SCAN-SECRET-016",
+  "applicationId": "APP-1001",
+  "operation": "DOTNET_TEST",
+  "backendType": "local-container",
+  "toolchainProfileId": "dotnet-9.0-sts",
+  "state": "BLOCKED",
+  "history": [
+    {
+      "state": "PENDING",
+      "timestamp": "2026-11-15T11:27:46.307Z",
+      "detail": "Instance registered."
+    },
+    {
+      "state": "PREPARING",
+      "timestamp": "2026-11-15T11:27:46.307Z",
+      "detail": "Staging credential-free source snapshot."
+    },
+    {
+      "state": "RUNNING",
+      "timestamp": "2026-11-15T11:27:46.311Z",
+      "detail": "Executing DOTNET_TEST via local-container."
+    },
+    {
+      "state": "BLOCKED",
+      "timestamp": "2026-11-15T11:27:48.157Z",
+      "detail": "Approved digest-pinned image 'mcr.microsoft.com/dotnet/sdk@sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b' is not present in local runtime cache; auto-pull disabled."
+    }
+  ],
+  "createdAt": "2026-11-15T11:27:46.307Z",
+  "updatedAt": "2026-11-15T11:27:48.157Z",
+  "stagingDir": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-sandbox-staging/gcac-5f1a2fbac73e",
+  "containerName": "gcac-gcac-5f1a2fbac73e"
+}

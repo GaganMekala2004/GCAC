@@ -5,8 +5,11 @@ const { NormalizedFinding, SCANNER_STATUS, SEVERITY_LEVELS } = require('../findi
 const { OUTCOME_STATUS } = require('../../outcomeContract');
 const { SANDBOX_READINESS, discoverEnvironment } = require('../../sandbox/environmentDiscovery');
 const { EXECUTION_POLICY_VERSION, OPERATION_TYPES, TrustedExecutionGateway } = require('../../sandbox/trustedExecutionGateway');
-const { resolveProfileForRepository } = require('../../sandbox/toolchainProfiles');
+const { ContainerSandboxBackend } = require('../../sandbox/containerSandboxBackend');
+const { resolveProfileForRepository, assertProfileProvisioned } = require('../../sandbox/toolchainProfiles');
 const { resolveDotnetProjectFile, hasDotnetPackageDependencies } = require('../dotnetProjectLocator');
+const { snapshotPath, readSnapshot, refreshSnapshot } = require('../nugetAdvisories');
+const { auditResolvedProjects } = require('../nugetOfflineAudit');
 
 function extractAdvisoryId(advisoryUrl = '') {
     const m = String(advisoryUrl || '').match(/(?:GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}|CVE-\d{4}-\d{4,7})/i);
@@ -31,6 +34,13 @@ class NuGetAuditScanner extends ScannerAdapter {
     }
 
     async isAvailable(options = {}) {
+        try {
+            readSnapshot(options.advisorySnapshotPath || snapshotPath(options.workspaceRoot || process.cwd()));
+            return { available: true, version: this.version, mode: 'OFFLINE_ADVISORY_SNAPSHOT', reason: '' };
+        } catch (_) { /* Approved sandbox remains available for unsupported graphs. */ }
+        if (fs.existsSync(options.advisorySnapshotPath || snapshotPath(options.workspaceRoot || process.cwd()))) {
+            return { available: true, version: this.version, mode: 'OFFLINE_ADVISORY_SNAPSHOT', reason: 'Advisory snapshot requires validation/refresh before use.' };
+        }
         if (options && (options.sandboxBackend || options.executionGateway || options.envReport?.sandboxAvailable)) {
             return {
                 available: true,
@@ -72,10 +82,8 @@ class NuGetAuditScanner extends ScannerAdapter {
         // Detect inaccessible vulnerability audit sources
         const feedErrors = [
             'error NU1900',
-            'error NU1901',
-            'error NU1902',
-            'error NU1903',
-            'error NU1904',
+            'NU1900',
+            'NU1905',
             'Unable to load the service index for source',
             'Vulnerability intelligence source inaccessible',
             'The download of',
@@ -84,20 +92,13 @@ class NuGetAuditScanner extends ScannerAdapter {
         ];
 
         const hasFeedError = feedErrors.some(err => combined.includes(err));
-        if (hasFeedError && !combined.includes('has the following vulnerable packages')) {
-            return {
-                inaccessible: true,
-                findings: [],
-                error: 'AUDIT UNAVAILABLE — Vulnerability intelligence source inaccessible'
-            };
-        }
 
         const findings = [];
         const lines = combined.split('\n');
         const effectiveRoot = meta.repositoryRoot || workspaceRoot;
 
         // Pattern: > PackageName   Requested   Resolved   Severity   Advisory URL
-        const pkgLineRegex = />\s+([A-Za-z0-9_.-]+)\s+(\S+)\s+(\S+)\s+(Critical|High|Moderate|Low)\s+(https?:\/\/\S+)/i;
+        const pkgLineRegex = />\s+([A-Za-z0-9_.-]+)\s+(?:(\S+)\s+)?(\S+)\s+(Critical|High|Moderate|Low)\s+(https?:\/\/\S+)/i;
 
         for (const line of lines) {
             const match = line.trim().match(pkgLineRegex);
@@ -149,9 +150,9 @@ class NuGetAuditScanner extends ScannerAdapter {
         }
 
         return {
-            inaccessible: false,
+            inaccessible: hasFeedError,
             findings,
-            error: null
+            error: hasFeedError ? 'AUDIT UNAVAILABLE — Vulnerability intelligence source inaccessible' : null
         };
     }
 
@@ -275,6 +276,31 @@ class NuGetAuditScanner extends ScannerAdapter {
         }
 
         const projectDirRoot = path.dirname(projectFile);
+        let offlineDiagnostic = '';
+        try {
+            const snapshotFile = options.advisorySnapshotPath || snapshotPath(workspaceRoot);
+            let snapshot;
+            try { snapshot = readSnapshot(snapshotFile); }
+            catch (error) {
+                // Refresh official public data only; this never executes repository
+                // code or sends package inventories outside the workspace.
+                if (options.refreshAdvisories === false || options.abortSignal?.aborted ||
+                    (!fs.existsSync(snapshotFile) && options.refreshAdvisories !== true)) throw error;
+                snapshot = await refreshSnapshot(snapshotFile);
+            }
+            const audited = auditResolvedProjects(projectDir, snapshot, options.abortSignal);
+            const effectiveRoot = repoContext.repositoryRoot || boundaryRoot;
+            const findings = this.parseJsonAuditOutput(audited, projectFile, effectiveRoot, scanId, repoContext);
+            return {
+                scannerId: this.id, status: SCANNER_STATUS.COMPLETED,
+                executionPolicy: 'READ_ONLY_ADVISORY_DATA', networkPolicy: 'NO_NETWORK',
+                findings, errors: [], warnings: [], durationMs: Date.now() - startTime,
+                coverage: `100% (${audited.packagesChecked} resolved direct/transitive packages across ${audited.projectsChecked} projects)`,
+                diagnostics: { advisorySource: snapshot.source, advisoryFetchedAt: snapshot.fetchedAt,
+                    projectsChecked: audited.projectsChecked, packagesChecked: audited.packagesChecked }
+            };
+        } catch (error) { offlineDiagnostic = error.message; }
+        const repoLabel = repoContext.repository || (boundaryRoot && targetPath ? path.relative(boundaryRoot, targetPath).replace(/\\/g, '/') || path.basename(boundaryRoot) : path.basename(projectDirRoot));
         const envReport = options.envReport || (!options.executionGateway && !options.sandboxBackend
             ? discoverEnvironment({ workspaceRoot, useCache: true })
             : null);
@@ -287,18 +313,46 @@ class NuGetAuditScanner extends ScannerAdapter {
 
         let profile;
         try {
-            profile = resolveProfileForRepository(projectDirRoot, { Technology: 'dotnet' }, options.profilesPath);
+            profile = resolveProfileForRepository(projectFile || projectDirRoot, { Technology: 'dotnet' }, options.profilesPath, {
+                repositoryLabel: repoLabel
+            });
+            const isRealContainer = !options.sandboxBackend ||
+                (options.sandboxBackend instanceof ContainerSandboxBackend) ||
+                (options.sandboxBackend && typeof options.sandboxBackend.execFileFn === 'function');
+            if (isRealContainer && options.allowTemplateDigests !== true) {
+                assertProfileProvisioned(profile, { repositoryLabel: repoLabel });
+            }
         } catch (err) {
+            const targetFramework = err.targetFramework || profile?.targetFramework || 'unknown';
+            const profileId = err.profileId || profile?.profileId || 'unresolved';
+            const imageDigest = err.imageDigest || profile?.imageDigest || 'none';
+            const digestStatus = err.digestStatus || profile?.digestStatus || 'UNRESOLVED';
+            const diagMsg = `[${this.name}] Target repository '${repoLabel}' (${targetFramework} -> ${profileId}): ${err.message}`;
             return {
                 scannerId: this.id,
                 status: SCANNER_STATUS.FAILED,
                 sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
                 executionPolicy: 'SANDBOX_GATEWAY',
+                toolchainProfileId: profileId,
                 findings: [],
                 durationMs: Date.now() - startTime,
-                errors: [err.message],
-                warnings: [],
-                coverage: '0% (Toolchain profile blocked)'
+                errors: [diagMsg],
+                warnings: [
+                    `Toolchain resolution failed for '${repoLabel}'.`,
+                    err.code === 'UNPROVISIONED_TOOLCHAIN_PROFILE'
+                        ? `Profile '${profileId}' uses template placeholder digest '${imageDigest}'. Only verified profiles (dotnet-10.0-lts) are available locally.`
+                        : err.message
+                ],
+                coverage: err.code === 'UNPROVISIONED_TOOLCHAIN_PROFILE'
+                    ? '0% (Unprovisioned toolchain profile)'
+                    : '0% (Toolchain profile blocked)',
+                diagnostics: {
+                    repository: repoLabel,
+                    targetFramework,
+                    toolchainProfileId: profileId,
+                    imageDigest,
+                    digestStatus
+                }
             };
         }
 
@@ -332,17 +386,26 @@ class NuGetAuditScanner extends ScannerAdapter {
         if (!gwRes.executed || gwRes.timedOut || gwRes.cancelled ||
             gwRes.machineStatus === OUTCOME_STATUS.BLOCKED ||
             gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
+            const diagMsg = `[${this.name}] Target repository '${repoLabel}' (${profile.targetFramework || 'dotnet'} -> ${profile.profileId}): ${gwRes.reason || gwRes.summary || 'AUDIT UNAVAILABLE — Sandbox required for NuGet dependency audit.'}`;
             return {
                 scannerId: this.id,
                 status: gwRes.cancelled ? SCANNER_STATUS.CANCELLED : SCANNER_STATUS.FAILED,
                 sandboxStatus: gwRes.sandboxStatus || SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
                 executionPolicy: 'SANDBOX_GATEWAY',
+                toolchainProfileId: profile.profileId,
                 networkPolicy: gwRes.networkPolicy || 'NO_NETWORK',
                 findings: [],
                 durationMs: Date.now() - startTime,
-                errors: [gwRes.reason || gwRes.summary || 'AUDIT UNAVAILABLE — Sandbox required for NuGet dependency audit.'],
+                errors: [diagMsg],
                 warnings: gwRes.prerequisites || ['Vulnerability audit requires approved sandbox & offline/internal feed cache; host fallback blocked.'],
-                coverage: '0% (Sandbox unavailable — NuGet audit blocked)'
+                coverage: '0% (Sandbox unavailable — NuGet audit blocked)',
+                diagnostics: {
+                    repository: repoLabel,
+                    targetFramework: profile.targetFramework || 'unknown',
+                    toolchainProfileId: profile.profileId,
+                    imageDigest: profile.imageDigest,
+                    digestStatus: profile.digestStatus || 'VERIFIED_IMAGE_DIGEST'
+                }
             };
         }
 
@@ -364,15 +427,15 @@ class NuGetAuditScanner extends ScannerAdapter {
                 status: SCANNER_STATUS.FAILED,
                 sandboxStatus: gwRes.sandboxStatus,
                 executionPolicy: 'SANDBOX_GATEWAY',
-                findings: [],
+                findings: parsed.findings,
                 durationMs: Date.now() - startTime,
                 errors: [parsed.error],
-                warnings: ['Vulnerability audit feed inaccessible; cannot guarantee zero findings.'],
+                warnings: [`Offline audit unavailable: ${offlineDiagnostic}`, 'Refresh official advisory data with: node scripts/refresh-nuget-advisories.js. A package cache alone contains no vulnerability intelligence.'],
                 coverage: '0% (Audit source inaccessible)'
             };
         }
 
-        if ((gwRes.exitCode ?? 0) !== 0 && parsed.findings.length === 0) {
+        if (gwRes.exitCode !== 0) {
             return {
                 scannerId: this.id,
                 status: SCANNER_STATUS.FAILED,
@@ -380,7 +443,7 @@ class NuGetAuditScanner extends ScannerAdapter {
                 executionPolicy: 'SANDBOX_GATEWAY',
                 backendType: gwRes.backendType,
                 networkPolicy: gwRes.networkPolicy,
-                findings: [],
+                findings: parsed.findings,
                 durationMs: Date.now() - startTime,
                 errors: [`AUDIT UNAVAILABLE — NuGet audit command exited with code ${gwRes.exitCode}: ${(gwRes.stderr || gwRes.stdout || 'Unknown error').slice(0, 300)}`],
                 warnings: ['NuGet dependency audit failed to complete cleanly; zero findings cannot be claimed.'],
@@ -399,7 +462,14 @@ class NuGetAuditScanner extends ScannerAdapter {
             durationMs: Date.now() - startTime,
             errors: [],
             warnings: [],
-            coverage: '100% (Sandboxed direct and transitive dependencies checked)'
+            coverage: '100% (Sandboxed direct and transitive dependencies checked)',
+            diagnostics: {
+                repository: repoLabel,
+                targetFramework: profile.targetFramework || 'net10.0',
+                toolchainProfileId: profile.profileId,
+                imageDigest: profile.imageDigest,
+                digestStatus: profile.digestStatus || 'VERIFIED_IMAGE_DIGEST'
+            }
         };
     }
 }

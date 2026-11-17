@@ -1,0 +1,8 @@
+{
+  "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f",
+  "sourceSha256": "d3552ce0368fe1e3724b50b32b608ad476210eaaf12cd917949cddc50aef3a49",
+  "diagnostic": {
+    "reasonCode": "DUPLICATE_LOCAL_DECLARATION"
+  },
+  "failureCategory": "PATCH_INVALID"
+}

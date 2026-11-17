@@ -1,0 +1,25 @@
+diff --git a/src/PaymentsAPI/Controllers/ReceiptController.cs b/src/PaymentsAPI/Controllers/ReceiptController.cs
+index 15df30c..27b7790 100644
+--- a/src/PaymentsAPI/Controllers/ReceiptController.cs
++++ b/src/PaymentsAPI/Controllers/ReceiptController.cs
+@@ -6,6 +6,18 @@ public class ReceiptController
+ {
+     public void Generate(string receiptId)
+     {
+-        Process.Start("cmd.exe", $"/c generate-receipt.bat {receiptId}");
++        var sanitizedReceiptId = SanitizeReceiptId(receiptId);
++        ProcessStartInfo startInfo = new ProcessStartInfo
++        {
++            FileName = "generate-receipt.bat",
++            Arguments = sanitizedReceiptId,
++            RedirectStandardOutput = true,
++            UseShellExecute = false,
++            CreateNoWindow = true
++        };
++        using (var process = Process.Start(startInfo))
++        {
++            process.WaitForExit();
++        }
+     }
+ }
+\ No newline at end of file

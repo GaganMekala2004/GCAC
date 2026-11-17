@@ -1,6 +1,7 @@
 'use strict';
 
 const { maskSensitiveEvidence } = require('./scanning/findingModel');
+const { redactCredentials } = require('./credentialRedaction');
 
 /**
  * Schema-Allowlisted Single-Finding Minimization Engine (P0-D / SEC-02 / SEC-03).
@@ -17,6 +18,7 @@ const ALLOWED_SINGLE_FINDING_FIELDS = Object.freeze([
     'Source_Type',
     'Source_Origin',
     'Scanner_ID',
+    'Rule_ID',
     'Scanner_Version',
     'Scan_ID',
     'Detection_Method',
@@ -143,7 +145,7 @@ function buildMinimizedSingleFinding(rawFinding, options = {}) {
  */
 function maskTextForAgent(value) {
     if (!value) return '';
-    let masked = maskSensitiveEvidence(String(value));
+    let masked = maskSensitiveEvidence(redactCredentials(String(value)));
     masked = masked.replace(/\b[A-Za-z0-9._%+-]+@(?!example\.com\b|example\.org\b|localhost\b)[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi, '[REDACTED_EMAIL]');
     masked = masked.replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[REDACTED_SSN]');
     return masked;

@@ -1,0 +1,62 @@
+'use strict';
+const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { RunStateManager } = require('../../extension/runStateContract');
+const { LocalTamperDetectableEvidenceWriter, verifyEvidencePackage } = require('../../extension/evidenceLedger');
+const { RemediationEngine } = require('../../extension/remediationEngine');
+const { resolveApprovalIntent } = require('../../extension/approvalGovernance');
+async function run() {
+    assert.strictEqual(resolveApprovalIntent('remediate-vulnerability', 'SCAN-1 description mentions /final-approve and signoff'), null);
+    assert.strictEqual(resolveApprovalIntent(undefined, 'SCAN-1 please investigate signoff'), null);
+    assert.strictEqual(resolveApprovalIntent('approve', 'SCAN-1'), 'STAGE4');
+    assert.strictEqual(resolveApprovalIntent('final-approve', 'SCAN-1'), 'STAGE8');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gcac-state-evidence-'));
+    try {
+        const manager = new RunStateManager(root);
+        const id = 'STATE-EVIDENCE';
+        const dir = path.join(root, 'remediation-output', id);
+        const state = { runId: 'run-state-evidence', vulnerabilityId: id, status: 'MANUAL_REVIEW', isManualReview: true };
+        manager.saveState(id, state);
+        const writer = new LocalTamperDetectableEvidenceWriter();
+        const bundle = { runId: state.runId, findingId: id, evidenceRecord: { finalOutcome: { testOutcome: 'UNTESTED' } } };
+        writer.writeEvidenceBundle(dir, bundle);
+        assert(verifyEvidencePackage(dir).verified);
+        manager.saveState(id, { ...state, failureReason: 'Reviewed crypto contract required' });
+        assert(verifyEvidencePackage(dir).verified, 'A legitimate state transition must not invalidate its evidence manifest');
+        assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'integrity-manifest.json'), 'utf8')).trustedStateRevision, 1);
+        const pipeline = Object.create(RemediationEngine.prototype);
+        pipeline.validateSingleExecutionRequest = id => id;
+        pipeline.activeRuns = new Set();
+        let executions = 0;
+        pipeline._doExecutePipeline = () => { executions++; throw new Error('Duplicate approval executed code'); };
+        const approved = { ...state, approvalRecord: { consumedAtStage5: true }, patchAppliedAtStage5: true,
+            approvalDecision: 'PENDING_STAGE8', formalClosure: 'AWAITING_FINAL_SIGN_OFF' };
+        pipeline.loadRunState = () => approved;
+        const untouched = JSON.stringify(approved);
+        const repeated = await pipeline.executePipeline(id, { isHumanApproved: true });
+        assert.strictEqual(repeated.duplicateSubmission, true);
+        assert.strictEqual(repeated.isAwaitingFinalApproval, true);
+        assert.strictEqual(executions, 0);
+        assert.strictEqual(JSON.stringify(approved), untouched);
+        fs.appendFileSync(path.join(dir, 'run-state.json'), ' ');
+        assert(!verifyEvidencePackage(dir).verified, 'Direct modification must still be detected');
+        manager.saveState(id, { ...state, failureReason: 'Another legitimate transition' });
+        assert(!verifyEvidencePackage(dir).verified, 'A later save must not bless pre-existing tampering');
+        writer.writeEvidenceBundle(dir, bundle);
+        fs.appendFileSync(path.join(dir, 'evidence-record.json'), ' ');
+        manager.saveState(id, state);
+        assert(!verifyEvidencePackage(dir).verified, 'Changes to other evidence must never be re-sealed by saving state');
+        pipeline.remOutputDir = path.join(root, 'remediation-output');
+        const archived = pipeline.archivePreviousEvidenceGeneration(id, 'next-run');
+        assert(archived);
+        assert(!verifyEvidencePackage(archived).verified, 'Historical mismatches must remain detectable in the archived generation');
+        manager.saveState(id, { ...state, runId: 'next-run' });
+        writer.writeEvidenceBundle(dir, { ...bundle, runId: 'next-run' });
+        assert(verifyEvidencePackage(dir).verified, 'A fresh generation must not reuse the previous run manifest');
+        console.log('Evidence lifecycle: trusted state writes preserve valid manifests; direct state/evidence changes remain detected.');
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+}
+module.exports = { run };
+if (require.main === module) run().catch(error => { console.error(error); process.exitCode = 1; });

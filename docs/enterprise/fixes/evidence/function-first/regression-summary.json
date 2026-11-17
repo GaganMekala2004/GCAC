@@ -1,0 +1,304 @@
+{
+  "extension": {
+    "command": "npm test",
+    "totalSuites": 23,
+    "passedSuites": 23,
+    "failedSuites": 0,
+    "passedSuiteNames": [
+      "Local Development Policy and Exact Patches",
+      "Provenance and Canonical Diagnostics",
+      "Baseline Approval Eligibility",
+      "Outbound Credential Minimization",
+      "Baseline NuGet Staging Regression",
+      "CSV Parser & Row Isolation",
+      "Report Parser & Evidence Discovery",
+      "Security Containment & Webview Hardening",
+      "Deterministic Test Runner Execution",
+      "Workflow State Machine & Approval Gates",
+      "Dashboard Metrics & Quality Accuracy",
+      "Scanner Adapters & Controller Execution",
+      "Normalized Findings Model & Storage",
+      "Post-Remediation Re-Scanning & Verification",
+      "Phase 1 P0 Security Containment & Core Integrity",
+      "Phase 2 Trust Controls & Secure Remediation Governance",
+      "Phase 3 Execution Isolation, Approved Toolchains & Supply Chain Security",
+      "Real-World Usability, Scan Accuracy, Portability & Retry",
+      "Production Workflow Stabilization & Reliability",
+      "Live Scanner Profile Selection & Toolchain Hardening",
+      "Docker Sandbox Scenarios & Boundary Hardening (A-I)",
+      "Stage 3 Toolchain Selection & Workflow-State Integrity",
+      "Stage 6 .NET Test Verification & Remediation Evidence"
+    ],
+    "logSha256": "a6e9583829435a87e348f6faa1f7d2ce7cf67aa0eab83f85763efeac407adbc3"
+  },
+  "dotnet": {
+    "command": "dotnet test tests/VulnerabilityRemediation.Tests/VulnerabilityRemediation.Tests.csproj --no-build --no-restore --nologo --logger trx --results-directory /private/tmp/gcac-function-final-dotnet",
+    "counters": {
+      "total": "66",
+      "executed": "66",
+      "passed": "66",
+      "failed": "0",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "trxSha256": "916c8c3ba4c3a1db50ece1b2f9ec8a0b10913ec1f276615626a5c8b9e8142801"
+  },
+  "technicalIntegration": {
+    "command": "node scripts/verify-function-first.js",
+    "scenarios": [
+      {
+        "scenario": "verified",
+        "findingId": "DEV-CRYPTO-VERIFIED",
+        "runId": "e8dde813-7a46-4906-8dc0-d6495b23cae0",
+        "executionMode": "LOCAL_DEVELOPMENT",
+        "localOutcome": "COMPLETED_VERIFIED",
+        "verifiedRemediation": true,
+        "baseline": {
+          "total": 3,
+          "failed": 2
+        },
+        "postFix": {
+          "total": 3,
+          "failed": 0
+        },
+        "reScan": "RESOLVED",
+        "stages": [
+          {
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "number": 3,
+            "status": "completed"
+          },
+          {
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "number": 6,
+            "status": "completed"
+          },
+          {
+            "number": 7,
+            "status": "completed"
+          },
+          {
+            "number": 8,
+            "status": "deferred_in_dev_mode"
+          },
+          {
+            "number": 9,
+            "status": "completed"
+          }
+        ],
+        "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+        "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+        "originalUnchanged": true
+      },
+      {
+        "scenario": "defective",
+        "findingId": "DEV-CRYPTO-DEFECTIVE",
+        "runId": "c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b",
+        "executionMode": "LOCAL_DEVELOPMENT",
+        "localOutcome": "FAILED",
+        "verifiedRemediation": false,
+        "baseline": {
+          "total": 3,
+          "failed": 2
+        },
+        "postFix": {
+          "total": 3,
+          "failed": 2
+        },
+        "reScan": "REGRESSION_DETECTED",
+        "stages": [
+          {
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "number": 3,
+            "status": "completed"
+          },
+          {
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "number": 6,
+            "status": "failed"
+          },
+          {
+            "number": 7,
+            "status": "failed"
+          },
+          {
+            "number": 8,
+            "status": "deferred_in_dev_mode"
+          },
+          {
+            "number": 9,
+            "status": "failed"
+          }
+        ],
+        "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+        "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+        "originalUnchanged": true
+      },
+      {
+        "scenario": "missing-tests",
+        "findingId": "DEV-CRYPTO-MISSING-TESTS",
+        "runId": "d8b339dd-6f94-4111-9922-a008f42d5ba3",
+        "executionMode": "LOCAL_DEVELOPMENT",
+        "localOutcome": "COMPLETED_WITH_LIMITATIONS",
+        "verifiedRemediation": false,
+        "baseline": {
+          "total": 0,
+          "failed": 0
+        },
+        "postFix": {
+          "total": 0,
+          "failed": 0
+        },
+        "reScan": "NOT_VERIFIED",
+        "stages": [
+          {
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "number": 3,
+            "status": "completed_with_limitations"
+          },
+          {
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "number": 6,
+            "status": "blocked"
+          },
+          {
+            "number": 7,
+            "status": "blocked"
+          },
+          {
+            "number": 8,
+            "status": "deferred_in_dev_mode"
+          },
+          {
+            "number": 9,
+            "status": "completed"
+          }
+        ],
+        "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+        "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+        "originalUnchanged": true
+      },
+      {
+        "scenario": "cancel-retry",
+        "cancellationEvidence": {
+          "outcome": "CANCELLED",
+          "backend": "local-container",
+          "retryEligible": true,
+          "approvedDiffSha256": "b771a121975511c4ed6804747a0756fc7defc12ce155047bd99cdff926ba9186"
+        },
+        "findingId": "DEV-CRYPTO-CANCEL-RETRY",
+        "runId": "78ad3909-24a4-4c65-bd6a-4ddb5151065e",
+        "executionMode": "LOCAL_DEVELOPMENT",
+        "localOutcome": "COMPLETED_VERIFIED",
+        "verifiedRemediation": true,
+        "baseline": {
+          "total": 3,
+          "failed": 2
+        },
+        "postFix": {
+          "total": 3,
+          "failed": 0
+        },
+        "reScan": "RESOLVED",
+        "stages": [
+          {
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "number": 3,
+            "status": "completed"
+          },
+          {
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "number": 6,
+            "status": "completed"
+          },
+          {
+            "number": 7,
+            "status": "completed"
+          },
+          {
+            "number": 8,
+            "status": "deferred_in_dev_mode"
+          },
+          {
+            "number": 9,
+            "status": "completed"
+          }
+        ],
+        "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+        "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+        "originalUnchanged": true
+      }
+    ],
+    "provider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+    "consent": "AUTOMATED_TEST_CONSENT_NOT_HUMAN"
+  },
+  "interactiveCopilotVerified": false,
+  "actualHumanConsentVerified": false,
+  "verdict": "PARTIALLY FUNCTIONAL"
+}

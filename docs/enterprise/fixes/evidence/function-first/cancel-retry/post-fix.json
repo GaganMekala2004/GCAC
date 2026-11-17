@@ -1,0 +1,124 @@
+{
+  "executed": true,
+  "passed": true,
+  "status": "PASS",
+  "sandboxStatus": "SANDBOX_READY",
+  "lifecycleState": "COMPLETED",
+  "machineStatus": "PASSED",
+  "reasonCode": null,
+  "reason": "All assertions passed inside isolated execution backend",
+  "instanceId": "gcac-4e5fa5de8c6c",
+  "runId": "78ad3909-24a4-4c65-bd6a-4ddb5151065e",
+  "operationId": "DOTNET_TEST",
+  "backendType": "local-container",
+  "runtime": "docker",
+  "toolchainProfileId": "dotnet-10.0-lts",
+  "toolchainProfileHash": "ae3bb9ba317890519a59736e5ea19f8d244166cb5258227c9722d7011f8b822b",
+  "imageDigest": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
+  "digestStatus": "VERIFIED_IMAGE_DIGEST",
+  "executable": "dotnet",
+  "approvedArgs": [
+    "test",
+    "--no-restore",
+    "--nologo",
+    "-v",
+    "normal",
+    "-v",
+    "normal",
+    "--logger",
+    "trx",
+    "--results-directory",
+    "/sandbox-out"
+  ],
+  "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+  "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-function-proof-UI19AK/cancel-retry/runs/DEV-CRYPTO-CANCEL-RETRY_78ad3909-24a4-4c65-bd6a-4ddb5151065e/worktree",
+  "startTime": "2026-11-15T16:43:53.557Z",
+  "endTime": "2026-11-15T16:43:57.521Z",
+  "durationMs": 3965,
+  "exitCode": 0,
+  "timedOut": false,
+  "cancelled": false,
+  "networkPolicy": "NO_NETWORK",
+  "networkEnforcementSummary": "Container network namespace isolated (--network=none); zero outbound or loopback/host-service egress.",
+  "dependencyStatus": "PREPROVISIONED_CACHE",
+  "dependencyWarnings": [
+    "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+  ],
+  "resourceLimits": {
+    "timeoutMs": 120000,
+    "memoryMb": 2048,
+    "cpus": 2,
+    "pidsLimit": 128
+  },
+  "stderr": "",
+  "outputArtifactHashes": {
+    "_81c85fa8b1eb_2026-11-15_16_43_57_net10.0.trx": {
+      "sha256": "8b17dd96bf5267cb0779a5b3a1798da9f040763b962bcc0cef19f2e9a063acf8",
+      "bytes": 5401
+    }
+  },
+  "outputArtifacts": {
+    "_81c85fa8b1eb_2026-11-15_16_43_57_net10.0.trx": {
+      "fileName": "_81c85fa8b1eb_2026-11-15_16_43_57_net10.0.trx",
+      "content": "﻿<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<TestRun id=\"fe0f7ed9-5b71-4cbe-bca4-fb8289aaa935\" name=\"@81c85fa8b1eb 2026-11-15 16:43:57\" xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\">\n  <Times creation=\"2026-11-15T16:43:57.4130793+00:00\" queuing=\"2026-11-15T16:43:57.4130794+00:00\" start=\"2026-11-15T16:43:56.4834576+00:00\" finish=\"2026-11-15T16:43:57.4172052+00:00\" />\n  <TestSettings name=\"default\" id=\"9cc0c43a-8a99-497a-99d1-757d70021a20\">\n    <Deployment runDeploymentRoot=\"_81c85fa8b1eb_2026-11-15_16_43_57\" />\n  </TestSettings>\n  <Results>\n    <UnitTestResult executionId=\"09fab9b7-7fdf-4070-bf54-f9af1d0537f2\" testId=\"9d0f546d-6b20-05b4-2a89-e01510ae7d78\" testName=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication\" computerName=\"81c85fa8b1eb\" duration=\"00:00:00.0010754\" startTime=\"2026-11-15T16:43:57.2242669+00:00\" endTime=\"2026-11-15T16:43:57.2242670+00:00\" testType=\"13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b\" outcome=\"Passed\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" relativeResultsDirectory=\"09fab9b7-7fdf-4070-bf54-f9af1d0537f2\" />\n    <UnitTestResult executionId=\"7e629ba6-185a-49d1-818d-aedbdedd0207\" testId=\"7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3\" testName=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip\" computerName=\"81c85fa8b1eb\" duration=\"00:00:00.0077750\" startTime=\"2026-11-15T16:43:57.2215707+00:00\" endTime=\"2026-11-15T16:43:57.2215860+00:00\" testType=\"13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b\" outcome=\"Passed\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" relativeResultsDirectory=\"7e629ba6-185a-49d1-818d-aedbdedd0207\" />\n    <UnitTestResult executionId=\"8ac743c4-76d9-4e63-9b61-cb78feb1fdb9\" testId=\"9a06e3dd-2368-3abb-becd-d3922cc9fb88\" testName=\"PaymentsAPI.Tests.PaymentControllerTests.Process_DoesNotThrowOnValidRequest\" computerName=\"81c85fa8b1eb\" duration=\"00:00:00.0086746\" startTime=\"2026-11-15T16:43:57.2234967+00:00\" endTime=\"2026-11-15T16:43:57.2234967+00:00\" testType=\"13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b\" outcome=\"Passed\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" relativeResultsDirectory=\"8ac743c4-76d9-4e63-9b61-cb78feb1fdb9\" />\n  </Results>\n  <TestDefinitions>\n    <UnitTest name=\"PaymentsAPI.Tests.PaymentControllerTests.Process_DoesNotThrowOnValidRequest\" storage=\"/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll\" id=\"9a06e3dd-2368-3abb-becd-d3922cc9fb88\">\n      <Execution id=\"8ac743c4-76d9-4e63-9b61-cb78feb1fdb9\" />\n      <TestMethod codeBase=\"/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll\" adapterTypeName=\"executor://xunit/VsTestRunner2/netcoreapp\" className=\"PaymentsAPI.Tests.PaymentControllerTests\" name=\"Process_DoesNotThrowOnValidRequest\" />\n    </UnitTest>\n    <UnitTest name=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication\" storage=\"/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll\" id=\"9d0f546d-6b20-05b4-2a89-e01510ae7d78\">\n      <Execution id=\"09fab9b7-7fdf-4070-bf54-f9af1d0537f2\" />\n      <TestMethod codeBase=\"/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll\" adapterTypeName=\"executor://xunit/VsTestRunner2/netcoreapp\" className=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests\" name=\"ModifiedCiphertextFailsAuthentication\" />\n    </UnitTest>\n    <UnitTest name=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip\" storage=\"/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll\" id=\"7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3\">\n      <Execution id=\"7e629ba6-185a-49d1-818d-aedbdedd0207\" />\n      <TestMethod codeBase=\"/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll\" adapterTypeName=\"executor://xunit/VsTestRunner2/netcoreapp\" className=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests\" name=\"EncryptionSupportsAes256AndAuthenticatedRoundTrip\" />\n    </UnitTest>\n  </TestDefinitions>\n  <TestEntries>\n    <TestEntry testId=\"9d0f546d-6b20-05b4-2a89-e01510ae7d78\" executionId=\"09fab9b7-7fdf-4070-bf54-f9af1d0537f2\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" />\n    <TestEntry testId=\"7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3\" executionId=\"7e629ba6-185a-49d1-818d-aedbdedd0207\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" />\n    <TestEntry testId=\"9a06e3dd-2368-3abb-becd-d3922cc9fb88\" executionId=\"8ac743c4-76d9-4e63-9b61-cb78feb1fdb9\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" />\n  </TestEntries>\n  <TestLists>\n    <TestList name=\"Results Not in a List\" id=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" />\n    <TestList name=\"All Loaded Results\" id=\"19431567-8539-422a-85d7-44ee4e166bda\" />\n  </TestLists>\n  <ResultSummary outcome=\"Completed\">\n    <Counters total=\"3\" executed=\"3\" passed=\"3\" failed=\"0\" error=\"0\" timeout=\"0\" aborted=\"0\" inconclusive=\"0\" passedButRunAborted=\"0\" notRunnable=\"0\" notExecuted=\"0\" disconnected=\"0\" warning=\"0\" completed=\"0\" inProgress=\"0\" pending=\"0\" />\n    <Output>\n      <StdOut>[xUnit.net 00:00:00.05] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.15)\n[xUnit.net 00:00:00.09]   Discovering: PaymentsAPI.Tests\n[xUnit.net 00:00:00.16]   Discovered:  PaymentsAPI.Tests\n[xUnit.net 00:00:00.17]   Starting:    PaymentsAPI.Tests\n[xUnit.net 00:00:00.26]   Finished:    PaymentsAPI.Tests\n</StdOut>\n    </Output>\n  </ResultSummary>\n</TestRun>",
+      "sha256": "8b17dd96bf5267cb0779a5b3a1798da9f040763b962bcc0cef19f2e9a063acf8",
+      "bytes": 5401
+    }
+  },
+  "injectionScreening": {
+    "runId": "78ad3909-24a4-4c65-bd6a-4ddb5151065e",
+    "contentSource": "sandbox:DOTNET_TEST",
+    "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+    "ruleId": "INJ-PASS",
+    "outcome": "ALLOW_UNTRUSTED_DATA",
+    "policyVersion": "GCAC-PH2-INJ-1.0",
+    "timestamp": "2026-11-15T16:43:57.584Z",
+    "redactedLocation": "DEV-CRYPTO-CANCEL-RETRY_78ad3909-24a4-4c65-bd6a-4ddb5151065e/worktree",
+    "matchCount": 0
+  },
+  "lifecycleHistory": [
+    {
+      "state": "PENDING",
+      "timestamp": "2026-11-15T16:43:53.547Z",
+      "detail": "Instance registered."
+    },
+    {
+      "state": "PREPARING",
+      "timestamp": "2026-11-15T16:43:53.548Z",
+      "detail": "Staging credential-free source snapshot."
+    },
+    {
+      "state": "RUNNING",
+      "timestamp": "2026-11-15T16:43:53.557Z",
+      "detail": "Executing DOTNET_TEST via local-container."
+    },
+    {
+      "state": "COMPLETED",
+      "timestamp": "2026-11-15T16:43:57.585Z",
+      "detail": "Completed with exitCode=0"
+    }
+  ],
+  "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception.",
+  "failureCategory": "TESTS_PASSED",
+  "stage": "Stage 5/6: Post-Fix Bench Test",
+  "testPhase": "POST_FIX_TEST",
+  "repositoryTested": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-function-proof-UI19AK/cancel-retry/runs/DEV-CRYPTO-CANCEL-RETRY_78ad3909-24a4-4c65-bd6a-4ddb5151065e/worktree",
+  "rootError": "",
+  "countsKnown": true,
+  "testsTotal": 3,
+  "testsPassed": 3,
+  "testsFailed": 0,
+  "testsSkipped": 0,
+  "testReportLocation": "_81c85fa8b1eb_2026-11-15_16_43_57_net10.0.trx",
+  "testFailures": [],
+  "provenance": {
+    "repositoryId": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-function-proof-UI19AK/cancel-retry/runs/DEV-CRYPTO-CANCEL-RETRY_78ad3909-24a4-4c65-bd6a-4ddb5151065e/worktree",
+    "runId": "78ad3909-24a4-4c65-bd6a-4ddb5151065e",
+    "stageId": "Stage 5/6: Post-Fix Bench Test",
+    "attemptId": 1,
+    "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out"
+  },
+  "retryEligible": false,
+  "suggestedNextAction": null,
+  "summary": "PASS — Tests passed (3/3) via local-container, Exit Code: 0"
+}

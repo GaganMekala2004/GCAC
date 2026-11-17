@@ -1,0 +1,11 @@
+using System.Diagnostics;
+
+namespace PaymentsAPI.Controllers;
+
+public class ReceiptController
+{
+    public void Generate(string receiptId)
+    {
+        Process.Start("cmd.exe", $"/c generate-receipt.bat {receiptId}");
+    }
+}

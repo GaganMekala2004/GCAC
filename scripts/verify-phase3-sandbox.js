@@ -33,6 +33,7 @@ const { TrustedExecutionGateway, EXECUTION_POLICY_VERSION, OPERATION_TYPES } = r
 const DEFAULT_LOCAL_CANDIDATES = {
     'dotnet-8.0-lts': ['mcr.microsoft.com/dotnet/sdk:8.0', 'mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim'],
     'dotnet-9.0-sts': ['mcr.microsoft.com/dotnet/sdk:9.0', 'mcr.microsoft.com/dotnet/sdk:9.0-bookworm-slim'],
+    'dotnet-10.0-lts': ['mcr.microsoft.com/dotnet/sdk:10.0', 'mcr.microsoft.com/dotnet/sdk:10.0-bookworm-slim'],
     'java-17-maven': ['maven:3.9-eclipse-temurin-17', 'maven:3.9.9-eclipse-temurin-17'],
     'node-22-lts': ['node:22-slim', 'node:22-bookworm-slim', 'node:22']
 };
@@ -132,7 +133,9 @@ async function runLiveContainerSmokeTest(env, opts) {
     }
 
     const reg = loadAndVerifyToolchainRegistry(PROFILES_PATH);
-    const chosenId = opts.profileId || 'node-22-lts';
+    const verifiedProfiles = reg.profiles.filter(p => !isTemplateDigestProfile(p));
+    const defaultProfileId = verifiedProfiles.length > 0 ? verifiedProfiles[0].profileId : 'node-22-lts';
+    const chosenId = opts.profileId || defaultProfileId;
     const profile = reg.byId.get(chosenId);
     if (!profile) {
         console.error(`Unknown toolchain profile '${chosenId}'.`);
@@ -160,7 +163,17 @@ async function runLiveContainerSmokeTest(env, opts) {
                 packages: {}
             }, null, 2));
         } else {
-            fs.writeFileSync(path.join(tmpRepo, 'Smoke.csproj'), '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework></PropertyGroup></Project>');
+            const tf = profile.targetFrameworks?.[0] || 'net10.0';
+            fs.writeFileSync(path.join(tmpRepo, 'Smoke.csproj'), `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>${tf}</TargetFramework><OutputType>Exe</OutputType></PropertyGroup></Project>`);
+            fs.writeFileSync(path.join(tmpRepo, 'Program.cs'), 'System.Console.WriteLine("Smoke OK");');
+            const runtimeMeta = env.selectedRuntime === 'docker' ? env.containers.docker : env.containers.podman;
+            const runtimeBin = runtimeMeta?.binaryPath || env.selectedRuntime;
+            try {
+                execFileSync(runtimeBin, ['run', '--rm', '--network', 'none', '-v', `${tmpRepo}:/work:rw`, '-w', '/work', profile.imageRef, 'dotnet', 'restore', '--nologo'], {
+                    timeout: 10000,
+                    stdio: ['ignore', 'pipe', 'pipe']
+                });
+            } catch {}
         }
 
         const backend = new ContainerSandboxBackend({ envReport: env });

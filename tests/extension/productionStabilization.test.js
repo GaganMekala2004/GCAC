@@ -78,7 +78,7 @@ function makeReadySandboxBackend(execBehavior) {
         }),
         validatePolicy: () => ({ valid: true }),
         prepareEnvironment: async (req) => ({ instanceId: req.instanceId, workDir: req.approvedWorkspaceReference, staged: {} }),
-        executeApprovedOperation: async (req) => execBehavior(req),
+        executeApprovedOperation: async (req, operation) => execBehavior(req, operation),
         cancelOperation: async () => ({ cancelled: true }),
         collectEvidence: async () => ({}),
         cleanup: async () => ({ cleaned: true })
@@ -238,7 +238,7 @@ async function run() {
             const sbxWs = initGitRepo(path.join(tmpBase, 'sec005-ws'), {
                 'src/PaymentsAPI/Controllers/ReceiptController.cs': 'public class ReceiptController { private const string ApiKey = "' + ['sk', 'live', 'TestSecretValue123456'].join('_') + '"; }\n',
                 'src/PaymentsAPI/Controllers/PaymentController.cs': 'using System.Data.SqlClient;\npublic class PaymentController { SqlCommand _cmd; }\n',
-                'src/PaymentsAPI/PaymentsAPI.csproj': '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>'
+                'src/PaymentsAPI/PaymentsAPI.csproj': '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><IsTestProject>true</IsTestProject></PropertyGroup></Project>'
             });
             const storeDir = path.join(sbxWs, 'output', 'scans');
             const fStore = new FindingsStore(sbxWs, storeDir);
@@ -276,12 +276,19 @@ async function run() {
             assert(parsedCs1069.rootError.includes('CS1069'));
 
             const readyEnv = makeReadyEnvReport();
-            const backend = makeReadySandboxBackend(() => ({
-                exitCode: 1,
+            let baselineInvocation = true;
+            const backend = makeReadySandboxBackend((environment, operation) => {
+                if (operation?.operation === 'DOTNET_BUILD') return { exitCode: 0, stdout: 'Build succeeded.', stderr: '', durationMs: 10 };
+                if (baselineInvocation) {
+                    baselineInvocation = false;
+                    return { exitCode: 0, durationMs: 30, stdout: 'Passed! - Failed: 0, Passed: 1, Skipped: 0, Total: 1', stderr: '' };
+                }
+                return { exitCode: 1,
                 durationMs: 30,
                 stdout: buildFailOutput,
                 stderr: ''
-            }));
+            };
+            });
             const mockLlm = {
                 getAvailableModels: async () => [{ id: 'copilot-gpt', name: 'Mock Copilot', vendor: 'copilot' }],
                 generateJson: async (p) => {
@@ -289,7 +296,10 @@ async function run() {
                     if (p.includes('Root Cause Analysis')) return { dataFlow: 'Literal key in class', rootCause: 'Plaintext secret', securityImpact: 'Credential exposure', proposedFix: 'Load from environment', affectedLines: 'Line 1', summary: 'Externalize secret' };
                     return { rating: 'FAIL', score: 40, summary: 'Validation failed due to CS1069 compilation failure.', auditChecks: ['Build failed CS1069'] };
                 },
-                generateCompletion: async () => '```diff\n--- a/src/PaymentsAPI/Controllers/ReceiptController.cs\n+++ b/src/PaymentsAPI/Controllers/ReceiptController.cs\n@@ -1 +1 @@\n-public class ReceiptController { private const string ApiKey = "x"; }\n+public class ReceiptController { private string ApiKey => System.Environment.GetEnvironmentVariable("RECEIPT_API_KEY") ?? ""; }\n```\n```full_code\npublic class ReceiptController { private string ApiKey => System.Environment.GetEnvironmentVariable("RECEIPT_API_KEY") ?? ""; }\n```'
+                generateCompletion: async () => JSON.stringify({ edits: [{
+                    oldText: 'public class ReceiptController { private const string ApiKey = "<GCAC_REDACTED_1>"; }',
+                    newText: 'public class ReceiptController { private string ApiKey => System.Environment.GetEnvironmentVariable("RECEIPT_API_KEY") ?? ""; }'
+                }] })
             };
 
             const events = [];
@@ -303,16 +313,36 @@ async function run() {
                 runsRoot: path.join(tmpBase, 'sec005-runs')
             });
 
-            // Stage 1-4 pause
+            // A compiler failure in the baseline must stop before patch approval.
+            baselineInvocation = false;
+            await assert.rejects(() => engine.executePipeline('SCAN-SECRET-005', {
+                onProgress: (event) => events.push(event)
+            }), /BLOCKED \(BaselineTest\).*CS1069/);
+            const blockedBaseline = engine.loadRunState('SCAN-SECRET-005');
+            assert.strictEqual(blockedBaseline.status, 'BLOCKED');
+            assert.strictEqual(blockedBaseline.stages[3].status, 'blocked_by_prerequisite');
+            assert.strictEqual(blockedBaseline.securityValidationOutcome, 'NOT_EXECUTED');
+            assert.strictEqual(blockedBaseline.proposedDiffSha256, null);
+            assert(events.some(event => event.type === 'STAGE_BLOCKED' && event.stageNumber === 3));
+            assert(events.some(event => event.type === 'WORKFLOW_FAILED' && event.executionState === 'BLOCKED'));
+            baselineInvocation = true;
+
+            // Stage 1-4 pause with an eligible baseline from the mock backend.
             const gate4Pause = await engine.executePipeline('SCAN-SECRET-005', {
                 onProgress: (e) => events.push(e)
             });
             assert.strictEqual(gate4Pause.isAwaitingApproval, true);
             assert.strictEqual(gate4Pause.stage, 4);
+            const gateMarkdown = formatGateMarkdown('SCAN-SECRET-005', gate4Pause);
+            assert(gateMarkdown.includes('/approve SCAN-SECRET-005'), 'An eligible JSON proposal must expose the chat approval command');
+            assert(require('../../extension/evidenceLedger').verifyEvidencePackage(path.join(sbxWs, 'remediation-output', 'SCAN-SECRET-005')).verified,
+                'Stage 4 evidence must remain verified after state persistence');
 
             // Stage 4 approve -> Stage 5-9 concludes with Validation Failed & Stage 8 BLOCKED!
             const failedConcluded = await engine.executePipeline('SCAN-SECRET-005', {
                 isHumanApproved: true,
+                allowBaselineException: true,
+                baselineExceptionRationale: 'Harness test with documented baseline exception',
                 onProgress: (e) => events.push(e)
             });
 
@@ -429,7 +459,7 @@ async function run() {
         {
             const retryRepo = initGitRepo(path.join(tmpBase, 'retry-neg'), {
                 'App.cs': 'public class App {}',
-                'App.csproj': '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>'
+                'App.csproj': '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><IsTestProject>true</IsTestProject></PropertyGroup></Project>'
             });
             fs.mkdirSync(path.join(retryRepo, 'vulnerability'), { recursive: true });
             const csvPath = path.join(retryRepo, 'vulnerability', 'vulnerabilities.csv');

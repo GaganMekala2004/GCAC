@@ -1,0 +1,11 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information"
+    }
+  },
+  "PaymentGateway": {
+    "ApiKey": "sk_live_99887766554433221100aabbccddeeff",
+    "Endpoint": "https://api.paymentgateway.internal/v1"
+  }
+}

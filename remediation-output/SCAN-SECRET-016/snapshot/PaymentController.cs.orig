@@ -1,0 +1,18 @@
+using System.Data.SqlClient;
+
+namespace PaymentsAPI.Controllers;
+
+public class PaymentRequest
+{
+    public string AccountId { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+}
+
+public class PaymentController
+{
+    public void Process(PaymentRequest request)
+    {
+        string query = "SELECT * FROM Payments WHERE AccountId = '" + request.AccountId + "' AND Amount = " + request.Amount;
+        using var cmd = new SqlCommand(query);
+    }
+}

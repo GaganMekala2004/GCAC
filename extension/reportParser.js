@@ -314,6 +314,9 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
                     const rawRs = JSON.parse(fs.readFileSync(runStatePath, 'utf-8'));
                     const rs = normalizeCanonicalRunState(rawRs, vulnerabilityId);
                     details.runState = rs;
+                    details.executionMode = rs.executionMode || 'ENTERPRISE';
+                    details.localOutcome = rs.localOutcome || null;
+                    details.verifiedRemediation = rs.verifiedRemediation === true;
                     details.runId = rs.runId || null;
                     details.attemptId = rs.attemptId || null;
                     details.attemptNumber = Number(rs.attemptNumber || 1);
@@ -323,6 +326,7 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
                     details.failedStageId = rs.failedStageId || null;
                     details.failureCategory = rs.failureCategory || null;
                     details.failureReason = rs.failureReason || null;
+                    details.status = rs.status || (rs.workflowLifecycle === 'BLOCKED' ? 'BLOCKED' : details.status);
                     details.retryEligibility = rs.retryEligibility || null;
                     details.workflowLifecycle = rs.workflowLifecycle;
                     details.securityValidationOutcome = rs.securityValidationOutcome;
@@ -330,6 +334,14 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
                     details.formalClosure = rs.formalClosure;
                     details.findingState = rs.findingState;
                     details.terminalBanner = rs.terminalBanner;
+                    if (rs.failureCategory === 'TOOLCHAIN_IMAGE_UNAVAILABLE' || (details.failureReason && /is not present in local runtime cache|template placeholder|UNPROVISIONED_TOOLCHAIN_PROFILE/i.test(details.failureReason))) {
+                        details.failureCategory = 'TOOLCHAIN_IMAGE_UNAVAILABLE';
+                        details.workflowLifecycle = 'BLOCKED';
+                        details.findingState = 'COULD_NOT_RUN';
+                        details.formalClosure = 'COULD_NOT_RUN';
+                        details.status = 'BLOCKED';
+                        details.terminalBanner = 'Workflow Blocked — Toolchain Image Unavailable';
+                    }
                     details.handoff = rs.handoff || null;
                     details.lastAppliedSeq = Number(rs.lastAppliedSeq || 0);
                     details.findingContext = rs.findingContext || details.findingContext;
@@ -403,7 +415,8 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
             const sharedReportPath = path.join(sharedOutputDir, match);
             try {
                 const sharedContent = fs.readFileSync(sharedReportPath, 'utf-8');
-                if (!details.reportMarkdown || details.reportMarkdown.length < sharedContent.length) {
+                if ((!details.runState?.runId || sharedContent.includes(details.runState.runId)) &&
+                    (!details.reportMarkdown || details.reportMarkdown.length < sharedContent.length)) {
                     details.reportMarkdown = sharedContent;
                 }
                 details.hasEvidence = true;
@@ -429,7 +442,26 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
     }
 
     // Infer stages status from evidence and report content
-    inferStageStatuses(details);
+    const canonical = details.runState;
+    if (canonical?.schemaVersion === RUN_STATE_SCHEMA_VERSION && canonical.stages?.length === 9) {
+        // Explicit current-run nulls must not be filled from an older report.
+        for (const [stateKey, detailKey] of [['patchDiff', 'patchDiff'], ['postFixValidation', 'validation'],
+            ['baselineValidation', 'baselineValidation'], ['reScanVerification', 'reScanVerification'], ['securityReview', 'securityReview']]) {
+            if (Object.prototype.hasOwnProperty.call(canonical, stateKey)) details[detailKey] = canonical[stateKey] || null;
+        }
+        details.stages = canonical.stages.map((stage, index) => ({ ...details.stages[index], ...stage }));
+        if (canonical.status === 'HANDED_OFF_TO_COPILOT' || canonical.status === 'AWAITING_VERIFIED_RESULT') {
+            details.validation = canonical.postFixValidation || null;
+            details.failureCategory = canonical.failureCategory || null;
+            details.failureReason = canonical.failureReason || null;
+            details.diagnostics = canonical.diagnostics || {
+                failureCategory: 'VERIFIED_EXECUTION_PENDING',
+                rootError: 'Copilot handoff is recorded; no verified build, test, or re-scan result has been received for this run.'
+            };
+        }
+    } else {
+        inferStageStatuses(details);
+    }
 
     // Fail-closed: tampered evidence packages cannot present trusted PASS indicators
     if (details.integrityVerification && details.integrityVerification.status === 'TAMPERING_DETECTED') {
@@ -707,40 +739,65 @@ function inferStageStatuses(details) {
     }
 
     // Stage 3: Analysis / RCA & Baseline
-    if (details.classification || report.includes('Code Analysis / RCA Agent') || report.includes('Root Cause') || trace.includes('code-analysis-rca') || trace.includes('[RCA]') || trace.includes('[ANALYZE]')) {
+    const runStateStages = Array.isArray(details.runState?.stages) ? details.runState.stages : null;
+    const isStage3BlockedOrFailed = details.runState?.failedStage === 3 ||
+        runStateStages?.[2]?.status === 'blocked' ||
+        runStateStages?.[2]?.status === 'failed' ||
+        details.runState?.baselineValidation?.status === 'BLOCKED' ||
+        details.runState?.baselineValidation?.status === 'COULD NOT RUN' ||
+        details.runState?.baselineValidation?.machineStatus === 'BLOCKED' ||
+        details.runState?.baselineValidation?.machineStatus === 'COULD_NOT_RUN';
+
+    if (isStage3BlockedOrFailed) {
+        stages[idx.analysis].status = runStateStages?.[2]?.status === 'failed' ? 'failed' : 'blocked';
+        stages[idx.analysis].summary = runStateStages?.[2]?.summary || details.runState?.failureReason || 'Baseline testing could not run (toolchain unavailable).';
+    } else if (details.classification || report.includes('Code Analysis / RCA Agent') || report.includes('Root Cause') || trace.includes('code-analysis-rca') || trace.includes('[RCA]') || trace.includes('[ANALYZE]')) {
         stages[idx.analysis].status = 'completed';
         stages[idx.analysis].summary = details.classification?.strategy || 'RCA identified vulnerable data flow and call stack context.';
     }
 
     // Stage 4: Human Approval Gate (Pre-test fix authorization)
-    const isHumanApproved = report.includes('APPROVED') || report.includes('Human Review: Approved') || report.includes('STATUS: APPROVED') ||
+    const isHumanApproved = (report.includes('APPROVED') || report.includes('Human Review: Approved') || report.includes('STATUS: APPROVED') ||
         trace.includes('Human Approval granted') || trace.includes('[GOVERNANCE_GATE] Human Approval') ||
-        details.runState?.isApproved === true || details.runState?.approvalDecision === APPROVAL_DECISION.APPROVED_STAGE4;
-    const isAwaitingFirstApproval = report.includes('AWAITING_HUMAN_APPROVAL') || report.includes('Awaiting Human Review') ||
-        trace.includes('AWAITING_HUMAN_REVIEW') || details.runState?.status === 'AWAITING_HUMAN_APPROVAL';
+        details.runState?.isApproved === true || details.runState?.approvalDecision === APPROVAL_DECISION.APPROVED_STAGE4) && !isStage3BlockedOrFailed;
+    const isAwaitingFirstApproval = (report.includes('AWAITING_HUMAN_APPROVAL') || report.includes('Awaiting Human Review') ||
+        trace.includes('AWAITING_HUMAN_REVIEW') || details.runState?.status === 'AWAITING_HUMAN_APPROVAL') && !isStage3BlockedOrFailed;
 
-    let fixApplied = Boolean(patchDiff || trace.includes('[REMEDIATE]') || details.runState?.patchAppliedAtStage5 || report.includes('Isolated worktree updated'));
+    let fixApplied = Boolean(patchDiff || trace.includes('[REMEDIATE]') || details.runState?.patchAppliedAtStage5 || report.includes('Isolated worktree updated')) && !isStage3BlockedOrFailed;
     if (isLegacy7) {
-        fixApplied = Boolean(patchDiff || report.includes('## Remediation Agent') || report.includes('Remediation Strategy') || trace.includes('remediation') || trace.includes('[REMEDIATE]'));
+        fixApplied = Boolean(patchDiff || report.includes('## Remediation Agent') || report.includes('Remediation Strategy') || trace.includes('remediation') || trace.includes('[REMEDIATE]')) && !isStage3BlockedOrFailed;
     }
 
-    if (isHumanApproved || (fixApplied && (validation || report.includes('## Unit Test Agent') || report.includes('## Final Validation Agent')))) {
+    if (isStage3BlockedOrFailed) {
+        stages[idx.humanGate].status = 'blocked_by_prerequisite';
+        stages[idx.humanGate].summary = 'BLOCKED — Stage 3 source analysis and baseline testing prerequisites not satisfied.';
+    } else if (isHumanApproved || (fixApplied && (validation || report.includes('## Unit Test Agent') || report.includes('## Final Validation Agent')))) {
         stages[idx.humanGate].status = 'completed';
         stages[idx.humanGate].summary = 'Secure fix authorized by developer / security lead.';
-    } else if (isAwaitingFirstApproval || (stages[idx.classify].status === 'completed' && stages[idx.analysis].status === 'completed')) {
+    } else if (isAwaitingFirstApproval || (stages[idx.classify].status === 'completed' && stages[idx.analysis].status === 'completed' && !isStage3BlockedOrFailed)) {
         stages[idx.humanGate].status = 'awaiting_review';
         stages[idx.humanGate].summary = 'Awaiting human review and authorization of proposed fix.';
+    } else {
+        stages[idx.humanGate].status = 'pending';
+        stages[idx.humanGate].summary = 'Pending prerequisite completion.';
     }
 
     // Stage 5: Code Remediation (Patch application)
-    if (fixApplied && (!isAwaitingFirstApproval || isHumanApproved)) {
+    if (isStage3BlockedOrFailed) {
+        stages[idx.remediation].status = 'not_started';
+        stages[idx.remediation].summary = 'Not started (prerequisites blocked).';
+    } else if (fixApplied && (!isAwaitingFirstApproval || isHumanApproved)) {
         stages[idx.remediation].status = 'completed';
         stages[idx.remediation].summary = 'Minimal secure code patch applied within approved file scope.';
     }
 
     // Stage 6: Bench Test & Re-Scan
     let benchPassed = false;
-    if (validation || report.includes('## Unit Test Agent') || report.includes('Post-Fix Verification Tests') || report.includes('## Post-Fix Test Validation') || trace.includes('unit-test') || trace.includes('[TEST]') || trace.includes('[BENCH_TEST]')) {
+    if (isStage3BlockedOrFailed) {
+        stages[idx.benchTest].status = 'not_started';
+        stages[idx.benchTest].summary = 'Not started (prerequisites blocked).';
+        benchPassed = false;
+    } else if (validation || report.includes('## Unit Test Agent') || report.includes('Post-Fix Verification Tests') || report.includes('## Post-Fix Test Validation') || trace.includes('unit-test') || trace.includes('[TEST]') || trace.includes('[BENCH_TEST]')) {
         const valStatus = String(validation?.status || '').toUpperCase();
         const machine = String(validation?.machineStatus || '').toUpperCase();
         const cat = String(validation?.failureCategory || '').toUpperCase();
@@ -788,7 +845,7 @@ function inferStageStatuses(details) {
                 ? Math.min(idx.closure, Math.max(0, engineFailStage - 1))
                 : engineFailStage - 1;
             if (stages[targetIdx]) {
-                stages[targetIdx].status = 'failed';
+                stages[targetIdx].status = isStage3BlockedOrFailed && targetIdx === idx.analysis ? 'blocked' : 'failed';
                 if (!stages[targetIdx].summary || stages[targetIdx].summary.includes('Execute')) {
                     stages[targetIdx].summary = reasonText;
                 }
@@ -798,7 +855,10 @@ function inferStageStatuses(details) {
 
     // Stage 7: Security Review & Evidence (9-stage model)
     if (!isLegacy7 && stages[idx.secReview]) {
-        if (securityReview) {
+        if (isStage3BlockedOrFailed) {
+            stages[idx.secReview].status = 'not_started';
+            stages[idx.secReview].summary = 'Not started (prerequisites blocked).';
+        } else if (securityReview) {
             const revRating = String(securityReview.rating || securityReview.status || '').toUpperCase();
             stages[idx.secReview].status = revRating === 'PASS' ? 'completed' : (revRating === 'FAIL' || revRating === 'BLOCKED' ? 'failed' : 'completed');
             stages[idx.secReview].summary = securityReview.summary || `Security review outcome: ${revRating || 'Evaluated'}`;
@@ -815,7 +875,10 @@ function inferStageStatuses(details) {
     const hasBlockedInjection = details.injectionScreening?.outcome === SCREEN_OUTCOME.BLOCK ||
         details.injectionScreening?.outcome === SCREEN_OUTCOME.QUARANTINE;
 
-    if (hasIntegrityTampering || hasBlockedInjection) {
+    if (isStage3BlockedOrFailed) {
+        stages[idx.finalGate].status = 'not_started';
+        stages[idx.finalGate].summary = 'Not started (prerequisites blocked).';
+    } else if (hasIntegrityTampering || hasBlockedInjection) {
         if (stages[idx.benchTest]) {
             stages[idx.benchTest].status = 'failed';
             stages[idx.benchTest].summary = hasIntegrityTampering
@@ -857,7 +920,10 @@ function inferStageStatuses(details) {
     }
 
     // Stage 9: Workflow Closure
-    if (stages[idx.finalGate].status === 'completed') {
+    if (isStage3BlockedOrFailed) {
+        stages[idx.closure].status = 'not_started';
+        stages[idx.closure].summary = 'Not started (prerequisites blocked).';
+    } else if (stages[idx.finalGate].status === 'completed') {
         stages[idx.closure].status = 'completed';
         stages[idx.closure].summary = 'Workflow concluded with verified remediation and formal sign-off.';
     } else if (stages[idx.finalGate].status === 'blocked' || stages[idx.benchTest].status === 'failed') {

@@ -43,6 +43,21 @@
         "title": "GCAC: Scan Repository for Vulnerabilities",
         "category": "GCAC",
         "icon": "$(search)"
+      },
+      {
+        "command": "gcac.registerDevelopmentRepository",
+        "title": "GCAC: Register Trusted Disposable Development Repository",
+        "category": "GCAC"
+      },
+      {
+        "command": "gcac.acknowledgeDevelopmentBaseline",
+        "title": "GCAC: Acknowledge Development Baseline Exception",
+        "category": "GCAC"
+      },
+      {
+        "command": "gcac.cancelRemediation",
+        "title": "GCAC: Cancel Active Remediation",
+        "category": "GCAC"
       }
     ],
     "viewsContainers": {

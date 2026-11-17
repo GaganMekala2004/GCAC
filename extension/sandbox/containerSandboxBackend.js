@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
 const { spawn, execFileSync } = require('child_process');
 const { SANDBOX_READINESS, discoverEnvironment } = require('./environmentDiscovery');
@@ -137,8 +138,8 @@ class ContainerSandboxBackend extends ExecutionBackend {
             rootless: runtimeMeta.rootless,
             reason: runtimeMeta.reason,
             prerequisites: [],
-            enforcedBoundaries: report.boundaryDisclosure.enforcedBoundaries,
-            limitations: report.boundaryDisclosure.limitations
+            enforcedBoundaries: report?.boundaryDisclosure?.enforcedBoundaries || ['Isolated container rootfs', 'No network (--network=none)'],
+            limitations: report?.boundaryDisclosure?.limitations || []
         };
     }
 
@@ -227,7 +228,9 @@ class ContainerSandboxBackend extends ExecutionBackend {
      * Builds deterministic container CLI arguments without shell interpolation.
      */
     buildContainerRunArgs(spec) {
-        const validation = this.validatePolicy(spec.request || {}, spec.policy || {});
+        const policy = spec.policy ? { ...spec, ...spec.policy } : spec;
+        const request = spec.request ? { ...spec, ...spec.request } : spec;
+        const validation = this.validatePolicy(request, policy);
         if (!validation.valid) {
             throw new SandboxPolicyError(validation.reason, 'CONTAINER_POLICY_VIOLATION', { errors: validation.errors });
         }
@@ -291,6 +294,15 @@ class ContainerSandboxBackend extends ExecutionBackend {
         containerArgs.push('-v', `${outDirHost}:/sandbox-out:rw`);
         containerArgs.push('-v', `${homeDirHost}:/sandbox-home:rw`);
         containerArgs.push('-v', `${cacheDirHost}:/sandbox-cache:${cacheMountMode}`);
+
+        const hostNugetPackages = process.env.NUGET_PACKAGES || path.join(os.homedir(), '.nuget', 'packages');
+        if (fs.existsSync(hostNugetPackages)) {
+            const cacheNugetPoint = path.join(cacheDirHost, 'nuget');
+            if (!fs.existsSync(cacheNugetPoint)) {
+                try { fs.mkdirSync(cacheNugetPoint, { recursive: true }); } catch {}
+            }
+            containerArgs.push('-v', `${hostNugetPackages}:/sandbox-cache/nuget:ro`);
+        }
 
         for (const [k, v] of Object.entries(safeEnv)) {
             containerArgs.push('-e', `${k}=${v}`);
@@ -367,6 +379,10 @@ class ContainerSandboxBackend extends ExecutionBackend {
 
     async executeApprovedOperation(preparedEnv, request = {}) {
         const startTs = new Date();
+        if (preparedEnv.lifecycleState === SANDBOX_LIFECYCLE_STATES.CANCELLED) {
+            return { executed: false, exitCode: null, cancelled: true, timedOut: false, stdout: '', stderr: '',
+                machineStatus: OUTCOME_STATUS.CANCELLED, lifecycleState: SANDBOX_LIFECYCLE_STATES.CANCELLED, reason: 'Cancelled before container launch.' };
+        }
         const startMs = Date.now();
         const timeoutMs = Number(preparedEnv.policy?.timeoutMs || request.timeoutMs || 60000);
 
@@ -376,6 +392,8 @@ class ContainerSandboxBackend extends ExecutionBackend {
             runId: preparedEnv.runId,
             vulnerabilityId: preparedEnv.vulnerabilityId,
             imageRef: preparedEnv.policy.imageRef,
+            policy: preparedEnv.policy,
+            request,
             platform: preparedEnv.policy.platform || mapHostArchToContainerPlatform(process.arch),
             uidGid: preparedEnv.policy.uidGid || '65532:65532',
             networkMode: preparedEnv.policy.networkMode || 'none',
@@ -412,10 +430,12 @@ class ContainerSandboxBackend extends ExecutionBackend {
                     operationId: request.operationId || request.operation,
                     backendType: this.backendType,
                     runtime: preparedEnv.runtime,
-                    sandboxStatus: SANDBOX_READINESS.SANDBOX_READY,
+                    sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
                     lifecycleState: SANDBOX_LIFECYCLE_STATES.BLOCKED,
-                    machineStatus: OUTCOME_STATUS.BLOCKED,
-                    reasonCode: 'TOOLCHAIN_IMAGE_MISSING',
+                    machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
+                    status: 'COULD NOT RUN',
+                    failureCategory: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
+                    reasonCode: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
                     reason: `Approved digest-pinned image '${preparedEnv.policy.imageRef}' is not present in local runtime cache; auto-pull disabled.`,
                     imageDigest: preparedEnv.policy.imageRef,
                     executable: request.executable,
@@ -428,8 +448,9 @@ class ContainerSandboxBackend extends ExecutionBackend {
                     timedOut: false,
                     cancelled: false,
                     stdout: '',
-                    stderr: '',
-                    outputArtifactHashes: {}
+                    stderr: `Approved digest-pinned image '${preparedEnv.policy.imageRef}' is not present in local runtime cache; auto-pull disabled.`,
+                    outputArtifactHashes: {},
+                    summary: `COULD NOT RUN (TOOLCHAIN_IMAGE_UNAVAILABLE) — Approved digest-pinned image '${preparedEnv.policy.imageRef}' is not present in local runtime cache; auto-pull disabled.`
                 };
                 this.collectedEvidence.set(preparedEnv.instanceId, evidence);
                 return evidence;
@@ -506,6 +527,16 @@ class ContainerSandboxBackend extends ExecutionBackend {
                 clearTimeout(timer);
                 const endTs = new Date();
                 const outputArtifactHashes = this._collectOutputHashes(preparedEnv.staged.outDir);
+                const outputArtifacts = this._collectOutputArtifacts(preparedEnv.staged.outDir);
+
+                if (request.artifactDestinationDir) {
+                    try {
+                        fs.mkdirSync(request.artifactDestinationDir, { recursive: true });
+                        for (const fileName of Object.keys(outputArtifacts)) {
+                            fs.writeFileSync(path.join(request.artifactDestinationDir, fileName), outputArtifacts[fileName].content);
+                        }
+                    } catch {}
+                }
 
                 let lifecycleState = SANDBOX_LIFECYCLE_STATES.COMPLETED;
                 let machineStatus = OUTCOME_STATUS.PASSED;
@@ -549,7 +580,8 @@ class ContainerSandboxBackend extends ExecutionBackend {
                     cancelled,
                     stdout,
                     stderr,
-                    outputArtifactHashes
+                    outputArtifactHashes,
+                    outputArtifacts
                 };
                 this.collectedEvidence.set(preparedEnv.instanceId, result);
                 resolve(result);
@@ -596,7 +628,7 @@ class ContainerSandboxBackend extends ExecutionBackend {
             const inspectOut = this.execFileFn(
                 preparedEnv.binaryPath,
                 ['inspect', '--format', '{{index .Config.Labels "gcac.managed"}}|{{index .Config.Labels "gcac.instanceId"}}', preparedEnv.containerName],
-                { encoding: 'utf8', timeout: 3000, shell: false }
+                { encoding: 'utf8', timeout: 3000, shell: false, stdio: ['ignore', 'pipe', 'pipe'] }
             ).trim();
             if (inspectOut === `true|${preparedEnv.instanceId}`) {
                 this.execFileFn(preparedEnv.binaryPath, ['rm', '-f', preparedEnv.containerName], {
@@ -627,6 +659,27 @@ class ContainerSandboxBackend extends ExecutionBackend {
             }
         } catch {}
         return hashes;
+    }
+
+    _collectOutputArtifacts(outDir) {
+        const artifacts = {};
+        if (!outDir || !fs.existsSync(outDir)) return artifacts;
+        try {
+            const files = fs.readdirSync(outDir);
+            for (const f of files.sort()) {
+                const full = path.join(outDir, f);
+                if (fs.statSync(full).isFile()) {
+                    const buf = fs.readFileSync(full);
+                    artifacts[f] = {
+                        fileName: f,
+                        content: buf.toString('utf8'),
+                        sha256: crypto.createHash('sha256').update(buf).digest('hex'),
+                        bytes: buf.length
+                    };
+                }
+            }
+        } catch {}
+        return artifacts;
     }
 
     async cancelOperation(instanceId) {

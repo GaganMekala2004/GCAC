@@ -1,0 +1,20 @@
+{
+  "executed": false,
+  "passed": false,
+  "status": "UNTESTED",
+  "machineStatus": "UNTESTED",
+  "failureCategory": "TEST_PROJECT_NOT_FOUND",
+  "exitCode": null,
+  "countsKnown": true,
+  "testsTotal": 0,
+  "testsPassed": 0,
+  "testsFailed": 0,
+  "testsSkipped": 0,
+  "repositoryTested": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-function-proof-UI19AK/missing-tests/runs/DEV-CRYPTO-MISSING-TESTS_d8b339dd-6f94-4111-9922-a008f42d5ba3/worktree",
+  "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-function-proof-UI19AK/missing-tests/runs/DEV-CRYPTO-MISSING-TESTS_d8b339dd-6f94-4111-9922-a008f42d5ba3/worktree",
+  "testReportLocation": null,
+  "rootError": "No .NET test project was detected. A solution or stale TestResults directory is not a test suite.",
+  "summary": "UNTESTED — No .NET test project detected.",
+  "retryEligible": false,
+  "suggestedNextAction": "Add genuine tests, or acknowledge the separate development baseline exception where policy permits."
+}

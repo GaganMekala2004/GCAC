@@ -1,0 +1,143 @@
+{
+  "runId": "21762d65-d2e7-43d6-84bb-d2afc517aa5f",
+  "vulnerabilityId": "SCAN-SECRET-016",
+  "applicationNumber": "APP-1001",
+  "targetRelPath": "src/PaymentsAPI/Controllers/PaymentController.cs",
+  "status": "BLOCKED",
+  "workflowLifecycle": "BLOCKED",
+  "failedStage": 3,
+  "failedStageId": "analysis",
+  "failureCategory": "TOOLCHAIN_IMAGE_UNAVAILABLE",
+  "failureReason": "BLOCKED (BaselineTest): Approved digest-pinned image 'mcr.microsoft.com/dotnet/sdk@sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b' is not present in local runtime cache; auto-pull disabled.",
+  "securityValidationOutcome": "NOT_EXECUTED",
+  "approvalDecision": "BLOCKED_STAGE4",
+  "formalClosure": "COULD_NOT_RUN",
+  "findingState": "COULD_NOT_RUN",
+  "terminalBanner": "Workflow Blocked — Toolchain Image Unavailable",
+  "retryCount": 0,
+  "attemptNumber": 1,
+  "attemptId": "att-1-21762d65",
+  "attemptHistory": [],
+  "findingContext": {
+    "applicationId": "APP-1001",
+    "repositoryReference": "sample-repos/payments-api",
+    "repositoryPath": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/payments-api",
+    "technology": "dotnet"
+  },
+  "classification": {
+    "category": "SQL Injection",
+    "cwe": "CWE-89",
+    "route": "DotNetSourceFix",
+    "severity": "High"
+  },
+  "stages": [
+    {
+      "stageNumber": 1,
+      "id": "intake",
+      "name": "Stage 1: Intake & Mapping",
+      "label": "Intake & Mapping",
+      "shortLabel": "Intake",
+      "status": "completed",
+      "summary": "Finding 'SCAN-SECRET-016' mapped to repository sample-repos/payments-api.",
+      "attemptId": "att-1-21762d65"
+    },
+    {
+      "stageNumber": 2,
+      "id": "classification",
+      "name": "Stage 2: Classification",
+      "label": "Classification",
+      "shortLabel": "Classification",
+      "status": "completed",
+      "summary": "Classified as Assessed (CWE-89 SQL Injection). Remediation route prioritized.",
+      "attemptId": "att-1-21762d65"
+    },
+    {
+      "stageNumber": 3,
+      "id": "analysis",
+      "name": "Stage 3: Source Analysis",
+      "label": "Source Analysis",
+      "shortLabel": "Source Analysis",
+      "status": "blocked",
+      "summary": "BLOCKED (BaselineTest): Approved digest-pinned image 'mcr.microsoft.com/dotnet/sdk@sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b' is not present in local runtime cache; auto-pull disabled.",
+      "failureCategory": "TOOLCHAIN_IMAGE_UNAVAILABLE",
+      "attemptId": "att-1-21762d65"
+    },
+    {
+      "stageNumber": 4,
+      "id": "human-gate",
+      "name": "Stage 4: Human Approval",
+      "label": "Human Approval",
+      "shortLabel": "Human Gate",
+      "status": "blocked_by_prerequisite",
+      "summary": "BLOCKED — Stage 3 source analysis and baseline testing prerequisites not satisfied."
+    },
+    {
+      "stageNumber": 5,
+      "id": "remediation",
+      "name": "Stage 5: Code Remediation",
+      "label": "Code Remediation",
+      "shortLabel": "Remediation",
+      "status": "not_started",
+      "summary": "Not started (prerequisites blocked)."
+    },
+    {
+      "stageNumber": 6,
+      "id": "bench-test",
+      "name": "Stage 6: Bench Test & Re-Scan",
+      "label": "Bench Test & Re-Scan",
+      "shortLabel": "Bench Test",
+      "status": "not_started",
+      "summary": "Not started (prerequisites blocked)."
+    },
+    {
+      "stageNumber": 7,
+      "id": "security-review",
+      "name": "Stage 7: Security Review",
+      "label": "Security Review",
+      "shortLabel": "Review",
+      "status": "not_started",
+      "summary": "Not started (prerequisites blocked)."
+    },
+    {
+      "stageNumber": 8,
+      "id": "final-human-gate",
+      "name": "Stage 8: Final Sign-Off",
+      "label": "Final Sign-Off",
+      "shortLabel": "Final Sign-Off",
+      "status": "not_started",
+      "summary": "Not started (prerequisites blocked)."
+    },
+    {
+      "stageNumber": 9,
+      "id": "manual-validations",
+      "name": "Stage 9: Workflow Closure",
+      "label": "Workflow Closure",
+      "shortLabel": "Closure",
+      "status": "not_started",
+      "summary": "Not started (prerequisites blocked)."
+    }
+  ],
+  "stageExecutionLifecycle": [
+    { "stageNumber": 1, "id": "intake", "status": "completed" },
+    { "stageNumber": 2, "id": "classification", "status": "completed" },
+    { "stageNumber": 3, "id": "analysis", "status": "blocked" },
+    { "stageNumber": 4, "id": "human-gate", "status": "blocked_by_prerequisite" },
+    { "stageNumber": 5, "id": "remediation", "status": "not_started" },
+    { "stageNumber": 6, "id": "bench-test", "status": "not_started" },
+    { "stageNumber": 7, "id": "security-review", "status": "not_started" },
+    { "stageNumber": 8, "id": "final-human-gate", "status": "not_started" },
+    { "stageNumber": 9, "id": "manual-validations", "status": "not_started" }
+  ],
+  "retryEligibility": {
+    "retryEligible": false,
+    "canReviseFix": false,
+    "reasonCode": "TOOLCHAIN_IMAGE_UNAVAILABLE",
+    "reason": "Required toolchain image is not present in local runtime cache. Provision the approved image or migrate the repository before retrying."
+  },
+  "diagnostics": {
+    "toolchainProfileId": "dotnet-9.0-sts"
+  },
+  "proposedDiffSha256": null,
+  "patchDiff": null,
+  "approvalRecord": null
+}

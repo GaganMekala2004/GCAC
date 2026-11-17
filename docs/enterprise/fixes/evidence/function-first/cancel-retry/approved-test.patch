@@ -1,0 +1,16 @@
+--- a/src/PaymentsAPI/LegacyCrypto.cs
++++ b/src/PaymentsAPI/LegacyCrypto.cs
+@@ -6,8 +6,9 @@ public class LegacyCrypto
+ {
+     public byte[] Encrypt(byte[] data, byte[] key, byte[] iv)
+     {
+-        using var des = DES.Create();
+-        using var encryptor = des.CreateEncryptor(key, iv);
+-        return encryptor.TransformFinalBlock(data, 0, data.Length);
++        var ciphertext = new byte[data.Length + 16];
++        using var aes = new AesGcm(key, 16);
++        aes.Encrypt(iv, data, ciphertext.AsSpan(0, data.Length), ciphertext.AsSpan(data.Length, 16));
++        return ciphertext;
+     }
+ }
+\ No newline at end of file

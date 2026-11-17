@@ -187,6 +187,7 @@ class NormalizedFinding {
             Source_Type: 'SCANNER',
             Source_Origin: 'LocalScanner',
             Scanner_ID: this.scannerId,
+            Rule_ID: this.ruleId,
             Scanner_Version: this.scannerVersion,
             Scan_ID: this.scanId || '',
             Detection_Method: this.detectionMethod || 'ANALYZER_RULE',

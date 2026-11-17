@@ -3,7 +3,7 @@
     "vulnerability-data": {
       "command": "dotnet",
       "args": [
-        "${workspaceFolder}/mcp/VulnerabilityDataMcp/bin/Debug/net9.0/VulnerabilityDataMcp.dll"
+        "${workspaceFolder}/mcp/VulnerabilityDataMcp/bin/Debug/net10.0/VulnerabilityDataMcp.dll"
       ],
       "env": {
         "GCAS_WORKSPACE_ROOT": "${workspaceFolder}",

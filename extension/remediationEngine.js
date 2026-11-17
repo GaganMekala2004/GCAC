@@ -1,3 +1,9 @@
+const { createRunCancellation } = require('./runCancellation');
+const { EXECUTION_MODE, resolveExecutionMode, assertDevelopmentRepository, canAcknowledgeMissingBaseline, developmentConclusion } = require('./executionMode');
+const { applyExactPatch, extractProposedPatch, canonicalizeProposedPatch, patchFromExactEdits } = require('./patchApplication');
+const { assertCurrentFinding } = require('./findingSourceEvidence');
+const { isBaselineEligible } = require('./baselineEligibility');
+const { createCredentialRedactor } = require('./credentialRedaction');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -106,13 +112,17 @@ const STAGE_NAMES = Object.freeze({
  */
 class RemediationEngine {
     constructor(workspaceRoot, customCsvPath = null, options = {}) {
+        this.executionMode = resolveExecutionMode(options.executionEnvironment || process.env);
+        this.isLocalDevelopment = this.executionMode === EXECUTION_MODE.LOCAL_DEVELOPMENT;
         this.activeRuns = new Set();
+        this.runCancellations = new Map();
         this.findingsStore = options.findingsStore || null;
         this.reScanVerifier = options.reScanVerifier || null;
         this.extensionRoot = options.extensionRoot || path.resolve(__dirname, '..');
         this.llmClient = options.llmClient || llmClient;
         this.runBaselineTests = options.testRunner?.runBaselineTests || runBaselineTests;
         this.runPostFixTests = options.testRunner?.runPostFixTests || runPostFixTests;
+        this.compileProposal = options.compileProposal || require('./proposalCompilation').compileProposal;
         this.executionGateway = options.executionGateway || new TrustedExecutionGateway({
             workspaceRoot,
             backend: options.sandboxBackend || null,
@@ -126,12 +136,13 @@ class RemediationEngine {
         this.adminBundlePath = options.adminBundlePath || null;
         this.requireSignedAgentBundle = options.requireSignedAgentBundle === true;
         this.signatureVerifier = options.signatureVerifier || null;
-        this.requireAuthenticatedApproval = options.requireAuthenticatedApproval === true;
+        this.requireAuthenticatedApproval = !this.isLocalDevelopment && options.requireAuthenticatedApproval === true;
         this.approvalProvider = options.approvalProvider || new LocalPoCApprovalProvider({
             requireAuthenticatedApproval: this.requireAuthenticatedApproval
         });
         this.contentInjectionScreen = options.contentInjectionScreen || new ContentInjectionScreen();
         this.evidenceWriter = options.evidenceWriter || new LocalTamperDetectableEvidenceWriter();
+        this.publicationService = options.publicationService || null;
         this.registry = options.registry || (workspaceRoot ? new RepositoryContextRegistry({ workspaceRoot, extensionRoot: this.extensionRoot }) : null);
         this._explicitAuthorizedRoots = Array.isArray(options.authorizedRoots) ? [...options.authorizedRoots] : [];
         this.retryPolicy = {
@@ -142,6 +153,30 @@ class RemediationEngine {
         };
         this.isolatedWorkspaceOptions = options.isolatedWorkspaceOptions || (options.runsRoot ? { runsRoot: options.runsRoot } : {});
         this.updatePaths(workspaceRoot, customCsvPath);
+    }
+
+    async acknowledgeDevelopmentBaselineException(vulnerabilityId, input = {}, options = {}) {
+        if (!this.isLocalDevelopment || input.acknowledged !== true || !String(input.rationale || '').trim()) {
+            throw new Error('Explicit local development baseline acknowledgement and rationale are required.');
+        }
+        const state = this.loadRunState(vulnerabilityId);
+        if (!state || state.failedStage !== 3 || !canAcknowledgeMissingBaseline(state.baselineValidation)) {
+            throw new Error('BASELINE_EXCEPTION_NOT_ALLOWED: Failed assertions, compilation errors, sandbox blocks, and cancelled/timed-out runs require technical correction.');
+        }
+        const repo = state.findingContext?.canonicalRepositoryPath || state.isolatedWorkspace?.originalRepositoryPath || state.findingSnapshot?.Repository_Root;
+        assertDevelopmentRepository(this.registry, repo, options.workspaceTrusted);
+        const archived = this._archiveAttemptEvidence(vulnerabilityId, state);
+        state.attemptHistory = [...(state.attemptHistory || []), ...(archived ? [archived] : [])];
+        state.attemptNumber = Number(state.attemptNumber || 1) + 1;
+        state.attemptId = `att-${state.attemptNumber}-${crypto.randomUUID().slice(0, 8)}`;
+        state.baselineValidation.baselineExceptionAuthorized = true;
+        state.baselineValidation.baselineExceptionRationale = String(input.rationale).trim();
+        state.developmentBaselineConsent = { runId: state.runId, baselineSha256: sha256Hex(JSON.stringify(state.baselineValidation)), acknowledgedAt: new Date().toISOString(), rationale: String(input.rationale).trim() };
+        state.stage4Approved = false;
+        state.approvalRecord = null;
+        state.pendingApprovalRequest = null;
+        this.saveRunState(vulnerabilityId, state);
+        return this.executePipeline(vulnerabilityId, { ...options, retryFromStage: 4, attemptId: state.attemptId });
     }
 
     _buildAuthorizedRoots(workspaceRoot, extraRoots = []) {
@@ -277,6 +312,22 @@ class RemediationEngine {
         return manager.saveState(vulnerabilityId, state);
     }
 
+    approveCryptoMigrationContract(vulnerabilityId, input = {}) {
+        const state = this.loadRunState(vulnerabilityId);
+        const sourceFile = state?.sourceFilePath || state?.isolatedWorkspace?.isolatedTargetFile;
+        if (!state?.isManualReview || !state.baseTargetSha256 || !sourceFile || input.acknowledged !== true || input.legacyData !== 'NONE') {
+            throw new Error('A current manual-review run and explicit no-legacy-data migration contract are required.');
+        }
+        const source = fs.readFileSync(sourceFile, 'utf8');
+        if (sha256Hex(source) !== state.baseTargetSha256 || !/\bDES\.Create\s*\(/.test(source) || !/byte\[\]\s+Encrypt\s*\(/.test(source)) {
+            throw new Error('The source changed or this primitive/API requires a different migration contract. Prepare a fresh review.');
+        }
+        const cryptoMigrationContract = { schemaVersion: 1, acknowledged: true, legacyData: 'NONE', algorithm: 'AES-256-GCM',
+            sourceSha256: state.baseTargetSha256, targetRelPath: state.targetRelPath,
+            approvedAt: new Date().toISOString(), reviewerIdentity: 'AUTHENTICATION_NOT_VERIFIED', payloadFormat: 'VERSION1_NONCE12_TAG16_CIPHERTEXT' };
+        return this.saveRunState(vulnerabilityId, { ...state, cryptoMigrationContract });
+    }
+
     snapshotOriginalFile(vulnerabilityId, sourceFilePath) {
         if (!sourceFilePath || !fs.existsSync(sourceFilePath)) return null;
         const snapshotDir = path.join(this.remOutputDir, vulnerabilityId, 'snapshot');
@@ -369,6 +420,10 @@ class RemediationEngine {
 
     _classifyPipelineError(err) {
         const msg = err?.message || String(err || 'Unknown pipeline failure');
+        if (/TOOLCHAIN_IMAGE_UNAVAILABLE|TOOLCHAIN_IMAGE_MISSING|UNPROVISIONED_TOOLCHAIN_PROFILE|ToolchainUnavailable|TOOLCHAIN_UNAVAILABLE|Approved digest-pinned image.*is not present/i.test(msg)) {
+            return 'TOOLCHAIN_IMAGE_UNAVAILABLE';
+        }
+        if (err?.name === 'OutboundContextBlockedError' || /OutboundContextGate BLOCKED/i.test(msg)) return 'OUTBOUND_CONTEXT_BLOCKED';
         if (/timed?\s*out|ETIMEDOUT/i.test(msg)) return 'TIMED_OUT';
         if (/cancel|abort/i.test(msg)) return 'CANCELLED';
         if (/SANDBOX_UNAVAILABLE/i.test(msg)) return 'SANDBOX_UNAVAILABLE';
@@ -426,6 +481,23 @@ class RemediationEngine {
             archivedFiles
         };
         return record;
+    }
+
+    archivePreviousEvidenceGeneration(vulnerabilityId, nextRunId) {
+        const dir = path.join(this.remOutputDir, vulnerabilityId);
+        if (!fs.existsSync(dir) || !fs.existsSync(path.join(dir, 'integrity-manifest.json'))) return null;
+        const integrity = require('./evidenceLedger').verifyEvidencePackage(dir);
+        const archive = path.join(dir, 'runs', `previous-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`);
+        fs.mkdirSync(archive, { recursive: true });
+        // Preserve all prior bytes, including any mismatched manifest, rather
+        // than re-sealing historical evidence as if it belonged to the new run.
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.isFile() || entry.name === 'snapshot') fs.renameSync(path.join(dir, entry.name), path.join(archive, entry.name));
+        }
+        fs.writeFileSync(path.join(archive, 'generation-transition.json'), JSON.stringify({
+            nextRunId, archivedAt: new Date().toISOString(), priorIntegrity: integrity
+        }, null, 2));
+        return archive;
     }
 
     /**
@@ -670,6 +742,7 @@ class RemediationEngine {
         const isCodeOrSecurityFailure = [
             'TESTS_FAILED',
             'BUILD_FAILED',
+            'PATCH_INVALID',
             'NO_TESTS_DISCOVERED',
             'STILL_PRESENT',
             'REGRESSION_DETECTED'
@@ -695,6 +768,35 @@ class RemediationEngine {
                 canReviseFix: (failedStage || 0) >= 6,
                 reasonCode: failureCategory,
                 reason: `Execution stopped (${failureCategory}): ${state.failureReason || postVal?.rootError || 'Fix policy/restore/diagnostic condition before rerunning.'}`
+            };
+        }
+
+        let toolchainRecovered = options.toolchainRecovered === true || options.environmentRecovered === true;
+        if (!toolchainRecovered && options.toolchainRecovered === undefined && failureCategory === 'TOOLCHAIN_IMAGE_UNAVAILABLE') {
+            try {
+                const { resolveProfileForRepository, isTemplateDigestProfile } = require('./sandbox/toolchainProfiles');
+                const repoCandidate = findingCandidate?.Repository_Root || findingCandidate?.Repository || (state?.findingContext?.repositoryPath) || this.workspaceRoot;
+                if (repoCandidate && fs.existsSync(repoCandidate)) {
+                    const prof = resolveProfileForRepository(repoCandidate, findingCandidate || {}, this.profilesPath, { requireProvisioned: true });
+                    if (prof && !isTemplateDigestProfile(prof) && prof.digestStatus !== 'TEMPLATE_PLACEHOLDER') {
+                        const { execFileSync } = require('child_process');
+                        execFileSync('docker', ['image', 'inspect', prof.imageRef], { timeout: 3000, stdio: 'ignore' });
+                        toolchainRecovered = true;
+                    }
+                }
+            } catch {
+                toolchainRecovered = false;
+            }
+        }
+
+        if (failureCategory === 'TOOLCHAIN_IMAGE_UNAVAILABLE' && !toolchainRecovered) {
+            return {
+                ...baseMeta,
+                backoffRemainingMs,
+                retryEligible: false,
+                canReviseFix: false,
+                reasonCode: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
+                reason: 'Required toolchain image is not present in local runtime cache. Provision the approved image or migrate the repository before retrying.'
             };
         }
 
@@ -730,7 +832,8 @@ class RemediationEngine {
 
         const transientEligible = isInterruptedReload
             || ['TIMED_OUT', 'CANCELLED', 'RUNNER_CRASH', 'INTERRUPTED_BY_RELOAD', 'SCAN_FAILED_TRANSIENT'].includes(failureCategory)
-            || ((failureCategory === 'SANDBOX_UNAVAILABLE' || failureCategory === 'TEST_TOOL_MISSING') && envRecovered);
+            || ((failureCategory === 'SANDBOX_UNAVAILABLE' || failureCategory === 'TEST_TOOL_MISSING') && envRecovered)
+            || (failureCategory === 'TOOLCHAIN_IMAGE_UNAVAILABLE' && toolchainRecovered);
 
         if (transientEligible) {
             return {
@@ -775,6 +878,8 @@ class RemediationEngine {
      */
     async retryStage(vulnerabilityId, fromStage = null, options = {}) {
         const cleanId = this.validateSingleExecutionRequest(vulnerabilityId);
+
+        if (options.isFinalApproved && options.modelGenerated === true) throw new Error('FINAL_APPROVAL_MODEL_FORBIDDEN: A model response cannot grant final human sign-off.');
 
         if (options.workspaceTrusted === false) {
             throw new Error('SEC-02 Blocked: Workspace is untrusted; grant VS Code Workspace Trust before retrying remediation.');
@@ -838,7 +943,9 @@ class RemediationEngine {
         state.attemptHistory = history;
         state.attemptNumber = nextAttemptNumber;
         state.attemptId = nextAttemptId;
-        state.retryCount = Number(state.retryCount || 0) + 1;
+        const priorNeverStarted = state.baselineValidation?.executed === false && (!state.postFixValidation || state.postFixValidation?.executed === false);
+        const shouldIncrementRetry = options.consumeRetry !== false && !priorNeverStarted;
+        state.retryCount = shouldIncrementRetry ? (Number(state.retryCount || 0) + 1) : Number(state.retryCount || 0);
         state.attemptStartedAt = new Date().toISOString();
         state.failedStage = null;
         state.failedStageId = null;
@@ -951,7 +1058,7 @@ class RemediationEngine {
         const rollbackTarget = state.isolatedTargetFile && fs.existsSync(state.isolatedTargetFile)
             ? state.isolatedTargetFile
             : state.sourceFilePath;
-        if (rollbackTarget) {
+        if (rollbackTarget && state.patchAppliedAtStage5) {
             this.rollbackFileDetailed(cleanId, rollbackTarget);
         }
 
@@ -1000,18 +1107,48 @@ class RemediationEngine {
         return trimmed;
     }
 
+    cancelRun(vulnerabilityId) {
+        const token = this.runCancellations.get(vulnerabilityId);
+        if (!token) return false;
+        token.cancel();
+        return true;
+    }
+
     async executePipeline(vulnerabilityId, options = {}) {
         const cleanId = this.validateSingleExecutionRequest(vulnerabilityId);
+        if (options.isFinalApproved && options.modelGenerated === true) throw new Error('FINAL_APPROVAL_MODEL_FORBIDDEN: A model response cannot grant final human sign-off.');
 
         if (this.activeRuns.has(cleanId)) {
             throw new Error(`Remediation pipeline is already active for '${cleanId}'. Duplicate concurrent execution blocked.`);
         }
+        // A repeated consent click is a read of the existing execution result,
+        // never another execution and never a failure that rewrites its evidence.
+        const prior = this.loadRunState(cleanId);
+        if (options.isFinalApproved && prior?.formalClosure === FORMAL_CLOSURE.RESOLVED_CLOSED) {
+            return { ...prior, isCompleted: true, isResolved: true, isAwaitingFinalApproval: false,
+                isAwaitingApproval: false, duplicateSubmission: true, validation: prior.postFixValidation };
+        }
+        if (options.isFinalApproved && prior?.publicationPlan?.status === 'READY' && options.publishPullRequest !== true) {
+            throw new Error('PUBLICATION_CONSENT_REQUIRED: Final sign-off must explicitly authorize the reviewed GitHub pull request.');
+        }
+        if (options.isHumanApproved && !options.isFinalApproved && !options.retryFromStage && prior?.approvalRecord?.consumedAtStage5) {
+            if (!prior.patchAppliedAtStage5) throw new Error('APPROVAL_ALREADY_CONSUMED: Patch application needs recovery; approval cannot be replayed.');
+            return { ...prior, duplicateSubmission: true, isAwaitingApproval: false,
+                isAwaitingFinalApproval: prior.approvalDecision === APPROVAL_DECISION.PENDING_STAGE8,
+                isCompleted: prior.formalClosure === FORMAL_CLOSURE.RESOLVED_CLOSED,
+                isResolved: prior.formalClosure === FORMAL_CLOSURE.RESOLVED_CLOSED,
+                finalGateBlocked: prior.approvalDecision === APPROVAL_DECISION.BLOCKED_STAGE8,
+                validation: prior.postFixValidation, traceLogs: [] };
+        }
         this.activeRuns.add(cleanId);
-
+        const cancellation = createRunCancellation(options.cancellationToken);
+        this.runCancellations.set(cleanId, cancellation);
         try {
-            return await this._doExecutePipeline(cleanId, options);
+            return await this._doExecutePipeline(cleanId, { ...options, cancellationToken: cancellation });
         } finally {
             this.activeRuns.delete(cleanId);
+            this.runCancellations.delete(cleanId);
+            cancellation.dispose();
         }
     }
 
@@ -1054,6 +1191,11 @@ class RemediationEngine {
 
         const emitProgress = (evt) => {
             if (!evt || typeof evt !== 'object') return;
+            if (evt.type === 'STAGE_START' && evt.stageNumber <= 5 && options.cancellationToken?.isCancellationRequested) {
+                const error = new Error('Remediation cancelled before the next stage started.');
+                error.failureCategory = 'CANCELLED';
+                throw error;
+            }
             if (evt.type === 'LOG') {
                 rawOnProgress(evt);
                 return;
@@ -1179,14 +1321,61 @@ class RemediationEngine {
         const findingContext = ctxValidation.context;
         const resolvedRepositoryPath = ctxValidation.resolvedRepositoryPath;
 
+        if (this.isLocalDevelopment) assertDevelopmentRepository(this.registry, resolvedRepositoryPath, options.workspaceTrusted);
         const minimizedFinding = buildMinimizedSingleFinding(finding);
 
         let existingState = this.loadRunState(vulnerabilityId);
+        if (existingState?.executionMode && existingState.executionMode !== this.executionMode && (isApproved || options.retryFromStage)) {
+            throw new Error('EXECUTION_MODE_CHANGED: Start a new run and obtain fresh approval.');
+        }
+        if (this.isLocalDevelopment && existingState?.baselineValidation?.baselineExceptionAuthorized) {
+            const consent = existingState.developmentBaselineConsent;
+            if (!consent || consent.runId !== existingState.runId || consent.baselineSha256 !== sha256Hex(JSON.stringify(existingState.baselineValidation))) {
+                throw new Error('BASELINE_CONSENT_MISMATCH: Baseline exception is absent or changed; explicit acknowledgement is required.');
+            }
+        }
+        if (this.isLocalDevelopment && options.allowBaselineException) throw new Error('Use the separate local development baseline acknowledgement action.');
         if (existingState && existingState.vulnerabilityId && existingState.vulnerabilityId !== vulnerabilityId) {
             throw new Error(`SEC-02 Run Isolation Error: Stored run state belongs to '${existingState.vulnerabilityId}', not '${vulnerabilityId}'.`);
         }
 
-        if (isApproved && existingState && existingState.proposedDiffSha256) {
+        if (isFinalApproved) {
+            if (!existingState || existingState.vulnerabilityId !== vulnerabilityId || !existingState.stage4Approved) {
+                throw new Error(
+                    `Approval Gate Bypass Blocked: Cannot authorize Final Gate for '${vulnerabilityId}' ` +
+                    `because Stage 4 Human Approval has not been granted for this run.`
+                );
+            }
+        }
+
+        if (isApproved && !isFinalApproved) {
+            if (this.isLocalDevelopment && !(Number(options.retryFromStage) >= 6 && existingState?.patchAppliedAtStage5 && existingState?.approvalRecord) && (!existingState || options.approvedDiffSha256 !== existingState.proposedDiffSha256 || options.approvedRunId !== existingState.runId)) {
+                throw new Error('LOCAL_APPROVAL_DIFF_MISMATCH: Explicit consent must name the current run and exact proposed diff digest.');
+            }
+            if (!existingState) {
+                throw new Error(
+                    `Gate Integrity Violation: Cannot authorize remediation for '${finding.Vulnerability_ID}' without prior execution and verified patch proposal.`
+                );
+            }
+            const approvalBaseline = { ...existingState.baselineValidation };
+            if (options.allowBaselineException === true && options.baselineExceptionRationale) {
+                approvalBaseline.baselineExceptionAuthorized = true;
+                approvalBaseline.baselineExceptionRationale = options.baselineExceptionRationale;
+            }
+            if (!isBaselineEligible(approvalBaseline)) {
+                throw new Error('Gate Integrity Violation: Stage 4 approval is blocked because Stage 3 baseline testing did not succeed. Resolve prerequisites first.');
+            }
+            if (options.allowBaselineException === true && options.baselineExceptionRationale) {
+                if (existingState.baselineValidation) {
+                    existingState.baselineValidation.baselineExceptionAuthorized = true;
+                    existingState.baselineValidation.baselineExceptionRationale = options.baselineExceptionRationale;
+                }
+            }
+            if (!existingState.proposedDiffSha256 || !existingState.patchDiff || !/^[a-f0-9]{64}$/i.test(existingState.proposedDiffSha256)) {
+                throw new Error(
+                    `Gate Integrity Violation: Stage 4 approval requires a verified diff and computed SHA-256 digest. No approvable patch diff exists.`
+                );
+            }
             const recomputedSha = computeDiffSha256(existingState.patchDiff || '');
             if (existingState.proposedDiffSha256 !== recomputedSha) {
                 throw new Error(
@@ -1211,6 +1400,7 @@ class RemediationEngine {
             ? Number(existingState.retryCount || 0)
             : 0;
         const attemptStartedAt = (isApproved && existingState?.attemptStartedAt) ? existingState.attemptStartedAt : new Date().toISOString();
+        if (!isApproved && !isRetryExecution) this.archivePreviousEvidenceGeneration(vulnerabilityId, runId);
 
         activeRunIdRef = runId;
         activeAttemptIdRef = attemptId;
@@ -1222,15 +1412,6 @@ class RemediationEngine {
         }
         onProgress({ type: 'RUN_STARTED', stageId: 'intake', stageNumber: 1, summary: `Initialized isolated run for ${vulnerabilityId}` });
         onProgress({ type: 'STAGE_COMPLETE', stageId: 'intake', stageNumber: 1, summary: `Finding '${minimizedFinding.Vulnerability_ID}' mapped to repository ${resolvedRepositoryPath}.` });
-
-        if (isFinalApproved) {
-            if (!existingState || existingState.vulnerabilityId !== vulnerabilityId || !existingState.stage4Approved) {
-                throw new Error(
-                    `Approval Gate Bypass Blocked: Cannot authorize Final Gate for '${vulnerabilityId}' ` +
-                    `because Stage 4 Human Approval has not been granted for this run.`
-                );
-            }
-        }
 
         // Preserve Stage 5 P0-A suppression check on Stage 4 resume
         if (isApproved && existingState) {
@@ -1249,8 +1430,8 @@ class RemediationEngine {
         let classification = existingState?.classification || null;
         let governance = existingState?.governance || null;
         let rca = existingState?.rca || null;
-        let baselineValidation = existingState?.baselineValidation || null;
-        let postFixValidation = existingState?.postFixValidation || null;
+        let baselineValidation = (isApproved || isRetryExecution) ? existingState?.baselineValidation || null : null;
+        let postFixValidation = (isApproved || isRetryExecution) ? existingState?.postFixValidation || null : null;
         let sourceFilePath = existingState?.sourceFilePath || null;
         let targetRelPath = minimizedFinding.Location_Path || 'source';
         let remediationDecision = existingState?.remediationDecision || null;
@@ -1328,6 +1509,15 @@ class RemediationEngine {
         }
 
         // Screen source code (and extracted comments), README, and repo config inside isolated worktree (Block A)
+        if (this.isLocalDevelopment && !isApproved && !(isRetryExecution && existingState?.patchAppliedAtStage5)) {
+            assertCurrentFinding(minimizedFinding, sourceCode);
+            const originalTarget = assertPathWithinWorkspace(path.join(resolvedRepositoryPath, path.relative(isolatedWorkspace.isolatedRepoPath, sourceFilePath)), resolvedRepositoryPath);
+            if (!originalTarget || fs.readFileSync(originalTarget, 'utf8') !== sourceCode) {
+                const error = new Error('SOURCE_SNAPSHOT_MISMATCH: Finding source differs from the isolated Git baseline. Re-scan a clean disposable snapshot.');
+                error.failureCategory = 'FINDING_STALE';
+                throw error;
+            }
+        }
         if (sourceCode) {
             this._screenUntrustedText(sourceCode, `source:${targetRelPath}`, TRUST_CLASSES.UNTRUSTED_SOURCE_CODE, runId, targetRelPath, screeningRecords, chainEvents);
         }
@@ -1338,6 +1528,13 @@ class RemediationEngine {
         }
 
         const baseSourceSha256 = sha256Hex(sourceCode);
+        if (isApproved && !existingState?.patchAppliedAtStage5 &&
+            ((this.isLocalDevelopment && !existingState?.baseTargetSha256) ||
+             (existingState?.baseTargetSha256 && existingState.baseTargetSha256 !== baseSourceSha256))) {
+            const error = new Error('APPROVAL_SOURCE_CHANGED: The target source changed after proposal. Regenerate the diff and obtain fresh consent.');
+            error.failureCategory = 'EXECUTION_BLOCKED';
+            throw error;
+        }
         const minimizedFindingSha256 = sha256Hex(JSON.stringify(minimizedFinding));
 
         // 5. Evaluate Ownership Tier & Remediation Preference Ladder (Blocks D & E)
@@ -1346,10 +1543,18 @@ class RemediationEngine {
         const ownershipClassification = classifyFileOwnership(targetRelPath, {
             allowDependencyManifests: isDependencyManifestFinding
         });
-        remediationDecision = existingState?.remediationDecision || evaluateRemediationStrategy({
+        const proposedCryptoContract = existingState?.cryptoMigrationContract;
+        const cryptoMigrationContract = proposedCryptoContract?.acknowledged === true && proposedCryptoContract.legacyData === 'NONE' &&
+            proposedCryptoContract.algorithm === 'AES-256-GCM' && proposedCryptoContract.targetRelPath === targetRelPath &&
+            (proposedCryptoContract.sourceSha256 === baseSourceSha256 ||
+                (existingState?.stage4Approved && existingState.patchAppliedAtStage5 && proposedCryptoContract.sourceSha256 === existingState.baseTargetSha256 && baseSourceSha256 === existingState.expectedPostApplySha256))
+            ? proposedCryptoContract : null;
+        remediationDecision = (isApproved ? existingState?.remediationDecision : null) || evaluateRemediationStrategy({
             finding: minimizedFinding,
             sourceCode,
-            ownershipClassification
+            ownershipClassification,
+            localDevelopment: this.isLocalDevelopment,
+            cryptoMigrationContract
         });
         sourceToSinkEvidence = existingState?.sourceToSinkEvidence || extractSourceToSinkEvidence({
             finding: minimizedFinding,
@@ -1416,6 +1621,21 @@ class RemediationEngine {
                 });
             }
 
+            canonicalStages[1].status = 'blocked';
+            canonicalStages[1].summary = remediationDecision.blockingReason;
+            for (let i = 2; i < canonicalStages.length; i++) canonicalStages[i].status = 'not_started';
+            this.saveRunState(finding.Vulnerability_ID, {
+                runId, attemptId, attemptNumber, vulnerabilityId: finding.Vulnerability_ID,
+                repositoryId: activeRepoIdRef, status: 'MANUAL_REVIEW', isManualReview: true,
+                baseTargetSha256: baseSourceSha256, targetRelPath, sourceFilePath,
+                workflowLifecycle: 'BLOCKED', securityValidationOutcome: 'NOT_EXECUTED',
+                approvalDecision: 'NOT_REQUESTED', formalClosure: 'OPEN', findingState: 'OPEN',
+                failureCategory: 'MANUAL_REVIEW_REQUIRED', failureReason: remediationDecision.blockingReason,
+                stages: canonicalStages, remediationDecision, isolatedWorkspace,
+                patchDiff: null, proposedDiffSha256: null, approvalRecord: null, stage4Approved: false,
+                reportPath, updatedAt: now()
+            });
+
             return {
                 runId,
                 status: 'MANUAL_REVIEW',
@@ -1440,14 +1660,19 @@ class RemediationEngine {
         const activeModelName = availableModels[0].name || availableModels[0].id;
         log('DISCOVERY', `Connected to real LLM backend: ${activeModelName} (${availableModels[0].family || availableModels[0].vendor})`);
 
-        const numberedCode = sourceCode
-            ? sourceCode.split('\n').map((line, idx) => `${idx + 1}: ${line}`).join('\n')
+        const sourceRedactor = createCredentialRedactor();
+        const modelSourceCode = sourceRedactor.redact(sourceCode);
+        const findingLine = Math.max(1, Number(minimizedFinding.Line_Number) || 1);
+        const contextStart = Math.max(0, findingLine - 21);
+        const numberedCode = modelSourceCode
+            ? modelSourceCode.split('\n').slice(contextStart, findingLine + 20).map((line, idx) => `${contextStart + idx + 1}: ${line}`).join('\n')
             : 'No source code available on disk.';
 
         const llmCallContext = {
             runId,
+            cancellationToken: options.cancellationToken,
             filePath: targetRelPath,
-            sourceCode,
+            sourceCode: numberedCode,
             findingContext: minimizedFinding
         };
 
@@ -1526,6 +1751,9 @@ Analyze this minimized single-vulnerability finding:
 - File Location: ${targetRelPath} (Line ${minimizedFinding.Line_Number || 1})
 - Guidance: ${minimizedFinding.Remediation_Guidance || 'Apply secure coding best practices.'}
 
+Source-to-sink execution metadata (heuristic; never invent absent database execution):
+${JSON.stringify(sourceToSinkEvidence?.executionEvidence || { formalTaintProofSupplied: sourceToSinkEvidence?.formalTaintProofSupplied === true })}
+
 Source Code Context:
 \`\`\`
 ${numberedCode.slice(0, 2000)}
@@ -1546,7 +1774,7 @@ Perform an objective ADVISORY classification (scanner severity remains authorita
             try {
                 classification = await this.llmClient.generateJson(classifyPrompt, llmCallContext);
             } catch (err) {
-                if (err.name === 'OutboundContextBlockedError') throw err;
+                if (err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
                 log('CLASSIFY', `LLM JSON parse note: ${err.message}. Retrying with completion...`);
                 const fallbackText = await this.llmClient.generateCompletion(classifyPrompt, llmCallContext);
                 this._screenUntrustedText(fallbackText, 'llm:classificationFallback', TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
@@ -1563,6 +1791,17 @@ Perform an objective ADVISORY classification (scanner severity remains authorita
 
             governance = enforceSeverityGovernance({ finding, aiClassification: classification });
             classification.vulnerabilityId = minimizedFinding.Vulnerability_ID;
+            const scannerCwe = /^CWE-\d+$/i.test(minimizedFinding.CVE_ID || '') ? minimizedFinding.CVE_ID.toUpperCase() : null;
+            classification.scannerProvenance = { scannerId: minimizedFinding.Scanner_ID || null, ruleId: minimizedFinding.Rule_ID || null, cwe: scannerCwe, detectionMethod: minimizedFinding.Detection_Method || null };
+            if (scannerCwe) {
+                classification.advisoryCwe = classification.cwe;
+                classification.classificationMismatch = (String(classification.cwe || '').toUpperCase().match(/CWE-\d+\b/) || [])[0] !== scannerCwe;
+                classification.cwe = `${scannerCwe} - ${minimizedFinding.Title}`;
+                if (classification.classificationMismatch) {
+                    governance.requiresIndependentReview = true;
+                    governance.governanceNotices.push('Advisory CWE differs from scanner rule; retain scanner classification pending independent review.');
+                }
+            }
             classification.cveId = minimizedFinding.CVE_ID || 'N/A';
             classification.originalScannerSeverity = governance.originalScannerSeverity;
             classification.advisoryAiClassification = governance.advisoryAiClassification;
@@ -1631,7 +1870,7 @@ Perform complete analysis and return a JSON object with EXACTLY these keys:
             try {
                 rca = await this.llmClient.generateJson(rcaPrompt, llmCallContext);
             } catch (err) {
-                if (err.name === 'OutboundContextBlockedError') throw err;
+                if (err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
                 const rawRca = await this.llmClient.generateCompletion(rcaPrompt, llmCallContext);
                 this._screenUntrustedText(rawRca, 'llm:rcaFallback', TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
                 rca = {
@@ -1653,6 +1892,7 @@ Perform complete analysis and return a JSON object with EXACTLY these keys:
             currentStageNumber = 3;
             currentStageId = 'analysis';
             if (preserveStage3) {
+                if (canonicalStages[2]) canonicalStages[2].status = baselineValidation.baselineExceptionAuthorized ? 'completed_with_limitations' : 'completed';
                 log('BASELINE_TEST', `Preserving verified Stage 3 baseline validation from RunId:${runId}.`);
             } else {
             log('BASELINE_TEST', `Executing genuine baseline tests in isolated worktree '${isolatedWorkspace.isolatedRepoPath}'...`);
@@ -1666,7 +1906,8 @@ Perform complete analysis and return a JSON object with EXACTLY these keys:
                 executionGateway: this.executionGateway,
                 sandboxBackend: this.sandboxBackend,
                 envReport: this.envReport,
-                injectionScreen: this.contentInjectionScreen
+                injectionScreen: this.contentInjectionScreen,
+                cancellationToken: options.cancellationToken
             });
             commandPolicyDecisions.push({
                 stage: 'BASELINE_TEST',
@@ -1679,8 +1920,37 @@ Perform complete analysis and return a JSON object with EXACTLY these keys:
             if (baselineValidation.injectionScreening) {
                 screeningRecords.push(baselineValidation.injectionScreening);
             }
-            if (baselineValidation.machineStatus === OUTCOME_STATUS.BLOCKED) {
-                throw new Error(`BLOCKED (BaselineTest): ${baselineValidation.reason}`);
+            if (baselineValidation.machineStatus === OUTCOME_STATUS.BLOCKED || baselineValidation.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
+                const isToolchain = baselineValidation.failureCategory === 'TOOLCHAIN_IMAGE_UNAVAILABLE' ||
+                    baselineValidation.reasonCode === 'TOOLCHAIN_IMAGE_MISSING' ||
+                    baselineValidation.reasonCode === 'UNPROVISIONED_TOOLCHAIN_PROFILE' ||
+                    baselineValidation.reasonCode === 'TOOLCHAIN_IMAGE_UNAVAILABLE' ||
+                    baselineValidation.reasonCode === 'TOOLCHAIN_UNAVAILABLE' ||
+                    /Approved digest-pinned image.*is not present/i.test(baselineValidation.reason || '');
+                const prefix = isToolchain ? 'BLOCKED (ToolchainUnavailable)' : 'BLOCKED (BaselineTest)';
+                const err = new Error(`${prefix}: ${baselineValidation.reason}`);
+                err.failureCategory = isToolchain ? 'TOOLCHAIN_IMAGE_UNAVAILABLE' : (baselineValidation.failureCategory || 'EXECUTION_BLOCKED');
+                err.baselineValidation = baselineValidation;
+                throw err;
+            }
+
+            if (baselineValidation.machineStatus === OUTCOME_STATUS.UNTESTED || baselineValidation.status === 'UNTESTED') {
+                if (!this.isLocalDevelopment && options.allowBaselineException === true && options.baselineExceptionRationale) {
+                    baselineValidation.baselineExceptionAuthorized = true;
+                    baselineValidation.baselineExceptionRationale = options.baselineExceptionRationale;
+                    log('BASELINE_TEST', `Controlled baseline exception authorized: ${options.baselineExceptionRationale}`);
+                } else {
+                    baselineValidation.baselineExceptionAuthorized = false;
+                    log('BASELINE_TEST', `Baseline testing resulted in UNTESTED (${baselineValidation.summary || 'Zero tests executed'}). Explicit human exception rationale or verified test coverage required before Stage 4 approval.`);
+                }
+            }
+
+            if (!isBaselineEligible(baselineValidation)) {
+                const err = new Error(`BLOCKED (BaselineTest): ${baselineValidation.rootError || baselineValidation.reason || baselineValidation.summary || 'Baseline has no verified executed tests.'}`);
+                err.failureCategory = baselineValidation.failureCategory || 'BASELINE_INELIGIBLE';
+                err.baselineValidation = baselineValidation;
+                err.prerequisiteBlocked = true;
+                throw err;
             }
 
             sourceToSinkEvidence = extractSourceToSinkEvidence({
@@ -1707,7 +1977,7 @@ Perform complete analysis and return a JSON object with EXACTLY these keys:
                 rca,
                 baselineValidation: baselineValidation
             });
-            if (preserveStage3 && canonicalStages[2]) canonicalStages[2].status = 'completed';
+            if (preserveStage3 && canonicalStages[2]) canonicalStages[2].status = baselineValidation.baselineExceptionAuthorized ? 'completed_with_limitations' : 'completed';
             }
 
             // ==========================================
@@ -1737,68 +2007,107 @@ ${rca.proposedFix}
 
 Original Source Code:
 \`\`\`
-${sourceCode}
+${modelSourceCode}
 \`\`\`
 
 CRITICAL RULES:
 1. Fix ONLY the vulnerable lines in '${targetRelPath}'. Do not reformat, reorganize, or refactor unrelated code.
 2. Produce real, production-ready secure code. Do NOT introduce placeholders, mock functions, or suppress warnings.
-3. Output the fix in standard Unified Git Diff format starting with:
---- a/${targetRelPath}
-+++ b/${targetRelPath}
-@@ ... @@
-4. Also output the complete remediated file code.
+3. Return JSON containing exact source replacements. Git will generate the diff; do not calculate hunk counts or line positions.
+4. Every oldText MUST be copied verbatim from the original source above, including all unchanged lines within that replacement. It must occur exactly once. Never omit an existing line from oldText. Include enough context to disambiguate it.
+5. newText is the complete replacement for oldText. Preserve unrelated code. Multiple edits must not overlap. Use JSON newline escapes inside strings.
+6. Do not return a full-file replacement, markdown summary, diff, or extra fields.
+7. The candidate MUST compile using the repository's actual SDK and dependencies. Implement every new helper you call; never invent an API. In .NET use System.Security.Cryptography.AesGcm for GCM; CipherMode.GCM does not exist. When binding SQL parameters, reuse an existing SqlCommand variable and place bindings after its declaration. Include its existing declaration in oldText if replacing a larger block.
 
-Format your response as:
-\`\`\`diff
-<UNIFIED GIT DIFF HERE>
-\`\`\`
+Return exactly this JSON shape:
+{"edits":[{"oldText":"<exact existing source fragment>","newText":"<replacement fragment>"}]}`;
 
-\`\`\`full_code
-<COMPLETE REMEDIATED FILE CODE HERE>
-\`\`\`
+            let patchFeedback = '';
+            const repairProposal = /\.cs$/i.test(targetRelPath)
+                ? require('./dotnetRepairRecipes').dotnetRepairProposal({ sourceCode, cryptoMigrationContract }) : null;
+            const proposalLimit = repairProposal ? 4 : 3;
+            for (let proposalAttempt = 1; proposalAttempt <= proposalLimit; proposalAttempt++) {
+                if (options.cancellationToken?.isCancellationRequested) throw new Error('Remediation cancelled before patch proposal.');
+                const usingRecipe = proposalAttempt === 4;
+                const remediationResponse = usingRecipe ? repairProposal : sourceRedactor.restore(await this.llmClient.generateCompletion(remediationPrompt + patchFeedback, { ...llmCallContext, sourceCode: modelSourceCode }));
+                this._screenUntrustedText(remediationResponse, usingRecipe ? 'recipe:dotnetSourcePattern' : 'llm:remediationProposal',
+                    usingRecipe ? TRUST_CLASSES.UNTRUSTED_SOURCE_CODE : TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
+                if (usingRecipe) {
+                    log('REMEDIATE', 'Model correction attempts exhausted. Proposing a recognized .NET source-pattern repair; all compiler, scope and approval checks still apply.');
+                    chainEvents.push({ timestamp: now(), stage: 'PROPOSAL', eventType: 'DETERMINISTIC_REPAIR_PROPOSED', payload: { targetRelPath } });
+                }
+                patchDiff = '';
+                try {
+                    patchDiff = /^\s*\{|```json/i.test(remediationResponse)
+                        ? patchFromExactEdits(isolatedWorkspace.worktreeDir, remediationResponse, targetRelPath)
+                        : extractProposedPatch(remediationResponse);
 
-SUMMARY: <1-2 sentences explaining the exact fix applied>`;
+                    // Only the exact proposed diff is executable. A parallel model
+                    // full-file response is neither approved nor used as an edit channel.
+                    fullRemediatedCode = '';
 
-            const remediationResponse = await this.llmClient.generateCompletion(remediationPrompt, llmCallContext);
-            this._screenUntrustedText(remediationResponse, 'llm:remediationProposal', TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
+                    approvedFilePaths = extractDiffFilePaths(patchDiff, targetRelPath);
 
-            const diffMatch = remediationResponse.match(/```(?:diff|patch)\s*\n([\s\S]*?)```/i);
-            if (diffMatch && diffMatch[1].trim()) {
-                patchDiff = diffMatch[1].trim();
-            } else {
-                const lines = remediationResponse.split('\n');
-                const diffLines = lines.filter(l => l.startsWith('---') || l.startsWith('+++') || l.startsWith('@@') || l.startsWith('+') || l.startsWith('-') || l.startsWith(' '));
-                patchDiff = diffLines.length > 2 ? diffLines.join('\n') : remediationResponse;
+                    // Pre-approval scope & suppression gate (Block D)
+                    validateProposedChangesScope({
+                        worktreeDir: isolatedWorkspace.worktreeDir,
+                        proposedFiles: approvedFilePaths,
+                        approvedFilePaths: [targetRelPath],
+                        patchDiff,
+                        fullRemediatedCode,
+                        allowDependencyManifests: isDependencyManifestFinding
+                    });
+
+                    const rawProposalSha256 = computeDiffSha256(patchDiff);
+                    patchDiff = canonicalizeProposedPatch(isolatedWorkspace.worktreeDir, patchDiff, targetRelPath);
+                    if (/\.cs$/i.test(targetRelPath)) {
+                        const proposalCompilation = await this.compileProposal({ repository: isolatedWorkspace.worktreeDir, patchDiff,
+                            finding: minimizedFinding, gateway: this.executionGateway, runId, cancellationToken: options.cancellationToken,
+                            cryptoMigrationContract, runTests: this.runPostFixTests.bind(this),
+                            minimumTests: baselineValidation.testsTotal + 3,
+                            testOptions: { runId, applicationId: appNum, vulnerabilityId: finding.Vulnerability_ID,
+                                sandboxBackend: this.sandboxBackend, envReport: this.envReport, injectionScreen: this.contentInjectionScreen },
+                            artifactDir: path.join(this.remOutputDir, finding.Vulnerability_ID, 'attempts', attemptId, `candidate-${proposalAttempt}`) });
+                        if (proposalCompilation?.executed !== true || proposalCompilation.passed !== true || proposalCompilation.exitCode !== 0) {
+                            const unavailable = new Error('PROPOSAL_COMPILER_UNAVAILABLE: A real successful candidate build is required before approval.');
+                            unavailable.failureCategory = 'PROPOSAL_COMPILER_UNAVAILABLE';
+                            throw unavailable;
+                        }
+                        chainEvents.push({ timestamp: now(), stage: 'PROPOSAL', eventType: 'CANDIDATE_COMPILED', payload: proposalCompilation });
+                    }
+                    const canonicalProposalSha256 = computeDiffSha256(patchDiff);
+                    if (rawProposalSha256 !== canonicalProposalSha256) {
+                        log('REMEDIATE', 'Rebuilt diff metadata with Git from exact, unique source edits; isolated source unchanged.');
+                        chainEvents.push({ timestamp: new Date().toISOString(), stage: 'PROPOSAL', eventType: 'PATCH_CANONICALIZED',
+                            payload: { rawProposalSha256, canonicalProposalSha256, baseSourceSha256 } });
+                    }
+                } catch (error) {
+                    if (error.failureCategory !== 'PATCH_INVALID') throw error;
+                    const diagnosticsDir = path.join(this.remOutputDir, finding.Vulnerability_ID, 'attempts', attemptId, 'patch-proposals');
+                    fs.mkdirSync(diagnosticsDir, { recursive: true });
+                    fs.writeFileSync(path.join(diagnosticsDir, `proposal-${proposalAttempt}.response.txt`), sourceRedactor.redact(remediationResponse));
+                    fs.writeFileSync(path.join(diagnosticsDir, `proposal-${proposalAttempt}.patch`), sourceRedactor.redact(patchDiff || remediationResponse));
+                    fs.writeFileSync(path.join(diagnosticsDir, `proposal-${proposalAttempt}.json`), JSON.stringify({
+                        baseCommitSha: isolatedWorkspace.baseCommitSha, sourceSha256: baseSourceSha256,
+                        diagnostic: error.patchDiagnostic, failureCategory: error.failureCategory
+                    }, null, 2));
+                    if (proposalAttempt === proposalLimit) throw error;
+                    log('REMEDIATE', `Proposal ${proposalAttempt} rejected: ${error.message} Regenerating before approval.`);
+                    patchFeedback = `\nThe previous proposal failed validation: ${error.message}\nReturn corrected JSON edits. Copy oldText verbatim from the original source; include every existing line within it.\nPrevious rejected response:\n${sourceRedactor.redact(remediationResponse)}\n`;
+                    continue;
+                }
+                pendingApprovalRequest = createApprovalRequest({
+                    runId,
+                    vulnerabilityId: finding.Vulnerability_ID,
+                    applicationId: appNum,
+                    baseCommitHash: isolatedWorkspace.baseCommitSha,
+                    patchDiff,
+                    approvedFilePaths,
+                    rca,
+                    baselineValidation
+                });
+                break;
             }
-
-            const fullCodeMatch = remediationResponse.match(/```full_code\s*\n([\s\S]*?)```/i);
-            if (fullCodeMatch && fullCodeMatch[1].trim()) {
-                fullRemediatedCode = fullCodeMatch[1].trim();
-            }
-
-            approvedFilePaths = extractDiffFilePaths(patchDiff, targetRelPath);
-
-            // Pre-approval scope & suppression gate (Block D)
-            validateProposedChangesScope({
-                worktreeDir: isolatedWorkspace.worktreeDir,
-                proposedFiles: approvedFilePaths,
-                approvedFilePaths: [targetRelPath],
-                patchDiff,
-                fullRemediatedCode,
-                allowDependencyManifests: isDependencyManifestFinding
-            });
-
-            pendingApprovalRequest = createApprovalRequest({
-                runId,
-                vulnerabilityId: finding.Vulnerability_ID,
-                applicationId: appNum,
-                baseCommitHash: isolatedWorkspace.baseCommitSha,
-                patchDiff,
-                approvedFilePaths,
-                rca,
-                baselineValidation
-            });
         }
 
         const proposedDiffSha256 = computeDiffSha256(patchDiff || '');
@@ -1857,6 +2166,8 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
         }
 
         const stage4StatePayload = {
+            executionMode: this.executionMode,
+            developmentBaselineConsent: existingState?.developmentBaselineConsent || null,
             runId,
             attemptId,
             attemptNumber,
@@ -1883,8 +2194,14 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
             failureReason: null,
             revisionFeedback: revisionFeedback || null,
             stage4Approved: isApproved,
+            cryptoMigrationContract,
+            patchAppliedAtStage5: isApproved ? existingState?.patchAppliedAtStage5 === true : false,
+            expectedPostApplySha256: isApproved ? existingState?.expectedPostApplySha256 : null,
+            postWriteFilesChanged: isApproved ? existingState?.postWriteFilesChanged : null,
+            publicationPlan: isApproved ? existingState?.publicationPlan : null,
             stage6Approved: isFinalApproved,
             baseCommitHash: isolatedWorkspace.baseCommitSha,
+            baseTargetSha256: (isApproved || isRetryExecution) && existingState?.baseTargetSha256 ? existingState.baseTargetSha256 : baseSourceSha256,
             proposedDiffSha256,
             approvedFilePaths,
             approvedTargetFile: targetRelPath,
@@ -1970,6 +2287,7 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
                 retryCount,
                 attemptHistory,
                 findingContext,
+                executionMode: this.executionMode,
                 status: 'Awaiting Human Review',
                 isAwaitingApproval: true,
                 stage: 4,
@@ -2039,12 +2357,10 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
 
             if (sourceFilePath && fs.existsSync(sourceFilePath)) {
                 this.snapshotOriginalFile(finding.Vulnerability_ID, sourceFilePath);
-                if (fullRemediatedCode) {
-                    fs.writeFileSync(sourceFilePath, fullRemediatedCode, 'utf-8');
-                    currentState.expectedPostApplySha256 = sha256Hex(fs.readFileSync(sourceFilePath));
-                    currentState.patchAppliedAtStage5 = true;
-                    log('REMEDIATE', `Applied secure code fix to '${targetRelPath}' inside isolated worktree (original repository unchanged).`);
-                }
+                applyExactPatch(isolatedWorkspace.worktreeDir, patchDiff);
+                currentState.expectedPostApplySha256 = sha256Hex(fs.readFileSync(sourceFilePath));
+                currentState.patchAppliedAtStage5 = true;
+                log('REMEDIATE', `Applied the exact approved diff to '${targetRelPath}' inside the isolated worktree.`);
             }
 
             // Post-write filesystem + Git scope verification (Block D)
@@ -2071,7 +2387,7 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
             type: 'STAGE_COMPLETE',
             stageId: 'remediation',
             stageNumber: 5,
-            summary: `Secure fix applied to ${path.basename(targetRelPath)} in isolated worktree.`,
+            summary: `Approved patch applied to ${path.basename(targetRelPath)} in isolated worktree; security verification follows.`,
             patchDiff: patchDiff
         });
 
@@ -2092,8 +2408,20 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
             executionGateway: this.executionGateway,
             sandboxBackend: this.sandboxBackend,
             envReport: this.envReport,
-            injectionScreen: this.contentInjectionScreen
+            injectionScreen: this.contentInjectionScreen,
+            cancellationToken: options.cancellationToken
         });
+        if (cryptoMigrationContract && postFixValidation.passed) {
+            log('BENCH_TEST', 'Executing the reviewed AES-GCM contract tests: envelope/round-trip, tamper rejection, wrong key and invalid input lengths.');
+            postFixValidation = await require('./cryptoContractValidation').validateCryptoContract({
+                repository: isolatedWorkspace.worktreeDir, targetRelPath, finding, runTests: this.runPostFixTests.bind(this),
+                minimumTests: postFixValidation.testsTotal + 3,
+                artifactDir: path.join(this.remOutputDir, finding.Vulnerability_ID),
+                testOptions: { runId, applicationId: appNum, vulnerabilityId: finding.Vulnerability_ID,
+                    executionGateway: this.executionGateway, sandboxBackend: this.sandboxBackend, envReport: this.envReport,
+                    injectionScreen: this.contentInjectionScreen, cancellationToken: options.cancellationToken }
+            });
+        }
         commandPolicyDecisions.push({
             stage: 'POST_FIX_TEST',
             command: postFixValidation.command || 'N/A',
@@ -2130,7 +2458,7 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
         const originCheck = resolveOriginatingScannerId(finding);
         const expectsScannerReScan = isScannedFinding || originCheck.rawScannerId !== null;
 
-        if (this.reScanVerifier && expectsScannerReScan) {
+        if (this.reScanVerifier && expectsScannerReScan && !options.cancellationToken?.isCancellationRequested) {
             try {
                 log('RESCAN_VERIFICATION', `Initiating post-remediation targeted re-scan in isolated worktree for '${finding.Vulnerability_ID}'...`);
                 reScanVerification = await this.reScanVerifier.verifyRemediation({
@@ -2174,19 +2502,19 @@ SUMMARY: <1-2 sentences explaining the exact fix applied>`;
             reScanVerification.machineStatus === OUTCOME_STATUS.STILL_PRESENT ||
             reScanVerification.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED
         ));
-        const stage6Passed = postTestOutcomeForStage6 === OUTCOME_STATUS.PASSED && !reScanFailedAtStage6;
+        const stage6Passed = postTestOutcomeForStage6 === OUTCOME_STATUS.PASSED && (!expectsScannerReScan || reScanVerification?.machineStatus === OUTCOME_STATUS.RESOLVED);
         activeValidationOutcomeRef = reScanFailedAtStage6
             ? reScanVerification.machineStatus
             : postTestOutcomeForStage6;
 
         onProgress({
-            type: stage6Passed ? 'STAGE_COMPLETE' : 'STAGE_FAILED',
+            type: stage6Passed ? 'STAGE_COMPLETE' : (postFixValidation.testsFailed > 0 || postTestOutcomeForStage6 === OUTCOME_STATUS.FAILED || reScanFailedAtStage6 ? 'STAGE_FAILED' : 'STAGE_BLOCKED'),
             stageId: 'bench-test',
             stageNumber: 6,
             summary: stage6Passed
                 ? postFixValidation.summary
                 : (postFixValidation.rootError || reScanVerification?.reason || postFixValidation.summary),
-            failureCategory: stage6Passed ? null : (postFixValidation.failureCategory || (reScanFailedAtStage6 ? 'STILL_PRESENT' : postTestOutcomeForStage6)),
+            failureCategory: stage6Passed ? null : (postTestOutcomeForStage6 === OUTCOME_STATUS.PASSED ? (reScanVerification?.machineStatus || 'RESCAN_NOT_VERIFIED') : postFixValidation.failureCategory),
             validationOutcome: activeValidationOutcomeRef,
             evidenceRef: 'validation.json',
             validation: postFixValidation,
@@ -2279,13 +2607,14 @@ Return a JSON object with EXACTLY these keys:
 
         let securityReview = null;
         try {
+            if (options.cancellationToken?.isCancellationRequested) throw new Error('Cancelled before model security review; no review executed.');
             securityReview = await this.llmClient.generateJson(auditPrompt, {
                 ...llmCallContext,
                 sourceCode: patchDiff
             });
             this._screenUntrustedText(JSON.stringify(securityReview), 'llm:securityReview', TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
         } catch (err) {
-            if (err.name === 'OutboundContextBlockedError') throw err;
+            if (err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
             securityReview = {
                 rating: 'NOT_VERIFIED',
                 summary: `Independent security audit fallback (${err.message}): evaluating deterministic test outcome ${postTestOutcome}.`,
@@ -2371,17 +2700,17 @@ Return a JSON object with EXACTLY these keys:
             reScanVerification.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED
         ));
         const derivedFailedStage = hasPostTestFailure ? 6 : (hasReScanFailure ? 7 : (!outcomeEvaluation.isResolved ? 8 : null));
-        const derivedFailureCategory = postFixValidation?.failureCategory && postFixValidation.failureCategory !== 'NONE'
+        const derivedFailureCategory = hasPostTestFailure && postFixValidation?.failureCategory && postFixValidation.failureCategory !== 'NONE'
             ? postFixValidation.failureCategory
             : (reScanVerification?.machineStatus === OUTCOME_STATUS.STILL_PRESENT
                 ? 'STILL_PRESENT'
-                : (reScanVerification?.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED ? 'REGRESSION_DETECTED' : null));
+                : (reScanVerification?.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED ? 'REGRESSION_DETECTED' : (!outcomeEvaluation.isResolved ? 'SECURITY_VERIFICATION_INCOMPLETE' : null)));
         const derivedFailureReason = !outcomeEvaluation.isResolved
             ? (postFixValidation?.rootError || postFixValidation?.reason || reScanVerification?.reason || outcomeEvaluation.blockingReasons.join('; '))
             : null;
 
         onProgress({
-            type: outcomeEvaluation.isResolved ? 'STAGE_COMPLETE' : 'STAGE_FAILED',
+            type: outcomeEvaluation.isResolved ? 'STAGE_COMPLETE' : (outcomeEvaluation.finalValidationOutcome === OUTCOME_STATUS.FAILED ? 'STAGE_FAILED' : 'STAGE_BLOCKED'),
             stageId: 'security-review',
             stageNumber: 7,
             summary: `Security review outcome: ${outcomeEvaluation.finalValidationOutcome} (Regression: ${regressionStatus}).`,
@@ -2393,15 +2722,15 @@ Return a JSON object with EXACTLY these keys:
             outcomeEvaluation.finalValidationOutcome === OUTCOME_STATUS.BLOCKED ||
             outcomeEvaluation.finalValidationOutcome === OUTCOME_STATUS.NOT_VERIFIED;
         const nextWorkflowStatus = outcomeEvaluation.isResolved
-            ? (isFinalApproved ? 'COMPLETED' : 'AWAITING_FINAL_APPROVAL')
+            ? (isFinalApproved ? 'FINALIZING' : 'AWAITING_FINAL_APPROVAL')
             : (isCouldNotRunOutcome ? 'COULD_NOT_RUN' : 'VALIDATION_FAILED');
 
         currentStageNumber = 8;
         currentStageId = 'final-human-gate';
         currentState.stage = outcomeEvaluation.isResolved ? 8 : 9;
         currentState.status = nextWorkflowStatus;
-        currentState.workflowLifecycle = (outcomeEvaluation.isResolved && !isFinalApproved)
-            ? WORKFLOW_LIFECYCLE.WAITING_APPROVAL
+        currentState.workflowLifecycle = outcomeEvaluation.isResolved
+            ? (isFinalApproved ? WORKFLOW_LIFECYCLE.IN_PROGRESS : WORKFLOW_LIFECYCLE.WAITING_APPROVAL)
             : WORKFLOW_LIFECYCLE.COMPLETED;
         currentState.securityValidationOutcome = outcomeEvaluation.finalValidationOutcome;
         currentState.approvalDecision = !outcomeEvaluation.isResolved
@@ -2409,10 +2738,10 @@ Return a JSON object with EXACTLY these keys:
             : (isFinalApproved ? APPROVAL_DECISION.APPROVED_STAGE8 : APPROVAL_DECISION.PENDING_STAGE8);
         currentState.formalClosure = !outcomeEvaluation.isResolved
             ? (isCouldNotRunOutcome ? FORMAL_CLOSURE.COULD_NOT_RUN : FORMAL_CLOSURE.VALIDATION_FAILED)
-            : (isFinalApproved ? FORMAL_CLOSURE.RESOLVED_CLOSED : FORMAL_CLOSURE.AWAITING_FINAL_SIGN_OFF);
+            : (isFinalApproved ? FORMAL_CLOSURE.IN_REMEDIATION : FORMAL_CLOSURE.AWAITING_FINAL_SIGN_OFF);
         currentState.findingState = !outcomeEvaluation.isResolved
             ? (isCouldNotRunOutcome ? FINDING_STATE.COULD_NOT_RUN : FINDING_STATE.VALIDATION_FAILED)
-            : (isFinalApproved ? FINDING_STATE.RESOLVED : FINDING_STATE.AWAITING_FINAL_SIGN_OFF);
+            : (isFinalApproved ? FINDING_STATE.IN_REMEDIATION : FINDING_STATE.AWAITING_FINAL_SIGN_OFF);
         currentState.stages = canonicalStages;
         currentState.lastAppliedSeq = canonicalSeq;
         currentState.attemptId = attemptId;
@@ -2436,6 +2765,11 @@ Return a JSON object with EXACTLY these keys:
         currentState.sandboxExecution = sandboxExecution;
         currentState.sbomEvidence = sbomEvidence;
         currentState.stage6Approved = outcomeEvaluation.isResolved ? isFinalApproved : false;
+        if (outcomeEvaluation.isResolved && !isFinalApproved) {
+            canonicalStages[7].status = 'awaiting_review';
+            canonicalStages[7].summary = 'Validation passed. Final human sign-off required.';
+            canonicalStages[8].status = 'not_started';
+        }
         currentState.scopeVerification = postTestScope;
         currentState.updatedAt = now();
         currentState.retryEligibility = this.evaluateRetryEligibility(currentState, {
@@ -2468,6 +2802,39 @@ Return a JSON object with EXACTLY these keys:
             evidenceChecklist,
             chainEvents
         };
+
+        if (this.isLocalDevelopment) {
+            const conclusion = developmentConclusion({ evaluation: outcomeEvaluation, baseline: baselineValidation, tests: postFixValidation, reScan: reScanVerification, review: securityReview });
+            const verificationLimitations = [];
+            if (sourceToSinkEvidence?.executionEvidence?.executionObserved === false) {
+                verificationLimitations.push('No database command execution was observed in the target source. Scanner-level hardening and passing tests do not prove remediation of an executable SQL injection flow.');
+                if (conclusion.localOutcome === 'COMPLETED_VERIFIED') conclusion.localOutcome = 'COMPLETED_WITH_LIMITATIONS';
+                conclusion.verifiedRemediation = false;
+            }
+            if (evidenceChecklist.isSecretFinding && evidenceChecklist.checks.some(check =>
+                ['SECRET_MANAGER_REPLACEMENT', 'SECRET_REVOCATION_CONFIRMED', 'SECRET_ROTATION_CONFIRMED', 'EXPOSED_CREDENTIAL_INVALIDATED'].includes(check.id) && check.status !== 'PASS')) {
+                verificationLimitations.push('Credential externalization, provider revocation/rotation, and invalidation evidence are incomplete. Required operator actions remain recorded in the evidence checklist.');
+                if (conclusion.localOutcome === 'COMPLETED_VERIFIED') conclusion.localOutcome = 'COMPLETED_WITH_LIMITATIONS';
+                conclusion.verifiedRemediation = false;
+            }
+            canonicalStages[7].status = 'deferred_in_dev_mode';
+            canonicalStages[7].summary = 'DEFERRED_IN_DEV_MODE — Enterprise final sign-off is not required for this isolated local run.';
+            canonicalStages[8].status = conclusion.localOutcome === 'FAILED' ? 'failed' : conclusion.localOutcome === 'BLOCKED' ? 'blocked' : 'completed';
+            canonicalStages[8].summary = conclusion.localOutcome;
+            Object.assign(currentState, conclusion, { verificationLimitations, executionMode: this.executionMode, status: conclusion.localOutcome,
+                workflowLifecycle: WORKFLOW_LIFECYCLE.COMPLETED, approvalDecision: 'DEFERRED_IN_DEV_MODE',
+                formalClosure: 'DEFERRED_IN_DEV_MODE', findingState: conclusion.verifiedRemediation ? 'VERIFIED_LOCALLY' : 'OPEN',
+                stage: 9, stages: canonicalStages, stage6Approved: false, isResolved: conclusion.verifiedRemediation });
+            currentState.terminalBanner = `${this.executionMode} — ${conclusion.localOutcome}`;
+            this.saveRunState(finding.Vulnerability_ID, currentState);
+            const reportPath = this.persistArtifacts(finding, classification, rca, baselineValidation, patchDiff, traceLogs, postFixValidation, securityReview, true, false, reScanVerification, { ...evidenceContext, executionMode: this.executionMode, localOutcome: conclusion.localOutcome });
+            onProgress({ type: 'WORKFLOW_CONCLUDED', stageNumber: 9, stageId: 'manual-validations', summary: currentState.terminalBanner, validationOutcome: currentState.securityValidationOutcome });
+            currentState.lastAppliedSeq = canonicalSeq;
+            this.saveRunState(finding.Vulnerability_ID, currentState);
+            return { ...currentState, ...conclusion, isCompleted: ['COMPLETED_VERIFIED', 'COMPLETED_WITH_LIMITATIONS'].includes(conclusion.localOutcome),
+                isResolved: conclusion.verifiedRemediation, isAwaitingApproval: false, isAwaitingFinalApproval: false,
+                baselineValidation, validation: postFixValidation, reScanVerification, securityReview, patchDiff, reportPath, traceLogs };
+        }
 
         // ==========================================
         // FINAL HUMAN SIGN-OFF GATE (STAGE 8) & WORKFLOW CONCLUSION (STAGE 9)
@@ -2600,6 +2967,10 @@ Return a JSON object with EXACTLY these keys:
 
         if (!isFinalApproved) {
             log('FINAL_GATE', `STOP: Workflow reached Final Human Review Gate (Stage 8) [Outcome:${outcomeEvaluation.finalValidationOutcome}].`);
+            currentState.publicationPlan = this.publicationService?.prepare({
+                repositoryPath: resolvedRepositoryPath || repoField, runId, vulnerabilityId: finding.Vulnerability_ID, proposedDiffSha256
+            }) || { status: 'NOT_CONFIGURED', reason: 'GitHub publication is not configured. Final approval closes local evidence only.' };
+            this.saveRunState(finding.Vulnerability_ID, currentState);
             chainEvents.push({
                 timestamp: new Date().toISOString(),
                 stage: 'FINAL_GATE',
@@ -2662,6 +3033,7 @@ Return a JSON object with EXACTLY these keys:
                 findingState: FINDING_STATE.AWAITING_FINAL_SIGN_OFF,
                 terminalBanner: deriveTerminalBanner(currentState),
                 isAwaitingFinalApproval: true,
+                publicationPlan: currentState.publicationPlan,
                 finalGateBlocked: false,
                 stage: 8,
                 failedStage: currentState.failedStage,
@@ -2697,7 +3069,23 @@ Return a JSON object with EXACTLY these keys:
         currentStageId = 'manual-validations';
         log('FINAL_GATE', `Final Human Sign-Off Granted [RunId:${runId}]. Evaluating strict machine closure criteria...`);
         onProgress({ type: 'STAGE_START', stageId: 'manual-validations', stageNumber: 9, validationOutcome: outcomeEvaluation.finalValidationOutcome });
-        log('DOCUMENTATION', `Finalizing local records and tamper-detectable evidence manifest (no remote Git push performed)...`);
+        log('DOCUMENTATION', 'Finalizing evidence and executing only the publication plan explicitly authorized at Stage 8.');
+        if (existingState?.publicationPlan?.status === 'READY') {
+            if (!this.publicationService || options.publishPullRequest !== true) throw new Error('GitHub publication requires the reviewed plan and explicit final authorization.');
+            currentState.publicationResult = await this.publicationService.publish({
+                plan: existingState.publicationPlan, worktreeDir: isolatedWorkspace.worktreeDir,
+                approvedFiles: approvedFilePaths, patchDiff, finalApproved: true, runId,
+                expectedHead: isolatedWorkspace.baseCommitSha,
+                expectedFiles: { [targetRelPath]: currentState.expectedPostApplySha256 },
+                commitTitle: `Remediate ${finding.Vulnerability_ID}`,
+                summary: `Remediates ${finding.Vulnerability_ID}.\n\nValidated diff SHA-256: ${proposedDiffSha256}\n\n${postFixValidation.summary}\n\nScanner: ${reScanVerification?.machineStatus || reScanVerification?.status || 'NOT_VERIFIED'}.\n\nFinal human sign-off recorded for run ${runId}.`
+            });
+            chainEvents.push({ timestamp: now(), stage: 'PUBLICATION', eventType: 'GITHUB_PR_CREATED', payload: currentState.publicationResult });
+            log('PUBLICATION', `GitHub draft pull request created: ${currentState.publicationResult.url}`);
+        } else {
+            currentState.publicationResult = { status: 'NOT_CONFIGURED', reason: existingState?.publicationPlan?.reason || 'No reviewed GitHub publication plan exists; no remote action performed.' };
+        }
+        evidenceContext.publication = currentState.publicationResult;
 
         chainEvents.push({
             timestamp: new Date().toISOString(),
@@ -2760,6 +3148,8 @@ Return a JSON object with EXACTLY these keys:
         currentState.approvalDecision = outcomeEvaluation.isResolved ? APPROVAL_DECISION.APPROVED_STAGE8 : APPROVAL_DECISION.BLOCKED_STAGE8;
         currentState.formalClosure = outcomeEvaluation.isResolved ? FORMAL_CLOSURE.RESOLVED_CLOSED : FORMAL_CLOSURE.VALIDATION_FAILED;
         currentState.findingState = outcomeEvaluation.isResolved ? FINDING_STATE.RESOLVED : FINDING_STATE.VALIDATION_FAILED;
+        canonicalStages[8].status = outcomeEvaluation.isResolved ? 'completed' : 'failed';
+        canonicalStages[8].summary = outcomeEvaluation.isResolved ? 'Local verification evidence finalized. Remote publication is recorded separately.' : 'Workflow closure blocked by validation.';
         currentState.stages = canonicalStages;
         currentState.lastAppliedSeq = canonicalSeq;
         currentState.finalRemediationStatus = finalRemediationStatus;
@@ -2819,6 +3209,7 @@ Return a JSON object with EXACTLY these keys:
             isCompleted: outcomeEvaluation.isResolved,
             isResolved: outcomeEvaluation.isResolved,
             stage: 9,
+            publicationResult: currentState.publicationResult,
             vulnerabilityId: finding.Vulnerability_ID,
             reportPath: reportPath,
             patchDiff: patchDiff,
@@ -2833,20 +3224,49 @@ Return a JSON object with EXACTLY these keys:
             traceLogs: traceLogs
         };
         } catch (err) {
-            const failureCategory = this._classifyPipelineError(err);
+            const failureCategory = err.failureCategory || this._classifyPipelineError(err);
             const failTimeIso = new Date().toISOString();
-            const failedDiagnostics = currentStageNumber === 3 ? baselineValidation : postFixValidation;
+            const failedDiagnostics = currentStageNumber === 3 ? (err.baselineValidation || baselineValidation) : postFixValidation;
             log('ERROR', `[Stage ${currentStageNumber}] Failed (${failureCategory}): ${err.message}`);
 
+            const isToolchainBlocked = failureCategory === 'TOOLCHAIN_IMAGE_UNAVAILABLE';
+            const prerequisiteBlocked = isToolchainBlocked || err.prerequisiteBlocked === true || (currentStageNumber === 3 && !isBaselineEligible(failedDiagnostics));
+
             if (currentStageNumber >= 1 && currentStageNumber <= 9 && canonicalStages[currentStageNumber - 1]) {
-                canonicalStages[currentStageNumber - 1].status = 'failed';
+                canonicalStages[currentStageNumber - 1].status = prerequisiteBlocked ? 'blocked' : 'failed';
                 canonicalStages[currentStageNumber - 1].failureCategory = failureCategory;
                 canonicalStages[currentStageNumber - 1].summary = err.message;
                 canonicalStages[currentStageNumber - 1].updatedAt = failTimeIso;
             }
 
+            // Task B: If Stage 3 failed/blocked, Stage 4 is BLOCKED_BY_PREREQUISITE, Stages 5-9 are NOT_STARTED
+            if (currentStageNumber <= 3) {
+                if (canonicalStages[3]) {
+                    canonicalStages[3].status = 'blocked_by_prerequisite';
+                    canonicalStages[3].summary = 'BLOCKED — Stage 3 source analysis and baseline testing prerequisites not satisfied.';
+                    canonicalStages[3].failureCategory = null;
+                    canonicalStages[3].updatedAt = failTimeIso;
+                }
+                for (let s = 4; s < canonicalStages.length; s++) {
+                    canonicalStages[s].status = 'not_started';
+                    canonicalStages[s].summary = 'Not started (prerequisites blocked).';
+                    canonicalStages[s].failureCategory = null;
+                    canonicalStages[s].updatedAt = null;
+                }
+            }
+
+            if (failedDiagnostics && isToolchainBlocked) {
+                failedDiagnostics.machineStatus = OUTCOME_STATUS.COULD_NOT_RUN;
+                failedDiagnostics.status = 'COULD NOT RUN';
+                failedDiagnostics.failureCategory = 'TOOLCHAIN_IMAGE_UNAVAILABLE';
+                failedDiagnostics.executed = false;
+                failedDiagnostics.passed = false;
+            }
+
             const prev = this.loadRunState(vulnerabilityId) || existingState || {};
             const failedState = {
+                executionMode: this.executionMode,
+                localOutcome: this.isLocalDevelopment ? (prerequisiteBlocked ? 'BLOCKED' : 'FAILED') : undefined,
                 ...prev,
                 runId,
                 attemptId,
@@ -2861,8 +3281,14 @@ Return a JSON object with EXACTLY these keys:
                 findingSnapshot: minimizedFinding,
                 workspaceTrusted: options.workspaceTrusted !== false,
                 stage: currentStageNumber || prev.stage || 0,
-                status: 'FAILED',
-                workflowLifecycle: WORKFLOW_LIFECYCLE.ERROR,
+                status: prerequisiteBlocked ? 'BLOCKED' : 'FAILED',
+                workflowLifecycle: prerequisiteBlocked ? 'BLOCKED' : WORKFLOW_LIFECYCLE.ERROR,
+                securityValidationOutcome: prev.patchAppliedAtStage5 ? prev.securityValidationOutcome : VALIDATION_OUTCOME.NOT_EXECUTED,
+                postFixValidation: postFixValidation || (prev.patchAppliedAtStage5 ? prev.postFixValidation : null),
+                approvalDecision: prev.patchAppliedAtStage5 ? prev.approvalDecision : APPROVAL_DECISION.NOT_REQUESTED,
+                formalClosure: isToolchainBlocked ? FORMAL_CLOSURE.COULD_NOT_RUN : prev.formalClosure,
+                findingState: isToolchainBlocked ? FINDING_STATE.COULD_NOT_RUN : prev.findingState,
+                terminalBanner: isToolchainBlocked ? 'Workflow Blocked — Toolchain Image Unavailable' : 'Workflow Stopped — Execution Error',
                 stages: canonicalStages,
                 lastAppliedSeq: canonicalSeq,
                 failedStage: currentStageNumber || prev.stage || 1,
@@ -2878,10 +3304,14 @@ Return a JSON object with EXACTLY these keys:
                 classification: classification || prev.classification || null,
                 governance: governance || prev.governance || null,
                 rca: rca || prev.rca || null,
-                baselineValidation: baselineValidation || prev.baselineValidation || null,
-                postFixValidation: postFixValidation || prev.postFixValidation || null,
+                baselineValidation: (currentStageNumber === 3 ? failedDiagnostics : (baselineValidation || prev.baselineValidation || null)),
                 remediationDecision: remediationDecision || prev.remediationDecision || null,
                 sourceToSinkEvidence: sourceToSinkEvidence || prev.sourceToSinkEvidence || null,
+                proposedDiffSha256: prev.patchAppliedAtStage5 ? prev.proposedDiffSha256 : null,
+                patchDiff: prev.patchAppliedAtStage5 ? prev.patchDiff : null,
+                approvalRecord: prev.patchAppliedAtStage5 ? prev.approvalRecord : null,
+                pendingApprovalRequest: null,
+                stage4Approved: prev.patchAppliedAtStage5 ? prev.stage4Approved : false,
                 updatedAt: now()
             };
             failedState.retryEligibility = this.evaluateRetryEligibility(failedState, {
@@ -2893,19 +3323,33 @@ Return a JSON object with EXACTLY these keys:
                 this.saveRunState(finding.Vulnerability_ID, failedState);
                 const errTargetDir = path.join(this.remOutputDir, finding.Vulnerability_ID);
                 if (fs.existsSync(errTargetDir) && traceLogs.length > 0) {
-                    fs.writeFileSync(path.join(errTargetDir, 'agent-execution-trace.log'), traceLogs.join('\n'), 'utf-8');
+                    const failureDir = path.join(errTargetDir, 'attempts', attemptId, 'execution-failure');
+                    fs.mkdirSync(failureDir, { recursive: true });
+                    fs.writeFileSync(path.join(failureDir, 'agent-execution-trace.log'), traceLogs.join('\n'), 'utf-8');
                 }
                 if (baselineValidation && fs.existsSync(errTargetDir)) {
-                    fs.writeFileSync(path.join(errTargetDir, 'baseline-validation.json'), JSON.stringify(baselineValidation, null, 2), 'utf-8');
+                    const failureDir = path.join(errTargetDir, 'attempts', attemptId, 'execution-failure');
+                    fs.mkdirSync(failureDir, { recursive: true });
+                    fs.writeFileSync(path.join(failureDir, 'baseline-validation.json'), JSON.stringify(baselineValidation, null, 2), 'utf-8');
                 }
                 if (postFixValidation && fs.existsSync(errTargetDir)) {
-                    fs.writeFileSync(path.join(errTargetDir, 'validation.json'), JSON.stringify(postFixValidation, null, 2), 'utf-8');
+                    const failureDir = path.join(errTargetDir, 'attempts', attemptId, 'execution-failure');
+                    fs.mkdirSync(failureDir, { recursive: true });
+                    fs.writeFileSync(path.join(failureDir, 'validation.json'), JSON.stringify(postFixValidation, null, 2), 'utf-8');
+                }
+                if (!fs.existsSync(path.join(errTargetDir, 'integrity-manifest.json'))) {
+                    // A fresh generation failed before the proposal gate. Seal
+                    // its actual failure instead of retaining an older manifest.
+                    fs.writeFileSync(path.join(errTargetDir, 'agent-execution-trace.log'), traceLogs.join('\n'), 'utf8');
+                    chainEvents.push({ timestamp: new Date().toISOString(), stage: currentStageId,
+                        eventType: 'EXECUTION_STOPPED', payload: { failureCategory, stageNumber: currentStageNumber } });
+                    this._finalizeEvidenceLedger(finding, failedState, { runId, appNum, chainEvents, screeningRecords, commandPolicyDecisions });
                 }
             } catch {}
 
             if (currentStageNumber >= 1 && currentStageNumber <= 9) {
                 onProgress({
-                    type: 'STAGE_FAILED',
+                    type: prerequisiteBlocked ? 'STAGE_BLOCKED' : 'STAGE_FAILED',
                     stageId: currentStageId || CANONICAL_STAGES[currentStageNumber - 1]?.id,
                     stageNumber: currentStageNumber,
                     vulnerabilityId: finding.Vulnerability_ID,
@@ -2916,6 +3360,8 @@ Return a JSON object with EXACTLY these keys:
 
             onProgress({
                 type: 'WORKFLOW_FAILED',
+                executionState: prerequisiteBlocked ? 'BLOCKED' : 'FAILED',
+                workflowLifecycle: failedState.workflowLifecycle,
                 stageId: currentStageId || 'context',
                 stageNumber: currentStageNumber || 0,
                 vulnerabilityId: finding.Vulnerability_ID,
@@ -2992,6 +3438,7 @@ Return a JSON object with EXACTLY these keys:
             remediationPreferenceDecision: evidenceContext.remediationDecision || null,
             sourceToSinkEvidence: evidenceContext.sourceToSinkEvidence || null,
             sandboxExecution: evidenceContext.sandboxExecution || null,
+            publication: evidenceContext.publication || runState?.publicationResult || null,
             sbomEvidence: evidenceContext.sbomEvidence
                 ? {
                     sbomStatus: evidenceContext.sbomEvidence.sbomStatus,
@@ -3083,7 +3530,16 @@ Return a JSON object with EXACTLY these keys:
         const reportFileName = `${cleanTitle}_${id.toLowerCase().replace(/-/g, '_')}.md`;
         const reportPath = path.join(this.outputDir, reportFileName);
 
-        const mdContent = generateMarkdownReport(finding, classification, rca, baselineValidation, patchDiff, traceLogs, validation, securityReview, isApproved, isFinalApproved, reScanVerification, evidenceContext);
+        let mdContent = generateMarkdownReport(finding, classification, rca, baselineValidation, patchDiff, traceLogs, validation, securityReview, isApproved, isFinalApproved, reScanVerification, evidenceContext);
+        if (evidenceContext?.executionMode === 'LOCAL_DEVELOPMENT') {
+            mdContent = `# LOCAL_DEVELOPMENT — ${evidenceContext.localOutcome}
+
+Enterprise Stage 8 sign-off and formal closure: DEFERRED_IN_DEV_MODE.
+This outcome describes isolated local verification, not production security or publication.
+
+` + mdContent;
+            mdContent = mdContent.replace(/Final human sign-off required\./g, 'Enterprise final sign-off deferred in local development.');
+        }
         fs.writeFileSync(reportPath, mdContent, 'utf-8');
         fs.writeFileSync(path.join(targetDir, 'remediation-report.md'), mdContent, 'utf-8');
 
@@ -3268,11 +3724,11 @@ function generateMarkdownReport(finding, classification, rca, baselineValidation
 
     lines.push('## Documentation Agent');
     lines.push(`- **Consolidated Report Status**: Complete`);
-    const docStatusLabel = isFinalApproved
+    const docStatusLabel = evidenceContext?.localOutcome || (isFinalApproved
         ? (securityReview?.rating === 'PASS' ? 'Remediated' : 'Validation Failed')
-        : (isApproved ? 'Awaiting Final Human Review' : 'Awaiting Human Review');
+        : (isApproved ? 'Awaiting Final Human Review' : 'Awaiting Human Review'));
     lines.push(`- **Remediation Status**: **${docStatusLabel}**`);
-    lines.push(`- **Formal Closure**: **PENDING_FORMAL_CLOSURE** (Automated tools never close vulnerabilities)`);
+    lines.push(`- **Formal Closure**: **${evidenceContext?.executionMode === 'LOCAL_DEVELOPMENT' ? 'DEFERRED_IN_DEV_MODE' : 'PENDING_FORMAL_CLOSURE'}** (Automated tools never close vulnerabilities)`);
     lines.push(`- **Scope Test-Weakening Caveat**: ${TEST_WEAKENING_DETECTION_LIMITATIONS}`);
     lines.push('');
     lines.push('### Execution Trace');

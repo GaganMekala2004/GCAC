@@ -1,0 +1,16 @@
+diff --git a/src/PaymentsAPI/Controllers/PaymentController.cs b/src/PaymentsAPI/Controllers/PaymentController.cs
+index 95a63ce..57bea19 100644
+--- a/src/PaymentsAPI/Controllers/PaymentController.cs
++++ b/src/PaymentsAPI/Controllers/PaymentController.cs
+@@ -12,7 +12,9 @@ public class PaymentController
+ {
+     public void Process(PaymentRequest request)
+     {
+-        string query = "SELECT * FROM Payments WHERE AccountId = '" + request.AccountId + "' AND Amount = " + request.Amount;
++        string query = "SELECT * FROM Payments WHERE AccountId = @AccountId AND Amount = @Amount";
+         using var cmd = new SqlCommand(query);
++        cmd.Parameters.AddWithValue("@AccountId", request.AccountId);
++        cmd.Parameters.AddWithValue("@Amount", request.Amount);
+     }
+ }
+\ No newline at end of file

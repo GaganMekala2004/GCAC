@@ -1682,14 +1682,16 @@ body.theme-dark .nav-item.active svg {
     border: 1px solid var(--warning-border);
 }
 
-.badge-status-pending {
+.badge-status-pending,
+.badge-status-not_started {
     background-color: var(--bg-surface-hover);
     color: var(--text-muted);
     border: 1px solid var(--border-subtle);
 }
 
 .badge-status-failed,
-.badge-status-blocked {
+.badge-status-blocked,
+.badge-status-blocked_by_prerequisite {
     background-color: var(--danger-subtle);
     color: var(--danger);
     border: 1px solid var(--danger-border);

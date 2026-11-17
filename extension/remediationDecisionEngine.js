@@ -46,7 +46,7 @@ function inferVulnerabilityType(finding = {}) {
     if (combined.includes('xss') || combined.includes('cross-site scripting') || combined.includes('cwe-79')) {
         return VULNERABILITY_TYPES.XSS;
     }
-    if (combined.includes('cryptographic') || combined.includes('des') || combined.includes('migration') || combined.includes('refactor') || combined.includes('protocol')) {
+    if (combined.includes('cryptographic') || /\b(?:des|3des|md5|rc2|sha-?1)\b/.test(combined) || combined.includes('cwe-327') || combined.includes('cwe-328') || combined.includes('protocol migration')) {
         return VULNERABILITY_TYPES.WEAK_CRYPTO_MIGRATION;
     }
     if (combined.includes('secret') || combined.includes('api key') || combined.includes('cwe-798') || combined.includes('password')) {
@@ -62,7 +62,7 @@ function inferVulnerabilityType(finding = {}) {
  * Evaluates the lowest-risk legitimate remediation strategy using the 5-tier
  * Remediation Preference Ladder as a structured governance decision framework.
  */
-function evaluateRemediationStrategy({ finding = {}, sourceCode = '', ownershipClassification = null, hasApprovedUpgradeTarget = null } = {}) {
+function evaluateRemediationStrategy({ finding = {}, sourceCode = '', ownershipClassification = null, hasApprovedUpgradeTarget = null, localDevelopment = false, cryptoMigrationContract = null } = {}) {
     const vulnType = inferVulnerabilityType(finding);
     const loc = String(finding.Location_Path || 'unknown');
     const isManifest = /\.(?:csproj|json|xml|gradle)$/i.test(loc) && (loc.endsWith('.csproj') || loc.endsWith('pom.xml') || loc.endsWith('package.json'));
@@ -82,7 +82,7 @@ function evaluateRemediationStrategy({ finding = {}, sourceCode = '', ownershipC
     let selectedTier = null;
     let recommendedStrategy = '';
     let requiresManualReview = false;
-    let blastRadius = 'LOW';
+    let blastRadius = isHighBlastRadius ? 'HIGH' : 'LOW';
     let automatedExecutionAllowed = true;
     let blockingReason = null;
 
@@ -182,7 +182,7 @@ function evaluateRemediationStrategy({ finding = {}, sourceCode = '', ownershipC
                     ? 'Non-code infrastructure/appliance vulnerability cannot be remediated by editing application source files.'
                     : 'Vulnerability type or source ownership is uncertain; cannot safely automate source code changes.'
             });
-        } else if (isHighBlastRadius) {
+        } else if (isHighBlastRadius && !(vulnType === VULNERABILITY_TYPES.WEAK_CRYPTO_MIGRATION && cryptoMigrationContract?.acknowledged === true)) {
             blastRadius = 'HIGH';
             alternativesEvaluated.push({
                 tier: REMEDIATION_LADDER[3],
@@ -206,6 +206,9 @@ function evaluateRemediationStrategy({ finding = {}, sourceCode = '', ownershipC
             });
             selectedTier = REMEDIATION_LADDER[3];
             recommendedStrategy = `Apply minimal targeted secure coding fix in application-authored '${loc}'.`;
+            if (vulnType === VULNERABILITY_TYPES.WEAK_CRYPTO_MIGRATION && cryptoMigrationContract) {
+                recommendedStrategy = 'Implement the reviewed AES-256-GCM contract: keep Encrypt(byte[] data, byte[] key, byte[] iv); key must be 32 bytes, iv is a caller-supplied unique 12-byte nonce. Return [version byte 1][12-byte nonce][16-byte tag][ciphertext]. Reject invalid key/nonce lengths. Never use a static nonce or generate a replacement nonce silently. Legacy ciphertext compatibility is explicitly not required. Cryptographic contract tests are mandatory.';
+            }
         }
     }
 
@@ -215,7 +218,9 @@ function evaluateRemediationStrategy({ finding = {}, sourceCode = '', ownershipC
         requiresManualReview = true;
         automatedExecutionAllowed = false;
         if (isHighBlastRadius) blastRadius = 'HIGH';
-        blockingReason = blockingReason || 'No safe automated low-blast-radius remediation strategy; manual architectural or governance review required.';
+        blockingReason = blockingReason || (vulnType === VULNERABILITY_TYPES.WEAK_CRYPTO_MIGRATION
+            ? `Cryptographic migration in '${loc}' requires an approved compatibility contract. Review caller key/IV formats, ciphertext consumers and stored-data migration before changing the algorithm.`
+            : 'No safe automated low-blast-radius remediation strategy; manual architectural or governance review required.');
         recommendedStrategy = 'Halt automated editing and escalate to Manual Architectural / Security Review.';
         alternativesEvaluated.push({
             tier: REMEDIATION_LADDER[4],
@@ -245,7 +250,14 @@ function evaluateRemediationStrategy({ finding = {}, sourceCode = '', ownershipC
         requiresManualReview,
         automatedExecutionAllowed,
         disposition: automatedExecutionAllowed ? 'AUTOMATED_CANDIDATE' : 'MANUAL_REVIEW',
-        blockingReason
+        blockingReason,
+        manualReviewPlan: requiresManualReview && vulnType === VULNERABILITY_TYPES.WEAK_CRYPTO_MIGRATION ? [
+            `Inventory callers and persisted/encrypted data for '${loc}'; record compatibility requirements.`,
+            'Select an approved primitive for the actual use: authenticated encryption, general hashing, or password hashing.',
+            'Specify key handling, nonce/IV handling, payload format and legacy-data migration; document any caller/API changes.',
+            'Prepare compatibility, round-trip, malformed-input and tamper-rejection tests plus rollback steps.',
+            'Have the application/security owner review the migration and implement it through the architectural remediation path; then rerun tests and the originating scanner.'
+        ] : []
     };
 }
 
@@ -361,6 +373,12 @@ function extractSourceToSinkEvidence({ finding = {}, sourceCode = '', rca = null
 
     return {
         vulnerabilityType: vulnType,
+        executionEvidence: vulnType === VULNERABILITY_TYPES.SQL_INJECTION ? {
+            executionObserved: /\b(?:ExecuteReader|ExecuteNonQuery|ExecuteScalar)(?:Async)?\s*\(/.test(fullText),
+            parameterizedExecutingCommandObserved: [...fullText.matchAll(/\b(\w+)\.Execute(?:Reader|NonQuery|Scalar)(?:Async)?\s*\(/g)]
+                .some(match => new RegExp(`\\b${match[1]}\\.Parameters\\.(?:Add|AddWithValue)\\s*\\(`).test(fullText)),
+            limitation: 'Single-file syntactic evidence only. Query construction is not proof of database execution; parameter binding must belong to the executing command.'
+        } : null,
         analysisMethod,
         formalTaintProofSupplied: hasFormalAnalyzerFlows,
         formalTaintNotice: hasFormalAnalyzerFlows

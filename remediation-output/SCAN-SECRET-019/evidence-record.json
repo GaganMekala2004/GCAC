@@ -1,0 +1,148 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "46ddbef3-7079-4114-9e97-24ed8de4fac4",
+  "findingId": "SCAN-SECRET-019",
+  "findingFingerprint": "e139c0225eb89955",
+  "applicationId": "APP-1001",
+  "stage": 4,
+  "timestamp": "2026-11-15T15:58:21.381Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "62af51a89f4484bf62fad34562fa37b84d60d4d392bc7db38f24d90846c52d65",
+    "baseSourceSha256": "2f3f37dfe28d2d0209a43c2fa9a125d93b2015d98f445575421823a57f5681eb",
+    "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "46ddbef3-7079-4114-9e97-24ed8de4fac4",
+      "contentSource": "finding:SCAN-SECRET-019",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-15T15:58:21.289Z",
+      "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "46ddbef3-7079-4114-9e97-24ed8de4fac4",
+      "contentSource": "source:src/PaymentsAPI/LegacyCrypto.cs",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-15T15:58:21.380Z",
+      "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [],
+  "testCommand": "N/A",
+  "actualExitCode": null,
+  "testResultCounts": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": null,
+  "approvalReference": null,
+  "proposedDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "appliedDiffSha256": null,
+  "filesChanged": [],
+  "scopeVerificationOutcome": "NOT_APPLIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-SECRET-019",
+    "vulnerabilityType": "WEAK_CRYPTO_MIGRATION",
+    "affectedComponent": "src/PaymentsAPI/LegacyCrypto.cs",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "HIGH",
+    "selectedTier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+    "recommendedStrategy": "Halt automated editing and escalate to Manual Architectural / Security Review.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Root cause lies in application source code logic or architectural/vendor layer rather than declarative config."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Finding originates in custom/application code or infrastructure, not an outdated dependency manifest."
+      },
+      {
+        "tier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "High-blast-radius cryptographic/architectural migration cannot be resolved safely via isolated single-file patch."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": true,
+        "reason": "No safe automated low-blast-radius remediation strategy; manual architectural or governance review required."
+      }
+    ],
+    "requiresManualReview": true,
+    "automatedExecutionAllowed": false,
+    "disposition": "MANUAL_REVIEW",
+    "blockingReason": "No safe automated low-blast-radius remediation strategy; manual architectural or governance review required."
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "WEAK_CRYPTO_MIGRATION",
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "Unresolved (inspect method parameters)",
+      "file": "src/PaymentsAPI/LegacyCrypto.cs",
+      "line": 10,
+      "snippet": "using var encryptor = des.CreateEncryptor(key, iv);"
+    },
+    "dataPropagationEvidence": [],
+    "dangerousSink": {
+      "file": "src/PaymentsAPI/LegacyCrypto.cs",
+      "line": 10,
+      "snippet": "using var encryptor = des.CreateEncryptor(key, iv);"
+    },
+    "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+    "affectedFile": "src/PaymentsAPI/LegacyCrypto.cs",
+    "affectedFunction": "Encrypt(byte[] data, byte[] key, byte[] iv)",
+    "affectedLines": "Line 10",
+    "proposedRemediation": "Migrate cryptography to AES-256 (AES-GCM) for symmetric encryption and SHA-256/SHA-512 for cryptographic hashing.",
+    "baselineTestEvidence": {
+      "status": "NOT_EXECUTED",
+      "command": null,
+      "exitCode": null,
+      "summary": "No reproducible baseline test runner executed yet; documented static inspection evidence."
+    }
+  },
+  "sandboxExecution": null,
+  "sbomEvidence": null,
+  "finalOutcome": {
+    "scannerOutcome": "NOT_VERIFIED",
+    "testOutcome": "UNTESTED",
+    "workflowOutcome": "BLOCKED",
+    "finalValidationOutcome": "BLOCKED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE",
+    "legacyRemediationStatus": "Manual Review Required",
+    "legacyFinalValidationStatus": "BLOCKED",
+    "isResolved": false,
+    "blockingReasons": [
+      "No safe automated low-blast-radius remediation strategy; manual architectural or governance review required."
+    ]
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

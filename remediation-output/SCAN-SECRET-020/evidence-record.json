@@ -1,0 +1,230 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+  "findingId": "SCAN-SECRET-020",
+  "findingFingerprint": "fe9edab5047b016c",
+  "applicationId": "APP-1001",
+  "stage": 9,
+  "timestamp": "2026-11-16T15:43:33.751Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "bec66dc052d846aee7dc22122890934cd29af3833036a8262b273ca7bb55bee5",
+    "baseSourceSha256": "679a18cc2a8596fc84ae7afbba3c8b6e25dd87b8d73436763a0c866467264aa9",
+    "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+      "contentSource": "finding:SCAN-SECRET-020",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-16T15:43:25.374Z",
+      "redactedLocation": "PaymentsAPI/appsettings.json",
+      "matchCount": 0
+    },
+    {
+      "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+      "contentSource": "source:src/PaymentsAPI/appsettings.json",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-16T15:43:25.380Z",
+      "redactedLocation": "PaymentsAPI/appsettings.json",
+      "matchCount": 0
+    },
+    {
+      "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+      "contentSource": "sandbox:DOTNET_TEST",
+      "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-16T15:43:31.978Z",
+      "redactedLocation": "SCAN-SECRET-020_b5c858ca-0c5d-412d-9569-d1aa54e7b89c/worktree",
+      "matchCount": 0
+    },
+    {
+      "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+      "contentSource": "llm:securityReview",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-16T15:43:33.711Z",
+      "redactedLocation": "PaymentsAPI/appsettings.json",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [
+    {
+      "stage": "POST_FIX_TEST",
+      "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+      "executable": "dotnet",
+      "allowlisted": true,
+      "exitCode": 0,
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-020_b5c858ca-0c5d-412d-9569-d1aa54e7b89c/worktree"
+    }
+  ],
+  "testCommand": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+  "actualExitCode": 0,
+  "testResultCounts": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": {
+    "scannerId": "secrets-config",
+    "scannerOutcome": "RESOLVED",
+    "stillPresent": false,
+    "newFindingsCount": 0
+  },
+  "approvalReference": {
+    "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+    "decision": "APPROVED",
+    "approvalMode": "LOCAL_POC_APPROVAL",
+    "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
+    "proposedDiffSha256": "7cbaefe669963e0db0c9d5ed58f99c5fbf32a6695abbf7d692367d94c9fcef14",
+    "approvedFilePaths": [
+      "src/PaymentsAPI/appsettings.json"
+    ],
+    "expiresAt": "2026-11-17T15:25:15.675Z",
+    "timestamp": "2026-11-16T15:25:18.972Z"
+  },
+  "proposedDiffSha256": "7cbaefe669963e0db0c9d5ed58f99c5fbf32a6695abbf7d692367d94c9fcef14",
+  "appliedDiffSha256": "7cbaefe669963e0db0c9d5ed58f99c5fbf32a6695abbf7d692367d94c9fcef14",
+  "filesChanged": [],
+  "scopeVerificationOutcome": "SCOPE_VERIFIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-SECRET-020",
+    "vulnerabilityType": "XSS",
+    "affectedComponent": "src/PaymentsAPI/appsettings.json",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "LOW",
+    "selectedTier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+    "recommendedStrategy": "Apply minimal targeted secure coding fix in application-authored 'src/PaymentsAPI/appsettings.json'.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Root cause lies in application source code logic or architectural/vendor layer rather than declarative config."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Finding originates in custom/application code or infrastructure, not an outdated dependency manifest."
+      },
+      {
+        "tier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+        "feasible": true,
+        "suitable": true,
+        "reason": "Config/runtime/dependency options cannot fix custom application dataflow; minimal targeted code change in application-authored file is smallest safe fix."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": false,
+        "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+      }
+    ],
+    "requiresManualReview": false,
+    "automatedExecutionAllowed": true,
+    "disposition": "AUTOMATED_CANDIDATE",
+    "blockingReason": null
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "XSS",
+    "executionEvidence": null,
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "Unresolved (inspect method parameters)",
+      "file": "src/PaymentsAPI/appsettings.json",
+      "line": 8,
+      "snippet": "\"ApiKey\": \"sk_live_99887766554433221100aabbccddeeff\","
+    },
+    "dataPropagationEvidence": [],
+    "dangerousSink": {
+      "file": "src/PaymentsAPI/appsettings.json",
+      "line": 8,
+      "snippet": "\"ApiKey\": \"sk_live_99887766554433221100aabbccddeeff\","
+    },
+    "missingValidationOrEncoding": "Untrusted output is emitted into HTML response without HTML encoding.",
+    "affectedFile": "src/PaymentsAPI/appsettings.json",
+    "affectedFunction": "UnknownMethod",
+    "affectedLines": "Lines 8",
+    "proposedRemediation": "Replace the hardcoded API key with a secure method of storing secrets, such as using environment variables or a secure secrets management service.",
+    "baselineTestEvidence": {
+      "status": "PASS",
+      "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+      "exitCode": 0,
+      "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+    }
+  },
+  "sandboxExecution": {
+    "sandboxStatus": "SANDBOX_READY",
+    "backendType": "local-container",
+    "toolchainProfileId": "dotnet-10.0-lts",
+    "toolchainProfileHash": "ae3bb9ba317890519a59736e5ea19f8d244166cb5258227c9722d7011f8b822b",
+    "imageDigest": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
+    "networkPolicy": "NO_NETWORK",
+    "dependencyStatus": "PREPROVISIONED_CACHE",
+    "dependencyWarnings": [
+      "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+    ],
+    "instanceId": "gcac-387be5d2fd5a",
+    "timedOut": false,
+    "cancelled": false,
+    "gatewayAuditDecisions": [
+      {
+        "timestamp": "2026-11-16T15:43:27.268Z",
+        "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+        "instanceId": "gcac-387be5d2fd5a",
+        "vulnerabilityId": "SCAN-SECRET-020",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      }
+    ],
+    "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
+  },
+  "sbomEvidence": {
+    "sbomStatus": "MANIFEST_INVENTORY_ONLY_EXTERNAL_CLI_NOT_AVAILABLE",
+    "externalSbomCliStatus": "NOT_AVAILABLE",
+    "format": "CycloneDX/1.5",
+    "componentCount": 4,
+    "artifactHash": "6034de8b13dbd603bf3e07e6668d4cab797213c5bd5e7af106d768d289713c4d"
+  },
+  "finalOutcome": {
+    "scannerOutcome": "RESOLVED",
+    "testOutcome": "PASSED",
+    "workflowOutcome": "VerifiedLocally_PendingPR",
+    "finalValidationOutcome": "PASSED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE",
+    "legacyRemediationStatus": "Remediated",
+    "legacyFinalValidationStatus": "PASS",
+    "isResolved": true,
+    "blockingReasons": []
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

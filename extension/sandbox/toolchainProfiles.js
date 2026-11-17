@@ -100,92 +100,216 @@ function getApprovedProfile(profileId, profilesPath = DEFAULT_PROFILES_PATH) {
 }
 
 /**
- * Inspects repository metadata (global.json, *.csproj, pom.xml, package.json)
+ * Asserts that a resolved toolchain profile is enterprise-provisioned with a verified
+ * local image digest, failing closed immediately when unprovisioned template placeholders
+ * are encountered instead of attempting container execution.
+ */
+function assertProfileProvisioned(profile, context = {}) {
+    if (!profile) return;
+    if (isTemplateDigestProfile(profile) || profile.digestStatus === 'TEMPLATE_PLACEHOLDER') {
+        const repoLabel = context.repositoryLabel || profile.resolvedFrom || 'Target repository';
+        const tf = profile.targetFramework || context.targetFramework || 'detected framework';
+        const err = new ToolchainProfileError(
+            `UNPROVISIONED_TOOLCHAIN_PROFILE: ${repoLabel} targets '${tf}' which resolves to profile '${profile.profileId}'. However, profile '${profile.profileId}' uses template placeholder digest '${profile.imageDigest}' (status: TEMPLATE_PLACEHOLDER). Only verified, provisioned toolchains (such as 'dotnet-10.0-lts' @ sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb) are available in the local sandbox cache. Auto-pull is disabled by container security policy. Provision the required container image or migrate the repository to supported .NET 10 LTS.`,
+            'UNPROVISIONED_TOOLCHAIN_PROFILE'
+        );
+        err.profileId = profile.profileId;
+        err.targetFramework = tf;
+        err.imageDigest = profile.imageDigest;
+        err.digestStatus = profile.digestStatus;
+        err.failureCategory = 'TOOLCHAIN_IMAGE_UNAVAILABLE';
+        err.machineStatus = 'COULD_NOT_RUN';
+        throw err;
+    }
+}
+
+/**
+ * Inspects repository metadata (global.json, *.csproj, Directory.Build.props, pom.xml, package.json)
  * to select an approved compatible toolchain profile without trusting repo-injected
  * policy overrides.
  */
-function resolveProfileForRepository(repoRoot, finding = {}, profilesPath = DEFAULT_PROFILES_PATH) {
+function resolveProfileForRepository(repoRoot, finding = {}, profilesPath = DEFAULT_PROFILES_PATH, resolutionOptions = {}) {
     const registry = loadAndVerifyToolchainRegistry(profilesPath);
-    const tech = String(finding.Technology || '').toLowerCase();
+    const tech = String(finding.Technology || finding.technology || '').toLowerCase();
+
+    let targetDir = repoRoot;
+    let targetFile = null;
+    if (repoRoot && fs.existsSync(repoRoot)) {
+        try {
+            const stat = fs.statSync(repoRoot);
+            if (stat.isFile()) {
+                targetFile = repoRoot;
+                targetDir = path.dirname(repoRoot);
+            }
+        } catch {}
+    }
 
     // Check unsupported explicit build systems first (Gradle, Ant, Python)
-    if (repoRoot && fs.existsSync(repoRoot)) {
-        if (fs.existsSync(path.join(repoRoot, 'build.gradle')) || fs.existsSync(path.join(repoRoot, 'build.gradle.kts'))) {
+    if (targetDir && fs.existsSync(targetDir)) {
+        if (fs.existsSync(path.join(targetDir, 'build.gradle')) || fs.existsSync(path.join(targetDir, 'build.gradle.kts'))) {
             throw new ToolchainProfileError('Gradle toolchain is not approved in Phase 3; documented as future adapter.', 'UNAPPROVED_TOOLCHAIN_STACK');
         }
-        if (fs.existsSync(path.join(repoRoot, 'build.xml'))) {
+        if (fs.existsSync(path.join(targetDir, 'build.xml'))) {
             throw new ToolchainProfileError('Apache Ant toolchain is not approved in Phase 3; documented as future adapter.', 'UNAPPROVED_TOOLCHAIN_STACK');
         }
-        if (fs.existsSync(path.join(repoRoot, 'requirements.txt')) || fs.existsSync(path.join(repoRoot, 'pyproject.toml'))) {
-            if (!fs.existsSync(path.join(repoRoot, 'package.json')) && !fs.existsSync(path.join(repoRoot, 'pom.xml'))) {
+        if (fs.existsSync(path.join(targetDir, 'requirements.txt')) || fs.existsSync(path.join(targetDir, 'pyproject.toml'))) {
+            if (!fs.existsSync(path.join(targetDir, 'package.json')) && !fs.existsSync(path.join(targetDir, 'pom.xml'))) {
                 throw new ToolchainProfileError('Python toolchain is not approved in Phase 3; documented as future adapter.', 'UNAPPROVED_TOOLCHAIN_STACK');
             }
         }
     }
 
-    // 1. Inspect .NET global.json and .csproj
+    // 1. Inspect .NET global.json, .csproj, and Directory.Build.props
     let requestedDotnetSdk = null;
     const csprojFrameworks = [];
-    if (repoRoot && fs.existsSync(repoRoot)) {
-        const gjPath = path.join(repoRoot, 'global.json');
-        if (fs.existsSync(gjPath)) {
-            try {
-                const gj = JSON.parse(fs.readFileSync(gjPath, 'utf8'));
-                requestedDotnetSdk = gj.sdk?.version ? String(gj.sdk.version).trim() : null;
-            } catch {
-                throw new ToolchainProfileError('Malformed global.json in repository.', 'INVALID_GLOBAL_JSON');
+
+    const extractFrameworksFromXml = (xmlContent) => {
+        if (!xmlContent || typeof xmlContent !== 'string') return;
+        const matches = xmlContent.matchAll(/<TargetFramework[s]?>([^<]+)<\/TargetFramework[s]?>/gi);
+        for (const m of matches) {
+            if (m[1]) {
+                const parts = m[1].split(';').map(p => p.trim().toLowerCase()).filter(Boolean);
+                csprojFrameworks.push(...parts);
             }
         }
+    };
 
+    if (targetFile && targetFile.toLowerCase().endsWith('.csproj')) {
+        try {
+            extractFrameworksFromXml(fs.readFileSync(targetFile, 'utf8'));
+        } catch {}
+    }
+
+    if (targetDir && fs.existsSync(targetDir)) {
+        // Check global.json in targetDir and up to 2 parent directories
+        let curr = targetDir;
+        for (let d = 0; d < 3 && curr; d++) {
+            const gjPath = path.join(curr, 'global.json');
+            if (fs.existsSync(gjPath)) {
+                try {
+                    const gj = JSON.parse(fs.readFileSync(gjPath, 'utf8'));
+                    if (gj.sdk?.version) {
+                        requestedDotnetSdk = String(gj.sdk.version).trim();
+                        break;
+                    }
+                } catch {
+                    throw new ToolchainProfileError('Malformed global.json in repository.', 'INVALID_GLOBAL_JSON');
+                }
+            }
+            const parent = path.dirname(curr);
+            if (parent === curr) break;
+            curr = parent;
+        }
+
+        // Check Directory.Build.props
+        curr = targetDir;
+        for (let d = 0; d < 3 && curr; d++) {
+            const propsPath = path.join(curr, 'Directory.Build.props');
+            if (fs.existsSync(propsPath)) {
+                try {
+                    extractFrameworksFromXml(fs.readFileSync(propsPath, 'utf8'));
+                } catch {}
+            }
+            const parent = path.dirname(curr);
+            if (parent === curr) break;
+            curr = parent;
+        }
+
+        // Traverse directory for .csproj files (up to depth 5)
         const collectCsproj = (dir, depth = 0) => {
-            if (depth > 3) return;
+            if (depth > 5) return;
             let entries = [];
             try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
             for (const e of entries) {
                 if (['.git', 'node_modules', 'bin', 'obj'].includes(e.name)) continue;
                 const full = path.join(dir, e.name);
                 if (e.isDirectory()) collectCsproj(full, depth + 1);
-                else if (e.isFile() && e.name.endsWith('.csproj')) {
-                    const xml = fs.readFileSync(full, 'utf8');
-                    const m = xml.match(/<TargetFramework[s]?>([^<]+)<\/TargetFramework[s]?>/i);
-                    if (m) csprojFrameworks.push(m[1].trim().toLowerCase());
+                else if (e.isFile() && e.name.toLowerCase().endsWith('.csproj')) {
+                    try {
+                        extractFrameworksFromXml(fs.readFileSync(full, 'utf8'));
+                    } catch {}
                 }
             }
         };
-        collectCsproj(repoRoot, 0);
+        collectCsproj(targetDir, 0);
     }
+
+    let primaryFramework = null;
+    let selectedProfileId = null;
 
     if (requestedDotnetSdk) {
-        if (/^8\./.test(requestedDotnetSdk)) return getApprovedProfile('dotnet-8.0-lts', profilesPath);
-        if (/^9\./.test(requestedDotnetSdk)) return getApprovedProfile('dotnet-9.0-sts', profilesPath);
-        throw new ToolchainProfileError(
-            `global.json requests unapproved or EOL .NET SDK version '${requestedDotnetSdk}'. Only approved 8.0 LTS and 9.0 STS profiles exist.`,
-            'UNAPPROVED_DOTNET_SDK'
-        );
-    }
-
-    if (csprojFrameworks.length > 0 || tech === 'dotnet' || tech === 'csharp' || tech === '.net') {
-        const hasNet9 = csprojFrameworks.some(tf => tf.includes('net9.0'));
-        const hasUnsupported = csprojFrameworks.some(tf => /net(?:coreapp)?[1-7]\.0|netcoreapp/.test(tf));
-        if (hasUnsupported && !hasNet9 && !csprojFrameworks.some(tf => tf.includes('net8.0'))) {
+        if (/^10\./.test(requestedDotnetSdk)) {
+            primaryFramework = 'net10.0';
+            selectedProfileId = 'dotnet-10.0-lts';
+        } else if (/^9\./.test(requestedDotnetSdk)) {
+            primaryFramework = 'net9.0';
+            selectedProfileId = 'dotnet-9.0-sts';
+        } else if (/^8\./.test(requestedDotnetSdk)) {
+            primaryFramework = 'net8.0';
+            selectedProfileId = 'dotnet-8.0-lts';
+        } else {
             throw new ToolchainProfileError(
-                `TargetFramework '${csprojFrameworks.join(', ')}' is EOL/unapproved. Only net8.0 (LTS) and net9.0 (STS) are supported.`,
+                `global.json requests unapproved or EOL .NET SDK version '${requestedDotnetSdk}'. Only approved 8.0 LTS, 9.0 STS, and 10.0 LTS profiles exist.`,
+                'UNAPPROVED_DOTNET_SDK'
+            );
+        }
+    } else if (csprojFrameworks.length > 0 || tech === 'dotnet' || tech === 'csharp' || tech === '.net') {
+        const hasNet10 = csprojFrameworks.some(tf => tf.includes('net10.0'));
+        const hasNet9 = csprojFrameworks.some(tf => tf.includes('net9.0'));
+        const hasNet8 = csprojFrameworks.some(tf => tf.includes('net8.0'));
+        const hasUnsupported = csprojFrameworks.some(tf => /net(?:coreapp)?[1-7]\.0|netcoreapp/.test(tf));
+        if (hasUnsupported && !hasNet10 && !hasNet9 && !hasNet8) {
+            throw new ToolchainProfileError(
+                `TargetFramework '${csprojFrameworks.join(', ')}' is EOL/unapproved. Only net8.0 (LTS), net9.0 (STS), and net10.0 (LTS) are supported.`,
                 'UNAPPROVED_TARGET_FRAMEWORK'
             );
         }
-        return hasNet9
-            ? getApprovedProfile('dotnet-9.0-sts', profilesPath)
-            : getApprovedProfile('dotnet-8.0-lts', profilesPath);
+        if (hasNet10) {
+            primaryFramework = 'net10.0';
+            selectedProfileId = 'dotnet-10.0-lts';
+        } else if (hasNet9) {
+            primaryFramework = 'net9.0';
+            selectedProfileId = 'dotnet-9.0-sts';
+        } else {
+            primaryFramework = 'net8.0';
+            selectedProfileId = 'dotnet-8.0-lts';
+        }
+    }
+
+    if (selectedProfileId) {
+        const baseProfile = getApprovedProfile(selectedProfileId, profilesPath);
+        const resolved = {
+            ...baseProfile,
+            targetFramework: primaryFramework || 'net10.0',
+            detectedFrameworks: Array.from(new Set(csprojFrameworks)),
+            resolvedFrom: targetFile ? path.basename(targetFile) : (targetDir ? path.basename(targetDir) : 'context')
+        };
+        if (resolutionOptions.requireProvisioned === true) {
+            assertProfileProvisioned(resolved, resolutionOptions);
+        }
+        return resolved;
     }
 
     // 2. Inspect Java / Maven
-    if ((repoRoot && fs.existsSync(path.join(repoRoot, 'pom.xml'))) || tech === 'java' || tech === 'java-spring') {
-        return getApprovedProfile('java-17-maven', profilesPath);
+    if ((targetDir && fs.existsSync(path.join(targetDir, 'pom.xml'))) || tech === 'java' || tech === 'java-spring') {
+        const baseProfile = getApprovedProfile('java-17-maven', profilesPath);
+        return {
+            ...baseProfile,
+            targetFramework: 'java-17',
+            detectedFrameworks: ['java-17'],
+            resolvedFrom: 'pom.xml'
+        };
     }
 
     // 3. Inspect Node.js
-    if ((repoRoot && fs.existsSync(path.join(repoRoot, 'package.json'))) || tech === 'javascript' || tech === 'typescript' || tech === 'node') {
-        return getApprovedProfile('node-22-lts', profilesPath);
+    if ((targetDir && fs.existsSync(path.join(targetDir, 'package.json'))) || tech === 'javascript' || tech === 'typescript' || tech === 'node') {
+        const baseProfile = getApprovedProfile('node-22-lts', profilesPath);
+        return {
+            ...baseProfile,
+            targetFramework: 'node-22',
+            detectedFrameworks: ['node-22'],
+            resolvedFrom: 'package.json'
+        };
     }
 
     throw new ToolchainProfileError(
@@ -200,6 +324,7 @@ module.exports = {
     canonicalJson,
     computeProfileHash,
     isTemplateDigestProfile,
+    assertProfileProvisioned,
     loadAndVerifyToolchainRegistry,
     getApprovedProfile,
     resolveProfileForRepository

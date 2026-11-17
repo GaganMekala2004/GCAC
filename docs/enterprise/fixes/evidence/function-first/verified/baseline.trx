@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="f53dd00f-32a6-43b9-81c3-94da04657ddf" name="@b58bc251f243 2026-11-15 16:43:29" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-11-15T16:43:29.5761200+00:00" queuing="2026-11-15T16:43:29.5761201+00:00" start="2026-11-15T16:43:28.2037640+00:00" finish="2026-11-15T16:43:29.5816645+00:00" />
+  <TestSettings name="default" id="5fe6300f-848b-464a-ab49-f37645f81b80">
+    <Deployment runDeploymentRoot="_b58bc251f243_2026-11-15_16_43_29" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="7774b760-52f9-4937-9369-26bf7af9b414" testId="9d0f546d-6b20-05b4-2a89-e01510ae7d78" testName="PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication" computerName="b58bc251f243" duration="00:00:00.0004747" startTime="2026-11-15T16:43:29.3856739+00:00" endTime="2026-11-15T16:43:29.3856740+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7774b760-52f9-4937-9369-26bf7af9b414">
+      <Output>
+        <ErrorInfo>
+          <Message>System.ArgumentException : Specified key is not a valid size for this algorithm. (Parameter 'rgbKey')</Message>
+          <StackTrace>   at System.Security.Cryptography.DesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)
+   at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv) in /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs:line 10
+   at PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication() in /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs:line 29
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="c1d2fff0-5edc-43a3-bf5f-37722262b338" testId="9a06e3dd-2368-3abb-becd-d3922cc9fb88" testName="PaymentsAPI.Tests.PaymentControllerTests.Process_DoesNotThrowOnValidRequest" computerName="b58bc251f243" duration="00:00:00.0142747" startTime="2026-11-15T16:43:29.3776651+00:00" endTime="2026-11-15T16:43:29.3777136+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c1d2fff0-5edc-43a3-bf5f-37722262b338" />
+    <UnitTestResult executionId="81ad333d-ebf4-461d-8787-64ffe9421a83" testId="7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3" testName="PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip" computerName="b58bc251f243" duration="00:00:00.0073424" startTime="2026-11-15T16:43:29.3850907+00:00" endTime="2026-11-15T16:43:29.3850909+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="81ad333d-ebf4-461d-8787-64ffe9421a83">
+      <Output>
+        <ErrorInfo>
+          <Message>System.ArgumentException : Specified key is not a valid size for this algorithm. (Parameter 'rgbKey')</Message>
+          <StackTrace>   at System.Security.Cryptography.DesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)
+   at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv) in /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs:line 10
+   at PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip() in /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs:line 15
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="PaymentsAPI.Tests.PaymentControllerTests.Process_DoesNotThrowOnValidRequest" storage="/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll" id="9a06e3dd-2368-3abb-becd-d3922cc9fb88">
+      <Execution id="c1d2fff0-5edc-43a3-bf5f-37722262b338" />
+      <TestMethod codeBase="/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PaymentsAPI.Tests.PaymentControllerTests" name="Process_DoesNotThrowOnValidRequest" />
+    </UnitTest>
+    <UnitTest name="PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication" storage="/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll" id="9d0f546d-6b20-05b4-2a89-e01510ae7d78">
+      <Execution id="7774b760-52f9-4937-9369-26bf7af9b414" />
+      <TestMethod codeBase="/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PaymentsAPI.Tests.LegacyCryptoSecurityTests" name="ModifiedCiphertextFailsAuthentication" />
+    </UnitTest>
+    <UnitTest name="PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip" storage="/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll" id="7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3">
+      <Execution id="81ad333d-ebf4-461d-8787-64ffe9421a83" />
+      <TestMethod codeBase="/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PaymentsAPI.Tests.LegacyCryptoSecurityTests" name="EncryptionSupportsAes256AndAuthenticatedRoundTrip" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="9d0f546d-6b20-05b4-2a89-e01510ae7d78" executionId="7774b760-52f9-4937-9369-26bf7af9b414" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9a06e3dd-2368-3abb-becd-d3922cc9fb88" executionId="c1d2fff0-5edc-43a3-bf5f-37722262b338" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3" executionId="81ad333d-ebf4-461d-8787-64ffe9421a83" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="3" executed="3" passed="1" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.15)
+[xUnit.net 00:00:00.13]   Discovering: PaymentsAPI.Tests
+[xUnit.net 00:00:00.21]   Discovered:  PaymentsAPI.Tests
+[xUnit.net 00:00:00.21]   Starting:    PaymentsAPI.Tests
+[xUnit.net 00:00:00.32]       System.ArgumentException : Specified key is not a valid size for this algorithm. (Parameter 'rgbKey')
+[xUnit.net 00:00:00.32]       Stack Trace:
+[xUnit.net 00:00:00.32]            at System.Security.Cryptography.DesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)
+[xUnit.net 00:00:00.32]         /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs(10,0): at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv)
+[xUnit.net 00:00:00.32]         /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs(15,0): at PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip()
+[xUnit.net 00:00:00.32]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.32]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.32]       System.ArgumentException : Specified key is not a valid size for this algorithm. (Parameter 'rgbKey')
+[xUnit.net 00:00:00.32]       Stack Trace:
+[xUnit.net 00:00:00.32]            at System.Security.Cryptography.DesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)
+[xUnit.net 00:00:00.32]         /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs(10,0): at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv)
+[xUnit.net 00:00:00.32]         /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs(29,0): at PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication()
+[xUnit.net 00:00:00.32]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.32]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.38]   Finished:    PaymentsAPI.Tests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="b58bc251f243" outcome="Error" timestamp="2026-11-15T16:43:29.3862647+00:00">
+        <Text>[xUnit.net 00:00:00.32]     PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="b58bc251f243" outcome="Error" timestamp="2026-11-15T16:43:29.4431780+00:00">
+        <Text>[xUnit.net 00:00:00.32]     PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

@@ -16,17 +16,24 @@ const REVIEW_RECOMMENDATION = Object.freeze({
 const SECRET_DETECTION_REGEX = /(secret|credential|api[_\s-]?key|password|passwd|private[_\s-]?key|bearer|token|connection[_\s-]?string|cwe-798|cwe-321|cwe-259|cwe-522|sec-001|sec-002|sec-006)/i;
 
 function isSecretOrCredentialFinding(finding = {}, classification = {}) {
+    const cweText = String(classification?.cwe || finding.CVE_ID || finding.cveId || '').toUpperCase();
+    const ruleText = String(finding.Rule_ID || finding.ruleId || '').toUpperCase();
+    const titleText = String(finding.Title || finding.title || finding.Detailed_Name || finding.detailedName || '');
+
+    // Pure SQL injection, OS command injection, risky crypto, XSS, or path traversal findings
+    // must never produce credential rotation or secret revocation requirements.
+    const nonSecretCwes = /CWE-89|CWE-78|CWE-327|CWE-328|CWE-22|CWE-79\b/;
+    if (nonSecretCwes.test(cweText) || /^SEC-00[345]$/.test(ruleText) || /SQL Injection|Command Injection|Cryptographic/i.test(titleText)) {
+        return false;
+    }
+
     const tokens = [
-        finding.Vulnerability_ID,
-        finding.vulnerabilityId,
-        finding.Rule_ID,
-        finding.ruleId,
+        ruleText,
+        titleText,
         finding.Detailed_Name,
         finding.detailedName,
-        finding.Title,
-        finding.title,
         finding.Source_Classification,
-        classification?.cwe,
+        cweText,
         classification?.summary
     ].filter(Boolean).join(' ');
     return SECRET_DETECTION_REGEX.test(tokens);
@@ -129,15 +136,32 @@ function buildEvidenceChecklist(params = {}) {
     });
 
     // 3. Baseline reproduction / documented constraint
-    const hasBaseline = Boolean(baselineValidation && (baselineValidation.executed === true || baselineValidation.reason || baselineValidation.summary));
+    let baselineCheckStatus = CHECK_STATUS.MISSING;
+    let baselineDetail = 'No baseline execution record present.';
+    if (baselineValidation) {
+        if (baselineValidation.executed === true && (baselineValidation.passed === true || baselineValidation.testsTotal > 0)) {
+            baselineCheckStatus = CHECK_STATUS.PASS;
+            baselineDetail = baselineValidation.summary || `Baseline test executed (${baselineValidation.testsTotal} tests).`;
+        } else if (baselineValidation.baselineExceptionAuthorized === true) {
+            baselineCheckStatus = CHECK_STATUS.PASS;
+            baselineDetail = `Baseline exception authorized: ${baselineValidation.baselineExceptionRationale || 'Documented engineering constraint'}`;
+        } else if (baselineValidation.status === 'UNTESTED' || baselineValidation.machineStatus === 'UNTESTED') {
+            baselineCheckStatus = CHECK_STATUS.FAIL;
+            baselineDetail = `UNTESTED: ${baselineValidation.rootError || baselineValidation.reason || 'Zero tests executed without authorized exception'}`;
+        } else if (baselineValidation.executed === false) {
+            baselineCheckStatus = CHECK_STATUS.FAIL;
+            baselineDetail = `Execution blocked: ${baselineValidation.rootError || baselineValidation.reason || 'Baseline execution did not run'}`;
+        } else {
+            baselineCheckStatus = CHECK_STATUS.PASS;
+            baselineDetail = baselineValidation.summary || 'Baseline test executed.';
+        }
+    }
     checks.push({
         id: 'BASELINE_EVIDENCE',
         label: 'Baseline test reproduction or documented constraint',
-        status: hasBaseline ? CHECK_STATUS.PASS : CHECK_STATUS.MISSING,
+        status: baselineCheckStatus,
         required: true,
-        detail: baselineValidation
-            ? (baselineValidation.executed ? (baselineValidation.summary || 'Baseline tests executed.') : `Not executed (${baselineValidation.reason || baselineValidation.status || 'Constraint documented'})`)
-            : 'No baseline execution record present.'
+        detail: baselineDetail
     });
 
     // 4. Approved code diff & SHA-256 scope integrity

@@ -51,7 +51,7 @@ const SCANNER_RULES = [
         detectionMethod: 'DETERMINISTIC_REGEX',
         confidence: 'High',
         filePatterns: [/\.cs$/i],
-        regex: /(?:DES\.Create|MD5\.Create|RC2\.Create|TripleDES\.Create|new\s+DESCryptoServiceProvider)/i,
+        regex: /\b(?:(?:DES|MD5|RC2|TripleDES)\s*\.\s*Create\s*\(|new\s+DESCryptoServiceProvider\s*\()/i,
         description: 'Deprecated cryptographic algorithm detected. DES and MD5 are vulnerable to collision and brute-force attacks and must not be used for encryption or hashing.',
         remediationGuidance: 'Migrate cryptography to AES-256 (AES-GCM) for symmetric encryption and SHA-256/SHA-512 for cryptographic hashing.'
     },
@@ -108,7 +108,7 @@ class SecretsConfigScanner extends ScannerAdapter {
         super({
             id: 'secrets-config',
             name: 'Local Secrets & Configuration Analyzer',
-            version: '1.3.0',
+            version: '1.3.1',
             supportedLanguages: ['csharp', 'dotnet', 'java', 'json', 'xml', 'javascript', 'config'],
             supportedCategories: [
                 'CWE-798 (Hardcoded Credentials)',

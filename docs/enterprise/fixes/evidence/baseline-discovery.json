@@ -1,0 +1,42 @@
+[
+  {
+    "scenario": "passing",
+    "runId": "run-mwi0h8og",
+    "backendType": "local-container",
+    "networkPolicy": "NO_NETWORK",
+    "imageDigest": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
+    "machineStatus": "PASSED",
+    "failureCategory": "TESTS_PASSED",
+    "testsTotal": 1,
+    "testsPassed": 1,
+    "testsFailed": 0,
+    "artifacts": [
+      {
+        "name": "_f72dcac4c509_2026-11-15_15_50_46_net10.0.trx",
+        "file": "baseline-passing-1.trx",
+        "sha256": "fcb2d4a340c73a5deb64fbe1c0657f2291d8995094202f0dcbe5a53e3e46d778"
+      }
+    ],
+    "timestamp": "2026-11-15T15:50:46.532Z"
+  },
+  {
+    "scenario": "failing",
+    "runId": "run-mwi0hde0",
+    "backendType": "local-container",
+    "networkPolicy": "NO_NETWORK",
+    "imageDigest": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
+    "machineStatus": "FAILED",
+    "failureCategory": "TESTS_FAILED",
+    "testsTotal": 2,
+    "testsPassed": 1,
+    "testsFailed": 1,
+    "artifacts": [
+      {
+        "name": "_a1b1ae1c9546_2026-11-15_15_50_51_net10.0.trx",
+        "file": "baseline-failing-1.trx",
+        "sha256": "530f9341ebfb5bc0060b654c8514ba8f3f068879ab7d28025fcb651ff0b48e00"
+      }
+    ],
+    "timestamp": "2026-11-15T15:50:51.510Z"
+  }
+]

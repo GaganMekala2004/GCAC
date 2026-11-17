@@ -33,7 +33,8 @@ async function run() {
     // 3. detectRunner project type mapping
     const dotnetRunner = detectRunner({ Technology: 'dotnet' }, path.join(workspaceRoot, 'sample-repos/payments-api'));
     assert.strictEqual(dotnetRunner.tool, 'dotnet');
-    assert.deepStrictEqual(dotnetRunner.args, ['test', '--nologo', '-v', 'normal']);
+    assert(dotnetRunner.args.includes('test') && dotnetRunner.args.includes('--nologo'));
+    assert(dotnetRunner.args.includes('--logger') && dotnetRunner.args.includes('trx'));
 
     const javaRunner = detectRunner({ Technology: 'java-spring' }, path.join(workspaceRoot, 'sample-repos/customer-service'));
     assert.strictEqual(javaRunner.tool, 'mvn');

@@ -200,6 +200,30 @@ class IsolatedWorkspaceManager {
             throw new IsolatedWorkspaceBlockedError('Target repository subpath missing inside isolated worktree.');
         }
 
+        // Carry only offline restore manifests into the disposable worktree.
+        // Never copy compiled output, arbitrary obj content, or host credentials.
+        const copyRestoreMetadata = (src, dest, depth = 0) => {
+            if (depth > 6) return;
+            for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+                if (entry.isSymbolicLink()) continue;
+                if (entry.isDirectory()) {
+                    if (['.git', '.gcac', 'node_modules', 'bin', 'remediation-output', 'output'].includes(entry.name)) continue;
+                    if (entry.name === 'obj') {
+                        const sourceObj = path.join(src, entry.name);
+                        for (const file of fs.readdirSync(sourceObj, { withFileTypes: true })) {
+                            if (!file.isFile() || !/^(?:project\.assets\.json|project\.nuget\.cache|[^/]+\.nuget\.(?:g\.props|g\.targets|dgspec\.json))$/i.test(file.name)) continue;
+                            const target = path.join(dest, 'obj', file.name);
+                            fs.mkdirSync(path.dirname(target), { recursive: true });
+                            fs.copyFileSync(path.join(sourceObj, file.name), target);
+                        }
+                    } else if (fs.existsSync(path.join(dest, entry.name))) {
+                        copyRestoreMetadata(path.join(src, entry.name), path.join(dest, entry.name), depth + 1);
+                    }
+                }
+            }
+        };
+        copyRestoreMetadata(safeRepoAbs, safeIsolatedRepo);
+
         // 5. Verify expected target file is available inside isolated worktree (if provided)
         let isolatedTargetFile = null;
         if (expectedFileRelPath && typeof expectedFileRelPath === 'string') {

@@ -1,0 +1,240 @@
+[
+  {
+    "scenario": "verified",
+    "findingId": "DEV-CRYPTO-VERIFIED",
+    "runId": "e8dde813-7a46-4906-8dc0-d6495b23cae0",
+    "executionMode": "LOCAL_DEVELOPMENT",
+    "localOutcome": "COMPLETED_VERIFIED",
+    "verifiedRemediation": true,
+    "baseline": {
+      "total": 3,
+      "failed": 2
+    },
+    "postFix": {
+      "total": 3,
+      "failed": 0
+    },
+    "reScan": "RESOLVED",
+    "stages": [
+      {
+        "number": 1,
+        "status": "completed"
+      },
+      {
+        "number": 2,
+        "status": "completed"
+      },
+      {
+        "number": 3,
+        "status": "completed"
+      },
+      {
+        "number": 4,
+        "status": "completed"
+      },
+      {
+        "number": 5,
+        "status": "completed"
+      },
+      {
+        "number": 6,
+        "status": "completed"
+      },
+      {
+        "number": 7,
+        "status": "completed"
+      },
+      {
+        "number": 8,
+        "status": "deferred_in_dev_mode"
+      },
+      {
+        "number": 9,
+        "status": "completed"
+      }
+    ],
+    "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+    "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+    "originalUnchanged": true
+  },
+  {
+    "scenario": "defective",
+    "findingId": "DEV-CRYPTO-DEFECTIVE",
+    "runId": "c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b",
+    "executionMode": "LOCAL_DEVELOPMENT",
+    "localOutcome": "FAILED",
+    "verifiedRemediation": false,
+    "baseline": {
+      "total": 3,
+      "failed": 2
+    },
+    "postFix": {
+      "total": 3,
+      "failed": 2
+    },
+    "reScan": "REGRESSION_DETECTED",
+    "stages": [
+      {
+        "number": 1,
+        "status": "completed"
+      },
+      {
+        "number": 2,
+        "status": "completed"
+      },
+      {
+        "number": 3,
+        "status": "completed"
+      },
+      {
+        "number": 4,
+        "status": "completed"
+      },
+      {
+        "number": 5,
+        "status": "completed"
+      },
+      {
+        "number": 6,
+        "status": "failed"
+      },
+      {
+        "number": 7,
+        "status": "failed"
+      },
+      {
+        "number": 8,
+        "status": "deferred_in_dev_mode"
+      },
+      {
+        "number": 9,
+        "status": "failed"
+      }
+    ],
+    "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+    "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+    "originalUnchanged": true
+  },
+  {
+    "scenario": "missing-tests",
+    "findingId": "DEV-CRYPTO-MISSING-TESTS",
+    "runId": "d8b339dd-6f94-4111-9922-a008f42d5ba3",
+    "executionMode": "LOCAL_DEVELOPMENT",
+    "localOutcome": "COMPLETED_WITH_LIMITATIONS",
+    "verifiedRemediation": false,
+    "baseline": {
+      "total": 0,
+      "failed": 0
+    },
+    "postFix": {
+      "total": 0,
+      "failed": 0
+    },
+    "reScan": "NOT_VERIFIED",
+    "stages": [
+      {
+        "number": 1,
+        "status": "completed"
+      },
+      {
+        "number": 2,
+        "status": "completed"
+      },
+      {
+        "number": 3,
+        "status": "completed_with_limitations"
+      },
+      {
+        "number": 4,
+        "status": "completed"
+      },
+      {
+        "number": 5,
+        "status": "completed"
+      },
+      {
+        "number": 6,
+        "status": "blocked"
+      },
+      {
+        "number": 7,
+        "status": "blocked"
+      },
+      {
+        "number": 8,
+        "status": "deferred_in_dev_mode"
+      },
+      {
+        "number": 9,
+        "status": "completed"
+      }
+    ],
+    "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+    "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+    "originalUnchanged": true
+  },
+  {
+    "scenario": "cancel-retry",
+    "cancellationEvidence": {
+      "outcome": "CANCELLED",
+      "backend": "local-container",
+      "retryEligible": true,
+      "approvedDiffSha256": "b771a121975511c4ed6804747a0756fc7defc12ce155047bd99cdff926ba9186"
+    },
+    "findingId": "DEV-CRYPTO-CANCEL-RETRY",
+    "runId": "78ad3909-24a4-4c65-bd6a-4ddb5151065e",
+    "executionMode": "LOCAL_DEVELOPMENT",
+    "localOutcome": "COMPLETED_VERIFIED",
+    "verifiedRemediation": true,
+    "baseline": {
+      "total": 3,
+      "failed": 2
+    },
+    "postFix": {
+      "total": 3,
+      "failed": 0
+    },
+    "reScan": "RESOLVED",
+    "stages": [
+      {
+        "number": 1,
+        "status": "completed"
+      },
+      {
+        "number": 2,
+        "status": "completed"
+      },
+      {
+        "number": 3,
+        "status": "completed"
+      },
+      {
+        "number": 4,
+        "status": "completed"
+      },
+      {
+        "number": 5,
+        "status": "completed"
+      },
+      {
+        "number": 6,
+        "status": "completed"
+      },
+      {
+        "number": 7,
+        "status": "completed"
+      },
+      {
+        "number": 8,
+        "status": "deferred_in_dev_mode"
+      },
+      {
+        "number": 9,
+        "status": "completed"
+      }
+    ],
+    "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+    "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+    "originalUnchanged": true
+  }
+]

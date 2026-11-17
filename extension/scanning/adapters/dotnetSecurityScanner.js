@@ -5,7 +5,8 @@ const { NormalizedFinding, SCANNER_STATUS, SEVERITY_LEVELS } = require('../findi
 const { OUTCOME_STATUS } = require('../../outcomeContract');
 const { SANDBOX_READINESS, discoverEnvironment } = require('../../sandbox/environmentDiscovery');
 const { EXECUTION_POLICY_VERSION, OPERATION_TYPES, TrustedExecutionGateway } = require('../../sandbox/trustedExecutionGateway');
-const { resolveProfileForRepository } = require('../../sandbox/toolchainProfiles');
+const { ContainerSandboxBackend } = require('../../sandbox/containerSandboxBackend');
+const { resolveProfileForRepository, assertProfileProvisioned } = require('../../sandbox/toolchainProfiles');
 const { resolveDotnetProjectFile } = require('../dotnetProjectLocator');
 
 /**
@@ -284,6 +285,7 @@ class DotnetSecurityScanner extends ScannerAdapter {
         }
 
         const projectDirRoot = path.dirname(projectFile);
+        const repoLabel = repoContext.repository || (boundaryRoot && targetPath ? path.relative(boundaryRoot, targetPath).replace(/\\/g, '/') || path.basename(boundaryRoot) : path.basename(projectDirRoot));
         const envReport = options.envReport || (!options.executionGateway && !options.sandboxBackend
             ? discoverEnvironment({ workspaceRoot, useCache: true })
             : null);
@@ -296,18 +298,46 @@ class DotnetSecurityScanner extends ScannerAdapter {
 
         let profile;
         try {
-            profile = resolveProfileForRepository(projectDirRoot, { Technology: 'dotnet' }, options.profilesPath);
+            profile = resolveProfileForRepository(projectFile || projectDirRoot, { Technology: 'dotnet' }, options.profilesPath, {
+                repositoryLabel: repoLabel
+            });
+            const isRealContainer = !options.sandboxBackend ||
+                (options.sandboxBackend instanceof ContainerSandboxBackend) ||
+                (options.sandboxBackend && typeof options.sandboxBackend.execFileFn === 'function');
+            if (isRealContainer && options.allowTemplateDigests !== true) {
+                assertProfileProvisioned(profile, { repositoryLabel: repoLabel });
+            }
         } catch (err) {
+            const targetFramework = err.targetFramework || profile?.targetFramework || 'unknown';
+            const profileId = err.profileId || profile?.profileId || 'unresolved';
+            const imageDigest = err.imageDigest || profile?.imageDigest || 'none';
+            const digestStatus = err.digestStatus || profile?.digestStatus || 'UNRESOLVED';
+            const diagMsg = `[${this.name}] Target repository '${repoLabel}' (${targetFramework} -> ${profileId}): ${err.message}`;
             return {
                 scannerId: this.id,
                 status: SCANNER_STATUS.FAILED,
                 sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
                 executionPolicy: 'SANDBOX_GATEWAY',
+                toolchainProfileId: profileId,
                 findings: [],
                 durationMs: Date.now() - startTime,
-                errors: [err.message],
-                warnings: [],
-                coverage: '0% (Toolchain profile blocked)'
+                errors: [diagMsg],
+                warnings: [
+                    `Toolchain resolution failed for '${repoLabel}'.`,
+                    err.code === 'UNPROVISIONED_TOOLCHAIN_PROFILE'
+                        ? `Profile '${profileId}' uses template placeholder digest '${imageDigest}'. Only verified profiles (dotnet-10.0-lts) are available locally.`
+                        : err.message
+                ],
+                coverage: err.code === 'UNPROVISIONED_TOOLCHAIN_PROFILE'
+                    ? '0% (Unprovisioned toolchain profile)'
+                    : '0% (Toolchain profile blocked)',
+                diagnostics: {
+                    repository: repoLabel,
+                    targetFramework,
+                    toolchainProfileId: profileId,
+                    imageDigest,
+                    digestStatus
+                }
             };
         }
 
@@ -340,6 +370,7 @@ class DotnetSecurityScanner extends ScannerAdapter {
         if (!gwRes.executed || gwRes.timedOut || gwRes.cancelled ||
             gwRes.machineStatus === OUTCOME_STATUS.BLOCKED ||
             gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
+            const diagMsg = `[${this.name}] Target repository '${repoLabel}' (${profile.targetFramework || 'dotnet'} -> ${profile.profileId}): ${gwRes.reason || gwRes.summary || 'SANDBOX_UNAVAILABLE'}`;
             return {
                 scannerId: this.id,
                 status: gwRes.cancelled ? SCANNER_STATUS.CANCELLED : SCANNER_STATUS.FAILED,
@@ -349,9 +380,16 @@ class DotnetSecurityScanner extends ScannerAdapter {
                 networkPolicy: gwRes.networkPolicy || 'NO_NETWORK',
                 findings: [],
                 durationMs: Date.now() - startTime,
-                errors: [gwRes.reason || gwRes.summary || 'SANDBOX_UNAVAILABLE'],
+                errors: [diagMsg],
                 warnings: gwRes.prerequisites || [],
-                coverage: '0% (Build-backed security scan blocked or failed)'
+                coverage: '0% (Build-backed security scan blocked or failed)',
+                diagnostics: {
+                    repository: repoLabel,
+                    targetFramework: profile.targetFramework || 'unknown',
+                    toolchainProfileId: profile.profileId,
+                    imageDigest: profile.imageDigest,
+                    digestStatus: profile.digestStatus || 'VERIFIED_IMAGE_DIGEST'
+                }
             };
         }
 
@@ -379,7 +417,14 @@ class DotnetSecurityScanner extends ScannerAdapter {
             durationMs: Date.now() - startTime,
             errors: [],
             warnings: gwRes.exitCode !== 0 ? [`Build completed with compilation diagnostics (exit code ${gwRes.exitCode})`] : [],
-            coverage: gwRes.exitCode === 0 ? '100% (Sandboxed Roslyn analyzers active)' : 'Coverage active (Sandboxed diagnostics encountered)'
+            coverage: gwRes.exitCode === 0 ? '100% (Sandboxed Roslyn analyzers active)' : 'Coverage active (Sandboxed diagnostics encountered)',
+            diagnostics: {
+                repository: repoLabel,
+                targetFramework: profile.targetFramework || 'net10.0',
+                toolchainProfileId: profile.profileId,
+                imageDigest: profile.imageDigest,
+                digestStatus: profile.digestStatus || 'VERIFIED_IMAGE_DIGEST'
+            }
         };
     }
 }

@@ -1,0 +1,94 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="01dfb41d-fe53-449f-9a49-cdad85e5bb6b" name="@34f40a0b7106 2026-11-15 16:43:46" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-11-15T16:43:46.6597809+00:00" queuing="2026-11-15T16:43:46.6597810+00:00" start="2026-11-15T16:43:45.6875887+00:00" finish="2026-11-15T16:43:46.6643417+00:00" />
+  <TestSettings name="default" id="bb8e776a-a81c-48dd-8c01-41e771357efe">
+    <Deployment runDeploymentRoot="_34f40a0b7106_2026-11-15_16_43_46" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="9d496c27-962c-4dd4-a0fb-699cfa9476e8" testId="9d0f546d-6b20-05b4-2a89-e01510ae7d78" testName="PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication" computerName="34f40a0b7106" duration="00:00:00.0003810" startTime="2026-11-15T16:43:46.5002426+00:00" endTime="2026-11-15T16:43:46.5002427+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9d496c27-962c-4dd4-a0fb-699cfa9476e8">
+      <Output>
+        <ErrorInfo>
+          <Message>System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')</Message>
+          <StackTrace>   at System.Security.Cryptography.AesImplementation.CreateTransform(ReadOnlySpan`1 rgbKey, Byte[] rgbIV, Boolean encrypting)
+   at System.Security.Cryptography.AesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)
+   at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv) in /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs:line 10
+   at PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication() in /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs:line 29
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="4aaefa98-900c-46ef-a1b5-11c8777305fb" testId="7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3" testName="PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip" computerName="34f40a0b7106" duration="00:00:00.0050103" startTime="2026-11-15T16:43:46.4994851+00:00" endTime="2026-11-15T16:43:46.4994853+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4aaefa98-900c-46ef-a1b5-11c8777305fb">
+      <Output>
+        <ErrorInfo>
+          <Message>System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')</Message>
+          <StackTrace>   at System.Security.Cryptography.AesImplementation.CreateTransform(ReadOnlySpan`1 rgbKey, Byte[] rgbIV, Boolean encrypting)
+   at System.Security.Cryptography.AesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)
+   at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv) in /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs:line 10
+   at PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip() in /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs:line 15
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="5dccdc4e-fd81-4893-8192-f2510c85fa0e" testId="9a06e3dd-2368-3abb-becd-d3922cc9fb88" testName="PaymentsAPI.Tests.PaymentControllerTests.Process_DoesNotThrowOnValidRequest" computerName="34f40a0b7106" duration="00:00:00.0096757" startTime="2026-11-15T16:43:46.4930537+00:00" endTime="2026-11-15T16:43:46.4930690+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5dccdc4e-fd81-4893-8192-f2510c85fa0e" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="PaymentsAPI.Tests.PaymentControllerTests.Process_DoesNotThrowOnValidRequest" storage="/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll" id="9a06e3dd-2368-3abb-becd-d3922cc9fb88">
+      <Execution id="5dccdc4e-fd81-4893-8192-f2510c85fa0e" />
+      <TestMethod codeBase="/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PaymentsAPI.Tests.PaymentControllerTests" name="Process_DoesNotThrowOnValidRequest" />
+    </UnitTest>
+    <UnitTest name="PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication" storage="/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll" id="9d0f546d-6b20-05b4-2a89-e01510ae7d78">
+      <Execution id="9d496c27-962c-4dd4-a0fb-699cfa9476e8" />
+      <TestMethod codeBase="/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PaymentsAPI.Tests.LegacyCryptoSecurityTests" name="ModifiedCiphertextFailsAuthentication" />
+    </UnitTest>
+    <UnitTest name="PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip" storage="/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll" id="7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3">
+      <Execution id="4aaefa98-900c-46ef-a1b5-11c8777305fb" />
+      <TestMethod codeBase="/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PaymentsAPI.Tests.LegacyCryptoSecurityTests" name="EncryptionSupportsAes256AndAuthenticatedRoundTrip" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="9d0f546d-6b20-05b4-2a89-e01510ae7d78" executionId="9d496c27-962c-4dd4-a0fb-699cfa9476e8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3" executionId="4aaefa98-900c-46ef-a1b5-11c8777305fb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9a06e3dd-2368-3abb-becd-d3922cc9fb88" executionId="5dccdc4e-fd81-4893-8192-f2510c85fa0e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="3" executed="3" passed="1" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.15)
+[xUnit.net 00:00:00.11]   Discovering: PaymentsAPI.Tests
+[xUnit.net 00:00:00.13]   Discovered:  PaymentsAPI.Tests
+[xUnit.net 00:00:00.17]   Starting:    PaymentsAPI.Tests
+[xUnit.net 00:00:00.22]       System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')
+[xUnit.net 00:00:00.22]       Stack Trace:
+[xUnit.net 00:00:00.22]            at System.Security.Cryptography.AesImplementation.CreateTransform(ReadOnlySpan`1 rgbKey, Byte[] rgbIV, Boolean encrypting)
+[xUnit.net 00:00:00.22]            at System.Security.Cryptography.AesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)
+[xUnit.net 00:00:00.22]         /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs(10,0): at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv)
+[xUnit.net 00:00:00.22]         /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs(15,0): at PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip()
+[xUnit.net 00:00:00.22]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.22]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.22]       System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')
+[xUnit.net 00:00:00.22]       Stack Trace:
+[xUnit.net 00:00:00.22]            at System.Security.Cryptography.AesImplementation.CreateTransform(ReadOnlySpan`1 rgbKey, Byte[] rgbIV, Boolean encrypting)
+[xUnit.net 00:00:00.22]            at System.Security.Cryptography.AesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)
+[xUnit.net 00:00:00.22]         /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs(10,0): at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv)
+[xUnit.net 00:00:00.22]         /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs(29,0): at PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication()
+[xUnit.net 00:00:00.22]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.22]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.22]   Finished:    PaymentsAPI.Tests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="34f40a0b7106" outcome="Error" timestamp="2026-11-15T16:43:46.4994395+00:00">
+        <Text>[xUnit.net 00:00:00.21]     PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="34f40a0b7106" outcome="Error" timestamp="2026-11-15T16:43:46.5003032+00:00">
+        <Text>[xUnit.net 00:00:00.22]     PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

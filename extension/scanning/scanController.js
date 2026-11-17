@@ -480,7 +480,7 @@ class ScanController {
                 });
 
                 let cacheDescriptor = null;
-                if (useCache && inputFingerprint && repoContext.canonicalRepositoryId) {
+                if (useCache && scanner.id !== 'nuget-audit' && inputFingerprint && repoContext.canonicalRepositoryId) {
                     const tCache0 = process.hrtime.bigint();
                     const ruleConfigHash = stableHashObject({
                         scannerId: scanner.id,
@@ -545,7 +545,9 @@ class ScanController {
                     const result = await scanner.scan(this.workspaceRoot, targetFullPath, {
                         scanId,
                         scanMode,
-                        timeoutMs: scanRequest.timeoutMs || 60000,
+                        // Let adapters choose a workload-appropriate default.
+                        timeoutMs: scanRequest.scannerTimeouts?.[scanner.id] ?? scanRequest.timeoutMs,
+                        advisorySnapshotPath: scanRequest.advisorySnapshotPath,
                         extensionRoot: this.extensionRoot,
                         repoContext,
                         authorizedRoots: allAllowedRoots,

@@ -794,12 +794,15 @@ async function run() {
             extensionRoot: REPO_ROOT,
             runsRoot: path.join(tmpBase, 'e2e-runs-root'),
             llmClient: mockedLlm,
+            compileProposal: async () => ({ executed: true, passed: true, exitCode: 0, backendType: 'mock-container-for-unit-test' }),
             testRunner: {
+                // This suite mocks execution; real compiler rejection is tested
+                // separately against the approved .NET container.
                 detectRunner: () => 'dotnet',
                 runBaselineTests: async (_f, wd) => ({
                     executed: true, status: 'FAIL', machineStatus: 'FAILED', outcome: 'FAILED',
                     command: 'dotnet test', workingDirectory: wd, exitCode: 1,
-                    testsTotal: 2, testsPassed: 1, testsFailed: 1, summary: 'Baseline repro failed',
+                    countsKnown: true, failureCategory: 'TESTS_FAILED', testsTotal: 2, testsPassed: 1, testsFailed: 1, summary: 'Baseline repro failed',
                     consoleOutput: 'Baseline repro failed SQLi check'
                 }),
                 runPostFixTests: async (_f, wd) => ({
@@ -847,6 +850,12 @@ async function run() {
 
         // Verify stage-level restart recovery preserves Stage 1-3 RCA/baseline and clears stale approval
         const pausedBeforeFinal = engine.loadRunState('VUL-E2E-P2');
+        assert.strictEqual(pausedBeforeFinal.stages[7].status, 'awaiting_review', 'Stage 8 must remain visible after Sync Status/reload');
+        const beforeRepeat = JSON.stringify(pausedBeforeFinal);
+        const repeatApproval = await engine.executePipeline('VUL-E2E-P2', { isHumanApproved: true });
+        assert.strictEqual(repeatApproval.duplicateSubmission, true);
+        assert.strictEqual(repeatApproval.isAwaitingFinalApproval, true);
+        assert.strictEqual(JSON.stringify(engine.loadRunState('VUL-E2E-P2')), beforeRepeat, 'Repeated approval cannot mutate stage history or approval evidence');
         pausedBeforeFinal.stage = 6;
         engine.saveRunState('VUL-E2E-P2', pausedBeforeFinal);
         const retryRes = await engine.retryStage('VUL-E2E-P2', 5, {});
@@ -866,9 +875,22 @@ async function run() {
         assert.strictEqual(conflictCheck.conflictDetected, true);
         fs.writeFileSync(targetCopy, backupCopy, 'utf8');
 
+        const publicationState = engine.loadRunState('VUL-E2E-P2');
+        publicationState.publicationPlan = { status: 'READY', owner: 'fixture', repository: 'fixture',
+            runId: publicationState.runId, proposedDiffSha256: publicationState.proposedDiffSha256 };
+        engine.saveRunState('VUL-E2E-P2', publicationState);
+        engine.publicationService = { publish: async () => { throw new Error('GITHUB_PUSH_FAILED: injected remote failure'); } };
+        await assert.rejects(engine.executePipeline('VUL-E2E-P2', { isHumanApproved: true, isFinalApproved: true, publishPullRequest: true }), /GITHUB_PUSH_FAILED/);
+        const publicationFailure = engine.loadRunState('VUL-E2E-P2');
+        assert.notStrictEqual(publicationFailure.formalClosure, 'RESOLVED_CLOSED', 'A failed publication cannot become a completed workflow');
+        assert.strictEqual(publicationFailure.approvalRecord.consumedAtStage5, true, 'Failed publication preserves historical consent');
+        assert.strictEqual(publicationFailure.securityValidationOutcome, 'PASSED', 'Publication failure cannot rewrite genuine test evidence as unexecuted');
+        engine.publicationService = { publish: async () => ({ status: 'CREATED', number: 1, url: 'https://github.com/fixture/fixture/pull/1' }) };
+
         // Step 3: Final Sign-off -> complete & verify evidence ledger
-        const finalRes = await engine.executePipeline('VUL-E2E-P2', { isHumanApproved: true, isFinalApproved: true });
+        const finalRes = await engine.executePipeline('VUL-E2E-P2', { isHumanApproved: true, isFinalApproved: true, publishPullRequest: true });
         assert.strictEqual(finalRes.isCompleted, true);
+        assert.strictEqual(engine.loadRunState('VUL-E2E-P2').stages[8].status, 'completed');
         const finalEvDir = path.join(e2eOrigin, 'remediation-output', 'VUL-E2E-P2');
         const finalVerify = verifyEvidencePackage(finalEvDir);
         assert.strictEqual(finalVerify.verified, true);

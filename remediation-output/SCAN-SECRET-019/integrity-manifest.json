@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "GCAC-PH2-MANIFEST-1.0",
+  "runId": "46ddbef3-7079-4114-9e97-24ed8de4fac4",
+  "findingId": "SCAN-SECRET-019",
+  "applicationId": "APP-1001",
+  "createdAt": "2026-11-15T15:58:21.382Z",
+  "evidenceWriterInterface": "LocalTamperDetectableEvidenceWriter",
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "chainSummary": {
+    "eventCount": 6,
+    "headHash": "484c5a6230363519adae76ee88a217fe7cd0983040d945e4d90db6e24d74f28f",
+    "tailHash": "4a242f28423b15e344c82895bda15076e8520e7826db7c4bbe767ad95f3731bf"
+  },
+  "artifacts": {
+    "agent-execution-trace.log": {
+      "sha256": "e3426f394e000de02804e7715923d3f64b9edb092508d6209731a3ee57f19ba7",
+      "sizeBytes": 1154
+    },
+    "events-chain.jsonl": {
+      "sha256": "17253c9d13b93e6dda9e010642b8943ea81d702055abd36bffa62af886205873",
+      "sizeBytes": 2538
+    },
+    "evidence-record.json": {
+      "sha256": "417fdcd8035d380e5733e5446dc4c58fdbb30aa350189d1b30002b333cf2bce6",
+      "sizeBytes": 6149
+    },
+    "finding.json": {
+      "sha256": "419de6d2bace8724facc583c2d2cd6a4b1056c1e3d250d452b2ee6d167fa4818",
+      "sizeBytes": 1215
+    },
+    "remediation-decision.json": {
+      "sha256": "981808611a6b16e95c3486866785183de27724392641917f0260c0de99ad06ba",
+      "sizeBytes": 1872
+    },
+    "remediation-report.md": {
+      "sha256": "375c307276a7d9660905e313a5c2c580ecb3a59da643af95133031cdfd88a109",
+      "sizeBytes": 4550
+    },
+    "run-state.json": {
+      "sha256": "e45fa24aca53131904f9b7aca557dee5e47743d62299bea1dc10285a60f19595",
+      "sizeBytes": 7908
+    },
+    "source-to-sink.json": {
+      "sha256": "b6db6aa8dc13125c5788837ac8beb005d52867d88cbae7bed292b82b534adf03",
+      "sizeBytes": 1307
+    }
+  },
+  "manifestSha256": "eef77046ab010d41fba7e246cacfb3d49eaeb9eee580900947b2a297c16568aa"
+}

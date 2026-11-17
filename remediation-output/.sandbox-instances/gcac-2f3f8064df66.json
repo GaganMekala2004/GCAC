@@ -1,0 +1,36 @@
+{
+  "instanceId": "gcac-2f3f8064df66",
+  "runId": "289af12b-34bc-4263-ada3-19efbcfd891e",
+  "vulnerabilityId": "SCAN-SECRET-016",
+  "applicationId": "APP-1001",
+  "operation": "DOTNET_TEST",
+  "backendType": "local-container",
+  "toolchainProfileId": "dotnet-10.0-lts",
+  "state": "FAILED",
+  "history": [
+    {
+      "state": "PENDING",
+      "timestamp": "2026-11-16T15:23:20.476Z",
+      "detail": "Instance registered."
+    },
+    {
+      "state": "PREPARING",
+      "timestamp": "2026-11-16T15:23:20.477Z",
+      "detail": "Staging credential-free source snapshot."
+    },
+    {
+      "state": "RUNNING",
+      "timestamp": "2026-11-16T15:23:20.486Z",
+      "detail": "Executing DOTNET_TEST via local-container."
+    },
+    {
+      "state": "FAILED",
+      "timestamp": "2026-11-16T15:23:23.113Z",
+      "detail": "Completed with exitCode=1"
+    }
+  ],
+  "createdAt": "2026-11-16T15:23:20.476Z",
+  "updatedAt": "2026-11-16T15:23:23.113Z",
+  "stagingDir": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-sandbox-staging/gcac-2f3f8064df66",
+  "containerName": "gcac-gcac-2f3f8064df66"
+}

@@ -1,0 +1,31 @@
+{
+  "sandboxStatus": "SANDBOX_READY",
+  "backendType": "local-container",
+  "toolchainProfileId": "dotnet-10.0-lts",
+  "toolchainProfileHash": "ae3bb9ba317890519a59736e5ea19f8d244166cb5258227c9722d7011f8b822b",
+  "imageDigest": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
+  "networkPolicy": "NO_NETWORK",
+  "dependencyStatus": "PREPROVISIONED_CACHE",
+  "dependencyWarnings": [
+    "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+  ],
+  "instanceId": "gcac-387be5d2fd5a",
+  "timedOut": false,
+  "cancelled": false,
+  "gatewayAuditDecisions": [
+    {
+      "timestamp": "2026-11-16T15:43:27.268Z",
+      "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+      "instanceId": "gcac-387be5d2fd5a",
+      "vulnerabilityId": "SCAN-SECRET-020",
+      "operation": "DOTNET_TEST",
+      "toolchainProfileId": "dotnet-10.0-lts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    }
+  ],
+  "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
+}

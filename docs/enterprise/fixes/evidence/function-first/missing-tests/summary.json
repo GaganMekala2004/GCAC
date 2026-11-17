@@ -1,0 +1,58 @@
+{
+  "scenario": "missing-tests",
+  "findingId": "DEV-CRYPTO-MISSING-TESTS",
+  "runId": "d8b339dd-6f94-4111-9922-a008f42d5ba3",
+  "executionMode": "LOCAL_DEVELOPMENT",
+  "localOutcome": "COMPLETED_WITH_LIMITATIONS",
+  "verifiedRemediation": false,
+  "baseline": {
+    "total": 0,
+    "failed": 0
+  },
+  "postFix": {
+    "total": 0,
+    "failed": 0
+  },
+  "reScan": "NOT_VERIFIED",
+  "stages": [
+    {
+      "number": 1,
+      "status": "completed"
+    },
+    {
+      "number": 2,
+      "status": "completed"
+    },
+    {
+      "number": 3,
+      "status": "completed_with_limitations"
+    },
+    {
+      "number": 4,
+      "status": "completed"
+    },
+    {
+      "number": 5,
+      "status": "completed"
+    },
+    {
+      "number": 6,
+      "status": "blocked"
+    },
+    {
+      "number": 7,
+      "status": "blocked"
+    },
+    {
+      "number": 8,
+      "status": "deferred_in_dev_mode"
+    },
+    {
+      "number": 9,
+      "status": "completed"
+    }
+  ],
+  "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+  "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+  "originalUnchanged": true
+}

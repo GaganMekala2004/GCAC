@@ -1,0 +1,97 @@
+[
+  {
+    "findingId": "SCAN-SECRET-016",
+    "scannerId": "secrets-config",
+    "scannerVersion": "1.3.1",
+    "ruleId": "SEC-005",
+    "cwe": "CWE-89",
+    "filePath": "src/PaymentsAPI/Controllers/PaymentController.cs",
+    "recordedLine": 15,
+    "recordedLocationStillMatches": true,
+    "currentMatches": [
+      {
+        "ruleId": "SEC-005",
+        "cwe": "CWE-89",
+        "line": 15
+      }
+    ],
+    "method": "FRESH_LOCAL_RULE_EXECUTION",
+    "timestamp": "2026-11-15T16:47:58.838Z"
+  },
+  {
+    "findingId": "SCAN-SECRET-017",
+    "scannerId": "secrets-config",
+    "scannerVersion": "1.3.1",
+    "ruleId": "SEC-004",
+    "cwe": "CWE-78",
+    "filePath": "src/PaymentsAPI/Controllers/ReceiptController.cs",
+    "recordedLine": 9,
+    "recordedLocationStillMatches": true,
+    "currentMatches": [
+      {
+        "ruleId": "SEC-004",
+        "cwe": "CWE-78",
+        "line": 9
+      }
+    ],
+    "method": "FRESH_LOCAL_RULE_EXECUTION",
+    "timestamp": "2026-11-15T16:47:58.838Z"
+  },
+  {
+    "findingId": "SCAN-SECRET-018",
+    "scannerId": "secrets-config",
+    "scannerVersion": "1.3.1",
+    "ruleId": "SEC-003",
+    "cwe": "CWE-327",
+    "filePath": "src/PaymentsAPI/LegacyCrypto.cs",
+    "recordedLine": 9,
+    "recordedLocationStillMatches": true,
+    "currentMatches": [
+      {
+        "ruleId": "SEC-003",
+        "cwe": "CWE-327",
+        "line": 9
+      }
+    ],
+    "method": "FRESH_LOCAL_RULE_EXECUTION",
+    "timestamp": "2026-11-15T16:47:58.839Z"
+  },
+  {
+    "findingId": "SCAN-SECRET-019",
+    "scannerId": "secrets-config",
+    "scannerVersion": "1.3.1",
+    "ruleId": "SEC-003",
+    "cwe": "CWE-327",
+    "filePath": "src/PaymentsAPI/LegacyCrypto.cs",
+    "recordedLine": 10,
+    "recordedLocationStillMatches": false,
+    "currentMatches": [
+      {
+        "ruleId": "SEC-003",
+        "cwe": "CWE-327",
+        "line": 9
+      }
+    ],
+    "method": "FRESH_LOCAL_RULE_EXECUTION",
+    "timestamp": "2026-11-15T16:47:58.839Z"
+  },
+  {
+    "findingId": "SCAN-SECRET-020",
+    "scannerId": "secrets-config",
+    "scannerVersion": "1.3.1",
+    "ruleId": "SEC-001",
+    "cwe": "CWE-798",
+    "filePath": "src/PaymentsAPI/appsettings.json",
+    "recordedLine": 8,
+    "recordedLocationStillMatches": true,
+    "currentMatches": [
+      {
+        "ruleId": "SEC-001",
+        "cwe": "CWE-798",
+        "line": 8
+      }
+    ],
+    "method": "FRESH_LOCAL_RULE_EXECUTION",
+    "timestamp": "2026-11-15T16:47:58.840Z"
+  }
+]

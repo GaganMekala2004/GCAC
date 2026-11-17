@@ -1,0 +1,58 @@
+{
+  "scenario": "verified",
+  "findingId": "DEV-CRYPTO-VERIFIED",
+  "runId": "e8dde813-7a46-4906-8dc0-d6495b23cae0",
+  "executionMode": "LOCAL_DEVELOPMENT",
+  "localOutcome": "COMPLETED_VERIFIED",
+  "verifiedRemediation": true,
+  "baseline": {
+    "total": 3,
+    "failed": 2
+  },
+  "postFix": {
+    "total": 3,
+    "failed": 0
+  },
+  "reScan": "RESOLVED",
+  "stages": [
+    {
+      "number": 1,
+      "status": "completed"
+    },
+    {
+      "number": 2,
+      "status": "completed"
+    },
+    {
+      "number": 3,
+      "status": "completed"
+    },
+    {
+      "number": 4,
+      "status": "completed"
+    },
+    {
+      "number": 5,
+      "status": "completed"
+    },
+    {
+      "number": 6,
+      "status": "completed"
+    },
+    {
+      "number": 7,
+      "status": "completed"
+    },
+    {
+      "number": 8,
+      "status": "deferred_in_dev_mode"
+    },
+    {
+      "number": 9,
+      "status": "completed"
+    }
+  ],
+  "proposalProvider": "AUTHORED_TEST_FIXTURE_NOT_COPILOT",
+  "approval": "AUTOMATED_TEST_CONSENT_NOT_HUMAN",
+  "originalUnchanged": true
+}

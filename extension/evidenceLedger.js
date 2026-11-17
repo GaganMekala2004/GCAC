@@ -353,7 +353,30 @@ function verifyEvidencePackage(targetDir, expectedRunId = null) {
     };
 }
 
+// Re-seal only a trusted lifecycle write, and only if the entire package was
+// intact immediately before it. Never bless a pre-existing modification.
+function writeStateWithIntegrity(targetDir, writeState) {
+    const manifestPath = path.join(targetDir, 'integrity-manifest.json');
+    const prior = fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath, 'utf8') : null;
+    const intact = prior && verifyEvidencePackage(targetDir).verified;
+    writeState();
+    if (!intact || !fs.existsSync(manifestPath) || fs.readFileSync(manifestPath, 'utf8') !== prior) return;
+    const manifest = JSON.parse(prior);
+    if (!manifest.artifacts?.['run-state.json']) return;
+    const bytes = fs.readFileSync(path.join(targetDir, 'run-state.json'));
+    manifest.previousRunStateSha256 = manifest.artifacts['run-state.json'].sha256;
+    manifest.artifacts['run-state.json'] = { sha256: sha256Hex(bytes), sizeBytes: bytes.length };
+    manifest.trustedStateRevision = (manifest.trustedStateRevision || 0) + 1;
+    manifest.lastTrustedStateWriteAt = new Date().toISOString();
+    const { manifestSha256, ...core } = manifest;
+    manifest.manifestSha256 = sha256Hex(canonicalJson(core));
+    const temp = `${manifestPath}.${process.pid}.tmp`;
+    fs.writeFileSync(temp, JSON.stringify(manifest, null, 2), 'utf8');
+    fs.renameSync(temp, manifestPath);
+}
+
 module.exports = {
+    writeStateWithIntegrity,
     EVIDENCE_SCHEMA_VERSION,
     MANIFEST_SCHEMA_VERSION,
     canonicalJson,

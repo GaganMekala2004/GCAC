@@ -5,6 +5,7 @@
  * No local LLMs, no external third-party endpoints, no templates, no mock data.
  */
 
+const { redactCredentials } = require('./credentialRedaction');
 const { outboundContextGate } = require('./outboundContextGate');
 
 let vscode = null;
@@ -75,6 +76,9 @@ class LlmClient {
      * @returns {Promise<string>} Full response text
      */
     async generateCompletion(prompt, options = {}) {
+        // Minimize the exact transmitted text, then apply the unchanged gate.
+        prompt = redactCredentials(prompt);
+        options = { ...options, systemPrompt: redactCredentials(options.systemPrompt), sourceCode: redactCredentials(options.sourceCode) };
         // Fail-closed outbound context gate BEFORE any model discovery or transmission
         const gate = options.outboundGate || outboundContextGate;
         gate.assertAllowed({

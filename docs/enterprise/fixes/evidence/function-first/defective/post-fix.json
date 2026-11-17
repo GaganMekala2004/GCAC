@@ -1,0 +1,135 @@
+{
+  "executed": true,
+  "passed": false,
+  "status": "FAIL",
+  "sandboxStatus": "SANDBOX_READY",
+  "lifecycleState": "FAILED",
+  "machineStatus": "FAILED",
+  "reasonCode": null,
+  "reason": "PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication: System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')",
+  "instanceId": "gcac-9b0716924d56",
+  "runId": "c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b",
+  "operationId": "DOTNET_TEST",
+  "backendType": "local-container",
+  "runtime": "docker",
+  "toolchainProfileId": "dotnet-10.0-lts",
+  "toolchainProfileHash": "ae3bb9ba317890519a59736e5ea19f8d244166cb5258227c9722d7011f8b822b",
+  "imageDigest": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
+  "digestStatus": "VERIFIED_IMAGE_DIGEST",
+  "executable": "dotnet",
+  "approvedArgs": [
+    "test",
+    "--no-restore",
+    "--nologo",
+    "-v",
+    "normal",
+    "-v",
+    "normal",
+    "--logger",
+    "trx",
+    "--results-directory",
+    "/sandbox-out"
+  ],
+  "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+  "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-function-proof-UI19AK/defective/runs/DEV-CRYPTO-DEFECTIVE_c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b/worktree",
+  "startTime": "2026-11-15T16:43:42.523Z",
+  "endTime": "2026-11-15T16:43:46.811Z",
+  "durationMs": 4288,
+  "exitCode": 1,
+  "timedOut": false,
+  "cancelled": false,
+  "networkPolicy": "NO_NETWORK",
+  "networkEnforcementSummary": "Container network namespace isolated (--network=none); zero outbound or loopback/host-service egress.",
+  "dependencyStatus": "PREPROVISIONED_CACHE",
+  "dependencyWarnings": [
+    "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+  ],
+  "resourceLimits": {
+    "timeoutMs": 120000,
+    "memoryMb": 2048,
+    "cpus": 2,
+    "pidsLimit": 128
+  },
+  "stderr": "[xUnit.net 00:00:00.21]     PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip [FAIL]\n[xUnit.net 00:00:00.22]     PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication [FAIL]\nTest Run Failed.\n",
+  "outputArtifactHashes": {
+    "_34f40a0b7106_2026-11-15_16_43_46_net10.0.trx": {
+      "sha256": "8cc6a41d88cacb8eaa0d10a77620d0f3a2b1868f7e8806a35d850e16b3a595d1",
+      "bytes": 10269
+    }
+  },
+  "outputArtifacts": {
+    "_34f40a0b7106_2026-11-15_16_43_46_net10.0.trx": {
+      "fileName": "_34f40a0b7106_2026-11-15_16_43_46_net10.0.trx",
+      "content": "﻿<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<TestRun id=\"01dfb41d-fe53-449f-9a49-cdad85e5bb6b\" name=\"@34f40a0b7106 2026-11-15 16:43:46\" xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\">\n  <Times creation=\"2026-11-15T16:43:46.6597809+00:00\" queuing=\"2026-11-15T16:43:46.6597810+00:00\" start=\"2026-11-15T16:43:45.6875887+00:00\" finish=\"2026-11-15T16:43:46.6643417+00:00\" />\n  <TestSettings name=\"default\" id=\"bb8e776a-a81c-48dd-8c01-41e771357efe\">\n    <Deployment runDeploymentRoot=\"_34f40a0b7106_2026-11-15_16_43_46\" />\n  </TestSettings>\n  <Results>\n    <UnitTestResult executionId=\"9d496c27-962c-4dd4-a0fb-699cfa9476e8\" testId=\"9d0f546d-6b20-05b4-2a89-e01510ae7d78\" testName=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication\" computerName=\"34f40a0b7106\" duration=\"00:00:00.0003810\" startTime=\"2026-11-15T16:43:46.5002426+00:00\" endTime=\"2026-11-15T16:43:46.5002427+00:00\" testType=\"13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b\" outcome=\"Failed\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" relativeResultsDirectory=\"9d496c27-962c-4dd4-a0fb-699cfa9476e8\">\n      <Output>\n        <ErrorInfo>\n          <Message>System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')</Message>\n          <StackTrace>   at System.Security.Cryptography.AesImplementation.CreateTransform(ReadOnlySpan`1 rgbKey, Byte[] rgbIV, Boolean encrypting)\n   at System.Security.Cryptography.AesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)\n   at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv) in /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs:line 10\n   at PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication() in /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs:line 29\n   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)\n   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>\n        </ErrorInfo>\n      </Output>\n    </UnitTestResult>\n    <UnitTestResult executionId=\"4aaefa98-900c-46ef-a1b5-11c8777305fb\" testId=\"7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3\" testName=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip\" computerName=\"34f40a0b7106\" duration=\"00:00:00.0050103\" startTime=\"2026-11-15T16:43:46.4994851+00:00\" endTime=\"2026-11-15T16:43:46.4994853+00:00\" testType=\"13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b\" outcome=\"Failed\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" relativeResultsDirectory=\"4aaefa98-900c-46ef-a1b5-11c8777305fb\">\n      <Output>\n        <ErrorInfo>\n          <Message>System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')</Message>\n          <StackTrace>   at System.Security.Cryptography.AesImplementation.CreateTransform(ReadOnlySpan`1 rgbKey, Byte[] rgbIV, Boolean encrypting)\n   at System.Security.Cryptography.AesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)\n   at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv) in /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs:line 10\n   at PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip() in /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs:line 15\n   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)\n   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>\n        </ErrorInfo>\n      </Output>\n    </UnitTestResult>\n    <UnitTestResult executionId=\"5dccdc4e-fd81-4893-8192-f2510c85fa0e\" testId=\"9a06e3dd-2368-3abb-becd-d3922cc9fb88\" testName=\"PaymentsAPI.Tests.PaymentControllerTests.Process_DoesNotThrowOnValidRequest\" computerName=\"34f40a0b7106\" duration=\"00:00:00.0096757\" startTime=\"2026-11-15T16:43:46.4930537+00:00\" endTime=\"2026-11-15T16:43:46.4930690+00:00\" testType=\"13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b\" outcome=\"Passed\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" relativeResultsDirectory=\"5dccdc4e-fd81-4893-8192-f2510c85fa0e\" />\n  </Results>\n  <TestDefinitions>\n    <UnitTest name=\"PaymentsAPI.Tests.PaymentControllerTests.Process_DoesNotThrowOnValidRequest\" storage=\"/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll\" id=\"9a06e3dd-2368-3abb-becd-d3922cc9fb88\">\n      <Execution id=\"5dccdc4e-fd81-4893-8192-f2510c85fa0e\" />\n      <TestMethod codeBase=\"/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll\" adapterTypeName=\"executor://xunit/VsTestRunner2/netcoreapp\" className=\"PaymentsAPI.Tests.PaymentControllerTests\" name=\"Process_DoesNotThrowOnValidRequest\" />\n    </UnitTest>\n    <UnitTest name=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication\" storage=\"/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll\" id=\"9d0f546d-6b20-05b4-2a89-e01510ae7d78\">\n      <Execution id=\"9d496c27-962c-4dd4-a0fb-699cfa9476e8\" />\n      <TestMethod codeBase=\"/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll\" adapterTypeName=\"executor://xunit/VsTestRunner2/netcoreapp\" className=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests\" name=\"ModifiedCiphertextFailsAuthentication\" />\n    </UnitTest>\n    <UnitTest name=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip\" storage=\"/sandbox-work/tests/paymentsapi.tests/bin/debug/net10.0/paymentsapi.tests.dll\" id=\"7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3\">\n      <Execution id=\"4aaefa98-900c-46ef-a1b5-11c8777305fb\" />\n      <TestMethod codeBase=\"/sandbox-work/tests/PaymentsAPI.Tests/bin/Debug/net10.0/PaymentsAPI.Tests.dll\" adapterTypeName=\"executor://xunit/VsTestRunner2/netcoreapp\" className=\"PaymentsAPI.Tests.LegacyCryptoSecurityTests\" name=\"EncryptionSupportsAes256AndAuthenticatedRoundTrip\" />\n    </UnitTest>\n  </TestDefinitions>\n  <TestEntries>\n    <TestEntry testId=\"9d0f546d-6b20-05b4-2a89-e01510ae7d78\" executionId=\"9d496c27-962c-4dd4-a0fb-699cfa9476e8\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" />\n    <TestEntry testId=\"7a1bb0a8-43a7-81ed-1b78-f755fc8d9fa3\" executionId=\"4aaefa98-900c-46ef-a1b5-11c8777305fb\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" />\n    <TestEntry testId=\"9a06e3dd-2368-3abb-becd-d3922cc9fb88\" executionId=\"5dccdc4e-fd81-4893-8192-f2510c85fa0e\" testListId=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" />\n  </TestEntries>\n  <TestLists>\n    <TestList name=\"Results Not in a List\" id=\"8c84fa94-04c1-424b-9868-57a2d4851a1d\" />\n    <TestList name=\"All Loaded Results\" id=\"19431567-8539-422a-85d7-44ee4e166bda\" />\n  </TestLists>\n  <ResultSummary outcome=\"Failed\">\n    <Counters total=\"3\" executed=\"3\" passed=\"1\" failed=\"2\" error=\"0\" timeout=\"0\" aborted=\"0\" inconclusive=\"0\" passedButRunAborted=\"0\" notRunnable=\"0\" notExecuted=\"0\" disconnected=\"0\" warning=\"0\" completed=\"0\" inProgress=\"0\" pending=\"0\" />\n    <Output>\n      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.15)\n[xUnit.net 00:00:00.11]   Discovering: PaymentsAPI.Tests\n[xUnit.net 00:00:00.13]   Discovered:  PaymentsAPI.Tests\n[xUnit.net 00:00:00.17]   Starting:    PaymentsAPI.Tests\n[xUnit.net 00:00:00.22]       System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')\n[xUnit.net 00:00:00.22]       Stack Trace:\n[xUnit.net 00:00:00.22]            at System.Security.Cryptography.AesImplementation.CreateTransform(ReadOnlySpan`1 rgbKey, Byte[] rgbIV, Boolean encrypting)\n[xUnit.net 00:00:00.22]            at System.Security.Cryptography.AesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)\n[xUnit.net 00:00:00.22]         /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs(10,0): at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv)\n[xUnit.net 00:00:00.22]         /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs(15,0): at PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip()\n[xUnit.net 00:00:00.22]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)\n[xUnit.net 00:00:00.22]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)\n[xUnit.net 00:00:00.22]       System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')\n[xUnit.net 00:00:00.22]       Stack Trace:\n[xUnit.net 00:00:00.22]            at System.Security.Cryptography.AesImplementation.CreateTransform(ReadOnlySpan`1 rgbKey, Byte[] rgbIV, Boolean encrypting)\n[xUnit.net 00:00:00.22]            at System.Security.Cryptography.AesImplementation.CreateTransform(Byte[] rgbKey, Byte[] rgbIV, Boolean encrypting)\n[xUnit.net 00:00:00.22]         /sandbox-work/src/PaymentsAPI/LegacyCrypto.cs(10,0): at PaymentsAPI.LegacyCrypto.Encrypt(Byte[] data, Byte[] key, Byte[] iv)\n[xUnit.net 00:00:00.22]         /sandbox-work/tests/PaymentsAPI.Tests/LegacyCryptoSecurityTests.cs(29,0): at PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication()\n[xUnit.net 00:00:00.22]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)\n[xUnit.net 00:00:00.22]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)\n[xUnit.net 00:00:00.22]   Finished:    PaymentsAPI.Tests\n</StdOut>\n    </Output>\n    <RunInfos>\n      <RunInfo computerName=\"34f40a0b7106\" outcome=\"Error\" timestamp=\"2026-11-15T16:43:46.4994395+00:00\">\n        <Text>[xUnit.net 00:00:00.21]     PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip [FAIL]</Text>\n      </RunInfo>\n      <RunInfo computerName=\"34f40a0b7106\" outcome=\"Error\" timestamp=\"2026-11-15T16:43:46.5003032+00:00\">\n        <Text>[xUnit.net 00:00:00.22]     PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication [FAIL]</Text>\n      </RunInfo>\n    </RunInfos>\n  </ResultSummary>\n</TestRun>",
+      "sha256": "8cc6a41d88cacb8eaa0d10a77620d0f3a2b1868f7e8806a35d850e16b3a595d1",
+      "bytes": 10269
+    }
+  },
+  "injectionScreening": {
+    "runId": "c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b",
+    "contentSource": "sandbox:DOTNET_TEST",
+    "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+    "ruleId": "INJ-PASS",
+    "outcome": "ALLOW_UNTRUSTED_DATA",
+    "policyVersion": "GCAC-PH2-INJ-1.0",
+    "timestamp": "2026-11-15T16:43:46.873Z",
+    "redactedLocation": "DEV-CRYPTO-DEFECTIVE_c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b/worktree",
+    "matchCount": 0
+  },
+  "lifecycleHistory": [
+    {
+      "state": "PENDING",
+      "timestamp": "2026-11-15T16:43:42.511Z",
+      "detail": "Instance registered."
+    },
+    {
+      "state": "PREPARING",
+      "timestamp": "2026-11-15T16:43:42.514Z",
+      "detail": "Staging credential-free source snapshot."
+    },
+    {
+      "state": "RUNNING",
+      "timestamp": "2026-11-15T16:43:42.523Z",
+      "detail": "Executing DOTNET_TEST via local-container."
+    },
+    {
+      "state": "FAILED",
+      "timestamp": "2026-11-15T16:43:46.874Z",
+      "detail": "Completed with exitCode=1"
+    }
+  ],
+  "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception.",
+  "failureCategory": "TESTS_FAILED",
+  "stage": "Stage 5/6: Post-Fix Bench Test",
+  "testPhase": "POST_FIX_TEST",
+  "repositoryTested": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-function-proof-UI19AK/defective/runs/DEV-CRYPTO-DEFECTIVE_c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b/worktree",
+  "rootError": "PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication: System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')",
+  "countsKnown": true,
+  "testsTotal": 3,
+  "testsPassed": 1,
+  "testsFailed": 2,
+  "testsSkipped": 0,
+  "testReportLocation": "_34f40a0b7106_2026-11-15_16_43_46_net10.0.trx",
+  "testFailures": [
+    {
+      "testName": "PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication",
+      "outcome": "Failed",
+      "error": "System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')"
+    },
+    {
+      "testName": "PaymentsAPI.Tests.LegacyCryptoSecurityTests.EncryptionSupportsAes256AndAuthenticatedRoundTrip",
+      "outcome": "Failed",
+      "error": "System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')"
+    }
+  ],
+  "provenance": {
+    "repositoryId": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-function-proof-UI19AK/defective/runs/DEV-CRYPTO-DEFECTIVE_c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b/worktree",
+    "runId": "c29bf8b2-d0b4-4344-920c-f4cf3c3ed12b",
+    "stageId": "Stage 5/6: Post-Fix Bench Test",
+    "attemptId": 1,
+    "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out"
+  },
+  "retryEligible": false,
+  "suggestedNextAction": "Genuine post-fix build/test failure; use Review Failure / Revise Fix to generate a revised patch and re-approve at Stage 4.",
+  "summary": "FAIL (TESTS_FAILED) — Passed: 1, Failed: 2, Skipped: 0, Exit Code: 1 — PaymentsAPI.Tests.LegacyCryptoSecurityTests.ModifiedCiphertextFailsAuthentication: System.ArgumentException : Specified initialization vector (IV) does not match the block size for this algorithm. (Parameter 'rgbIV')"
+}

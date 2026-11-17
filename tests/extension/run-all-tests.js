@@ -1,3 +1,4 @@
+const baselineStagingTests = require('./baselineStagingRegression.test');
 const csvTests = require('./csvParser.test');
 const reportTests = require('./reportParser.test');
 const securityTests = require('./security.test');
@@ -12,6 +13,10 @@ const phase2SecurityTests = require('./phase2Security.test');
 const { runPhase3SandboxSecurityTests } = require('./phase3SandboxSecurity.test');
 const realWorldUsabilityTests = require('./realWorldUsability.test');
 const productionStabilizationTests = require('./productionStabilization.test');
+const { runLiveProfileSelectionTests } = require('./liveScannerProfileSelection.test');
+const { runScenarioTests } = require('./dockerSandboxScenarios.test');
+const stage3ToolchainAndStateFixTests = require('./stage3ToolchainAndStateFix.test');
+const stage6TestVerificationTests = require('./stage6TestVerification.test');
 
 async function main() {
     console.log('===============================================================');
@@ -20,6 +25,18 @@ async function main() {
     console.log('===============================================================\n');
 
     const suites = [
+        { name: 'Recognized .NET Repair Recipes', fn: require('./dotnetRepairRecipes.test').run },
+        { name: 'Candidate Compiler Validation', fn: require('./proposalCompilation.test').run },
+        { name: 'Reviewed Crypto Migration Contract', fn: require('./cryptoMigrationContract.test').run },
+        { name: 'GitHub Publication Consent and Scope', fn: require('./githubPublication.test').run },
+        { name: 'State and Evidence Lifecycle', fn: require('./stateEvidenceLifecycle.test').run },
+        { name: 'Exact Proposal Reconstruction', fn: require('./patchCanonicalization.test').run },
+        { name: 'Remediation and Scanner Reliability', fn: require('./remediationReliability.test').run },
+        { name: 'Local Development Policy and Exact Patches', fn: require('./localDevelopment.test').run },
+        { name: 'Provenance and Canonical Diagnostics', fn: require('./provenanceAndCanonicalDiagnostics.test').run },
+        { name: 'Baseline Approval Eligibility', fn: require('./baselineEligibility.test').run },
+        { name: 'Outbound Credential Minimization', fn: require('./credentialRedaction.test').run },
+        { name: 'Baseline NuGet Staging Regression', fn: baselineStagingTests.run },
         { name: 'CSV Parser & Row Isolation', fn: csvTests.run },
         { name: 'Report Parser & Evidence Discovery', fn: reportTests.run },
         { name: 'Security Containment & Webview Hardening', fn: securityTests.run },
@@ -33,7 +50,11 @@ async function main() {
         { name: 'Phase 2 Trust Controls & Secure Remediation Governance', fn: phase2SecurityTests.run },
         { name: 'Phase 3 Execution Isolation, Approved Toolchains & Supply Chain Security', fn: runPhase3SandboxSecurityTests },
         { name: 'Real-World Usability, Scan Accuracy, Portability & Retry', fn: realWorldUsabilityTests.run },
-        { name: 'Production Workflow Stabilization & Reliability', fn: productionStabilizationTests.run }
+        { name: 'Production Workflow Stabilization & Reliability', fn: productionStabilizationTests.run },
+        { name: 'Live Scanner Profile Selection & Toolchain Hardening', fn: runLiveProfileSelectionTests },
+        { name: 'Docker Sandbox Scenarios & Boundary Hardening (A-I)', fn: runScenarioTests },
+        { name: 'Stage 3 Toolchain Selection & Workflow-State Integrity', fn: stage3ToolchainAndStateFixTests.run },
+        { name: 'Stage 6 .NET Test Verification & Remediation Evidence', fn: stage6TestVerificationTests.run }
     ];
 
     let passedSuites = 0;

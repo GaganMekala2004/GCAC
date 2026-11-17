@@ -1,0 +1,30 @@
+{
+  "vulnerabilityType": "WEAK_CRYPTO_MIGRATION",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "Unresolved (inspect method parameters)",
+    "file": "src/PaymentsAPI/LegacyCrypto.cs",
+    "line": 9,
+    "snippet": "using var des = DES.Create();"
+  },
+  "dataPropagationEvidence": [],
+  "dangerousSink": {
+    "file": "src/PaymentsAPI/LegacyCrypto.cs",
+    "line": 9,
+    "snippet": "using var des = DES.Create();"
+  },
+  "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+  "affectedFile": "src/PaymentsAPI/LegacyCrypto.cs",
+  "affectedFunction": "Encrypt(byte[] data, byte[] key, byte[] iv)",
+  "affectedLines": "9-11",
+  "proposedRemediation": "Replace the DES encryption with a more secure algorithm, such as AES, which is currently considered secure and widely accepted.",
+  "baselineTestEvidence": {
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+  }
+}

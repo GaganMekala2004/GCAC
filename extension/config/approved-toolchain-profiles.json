@@ -92,7 +92,21 @@
         "Debug",
         "--format",
         "json",
-        "console"
+        "console",
+        "--logger",
+        "trx",
+        "trx;LogFileName=test-results.trx",
+        "--results-directory",
+        "/sandbox-out",
+        "--report-trx",
+        "--report-trx-filename",
+        "test-results.trx",
+        "-p:IsTestProject=true",
+        "/p:IsTestProject=true",
+        "-p:RestorePackagesPath=/sandbox-cache/nuget",
+        "/p:RestorePackagesPath=/sandbox-cache/nuget",
+        "-p:NuGetPackageRoot=/sandbox-cache/nuget/",
+        "/p:NuGetPackageRoot=/sandbox-cache/nuget/"
       ],
       "runtimeLimits": {
         "timeoutMs": 120000,
@@ -107,7 +121,7 @@
         "/sandbox-out/roslyn.sarif"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "82905c448022276973098798cc177e6e2649a0d8adbf1848db3fed075ddd3a1d",
+      "profileSha256": "95552373559b5b43ac3aeee21c32e1997460346cffe8f21b54b25c085593c459",
       "digestStatus": "TEMPLATE_PLACEHOLDER"
     },
     {
@@ -185,7 +199,21 @@
         "Debug",
         "--format",
         "json",
-        "console"
+        "console",
+        "--logger",
+        "trx",
+        "trx;LogFileName=test-results.trx",
+        "--results-directory",
+        "/sandbox-out",
+        "--report-trx",
+        "--report-trx-filename",
+        "test-results.trx",
+        "-p:IsTestProject=true",
+        "/p:IsTestProject=true",
+        "-p:RestorePackagesPath=/sandbox-cache/nuget",
+        "/p:RestorePackagesPath=/sandbox-cache/nuget",
+        "-p:NuGetPackageRoot=/sandbox-cache/nuget/",
+        "/p:NuGetPackageRoot=/sandbox-cache/nuget/"
       ],
       "runtimeLimits": {
         "timeoutMs": 120000,
@@ -200,7 +228,7 @@
         "/sandbox-out/roslyn.sarif"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "05ef2e1954f929094487ab680deb67d65e76864e30947da807de38766b79676f",
+      "profileSha256": "ec4f4733197a1bbc26d278ba84f0fe52be44a6815d222272e4baede27fee8374",
       "digestStatus": "TEMPLATE_PLACEHOLDER"
     },
     {
@@ -297,6 +325,111 @@
       "profileVersion": "1.0.0",
       "profileSha256": "3283d21bd9f1bad54feb26403d8a3a97b63f09c9da046c40002aca812a1db864",
       "digestStatus": "TEMPLATE_PLACEHOLDER"
+    },
+    {
+      "profileId": "dotnet-10.0-lts",
+      "supportedStack": "dotnet",
+      "toolchainVersion": "10.0.404-lts",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "imageDigest": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
+      "imageRef": "mcr.microsoft.com/dotnet/sdk@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
+      "digestPolicyNote": "Verified local Docker image mcr.microsoft.com/dotnet/sdk:10.0 (SDK 10.0.404, Runtime 10.0.15 on linux/arm64).",
+      "approvedCommands": {
+        "DOTNET_BUILD": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "build",
+            "--no-restore",
+            "--nologo"
+          ]
+        },
+        "DOTNET_TEST": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "test",
+            "--no-restore",
+            "--nologo",
+            "-v",
+            "normal"
+          ]
+        },
+        "SECURITY_SCAN": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "build",
+            "--no-restore",
+            "--nologo",
+            "/p:EnableNETAnalyzers=true",
+            "/p:AnalysisLevel=latest"
+          ]
+        },
+        "TARGETED_RESCAN": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "build",
+            "--no-restore",
+            "--nologo",
+            "/p:EnableNETAnalyzers=true",
+            "/p:AnalysisLevel=latest"
+          ]
+        },
+        "NUGET_AUDIT": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "list",
+            "package",
+            "--vulnerable",
+            "--include-transitive"
+          ]
+        }
+      },
+      "permittedArguments": [
+        "--no-restore",
+        "--nologo",
+        "-v",
+        "normal",
+        "minimal",
+        "--filter",
+        "/p:EnableNETAnalyzers=true",
+        "/p:AnalysisLevel=latest",
+        "--configuration",
+        "Release",
+        "Debug",
+        "--format",
+        "json",
+        "console",
+        "--logger",
+        "trx",
+        "trx;LogFileName=test-results.trx",
+        "--results-directory",
+        "/sandbox-out",
+        "--report-trx",
+        "--report-trx-filename",
+        "test-results.trx",
+        "-p:IsTestProject=true",
+        "/p:IsTestProject=true",
+        "-p:RestorePackagesPath=/sandbox-cache/nuget",
+        "/p:RestorePackagesPath=/sandbox-cache/nuget",
+        "-p:NuGetPackageRoot=/sandbox-cache/nuget/",
+        "/p:NuGetPackageRoot=/sandbox-cache/nuget/"
+      ],
+      "runtimeLimits": {
+        "timeoutMs": 120000,
+        "memoryMb": 2048,
+        "cpus": 2,
+        "pidsLimit": 128
+      },
+      "networkPolicy": "NO_NETWORK",
+      "dependencyCachePolicy": "OFFLINE_NO_RESTORE_PER_APP_CACHE",
+      "outputArtifactPaths": [
+        "/sandbox-out/test-results.trx",
+        "/sandbox-out/roslyn.sarif"
+      ],
+      "profileVersion": "1.0.0",
+      "profileSha256": "ae3bb9ba317890519a59736e5ea19f8d244166cb5258227c9722d7011f8b822b",
+      "digestStatus": "VERIFIED_IMAGE_DIGEST"
     }
   ]
 }
