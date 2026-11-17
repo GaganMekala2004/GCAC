@@ -4,6 +4,7 @@ obj/
 out/
 .vs/
 .idea/
+tools/
 
 # Database & Storage (Never commit real DBs)
 data/*.db
