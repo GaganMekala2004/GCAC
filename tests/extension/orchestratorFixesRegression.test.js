@@ -80,7 +80,7 @@ async function runOrchestratorFixesRegressionSuite() {
         console.log('  ✓ Test 1.3: Workspace-specific path correctly mapped to enclosing git repo');
     }
 
-    // Test 1.4: Isolated workspace creation includes expected files
+    // Test 1.4: Isolated workspace creation on direct nested repository
     const runsRoot = path.join(workspaceRoot, '.test-tmp-runs-' + Date.now());
     fs.mkdirSync(runsRoot, { recursive: true });
     try {
@@ -94,7 +94,22 @@ async function runOrchestratorFixesRegressionSuite() {
         });
         assert(iso.isolatedTargetFile && fs.existsSync(iso.isolatedTargetFile), 'Isolated target file must exist in worktree');
         mgr.cleanupWorkspace(iso);
-        console.log('  ✓ Test 1.4: Isolated workspace creation verified with target file presence');
+        console.log('  ✓ Test 1.4: Isolated workspace creation on direct nested repo verified');
+
+        // Test 1.5: Nested repository worktree materialization from parent workspace
+        const isoParent = mgr.createIsolatedWorkspace({
+            runId: 'run-reg-test-parent-1',
+            vulnerabilityId: 'SCAN-SECRET-024-PARENT',
+            applicationId: 'LOCAL-B9AE6919',
+            repositoryPath: workspaceRoot,
+            expectedFileRelPath: 'sample-repos/payments-api/src/PaymentsAPI/Controllers/ReceiptController.cs'
+        });
+        assert(isoParent.isolatedTargetFile && fs.existsSync(isoParent.isolatedTargetFile), 'Target file must exist inside materialized nested worktree');
+        assert(Array.isArray(isoParent.nestedWorktrees) && isoParent.nestedWorktrees.length >= 1, 'Must register nested worktree for tracked cleanup');
+        const slnInWorktree = path.join(isoParent.worktreeDir, 'sample-repos/payments-api/PaymentsAPI.sln');
+        assert(fs.existsSync(slnInWorktree), 'Full nested solution must be materialized in worktree, not just a single copied file');
+        mgr.cleanupWorkspace(isoParent);
+        console.log('  ✓ Test 1.5: Nested repository materialized as isolated detached worktree preserving full Git tracking');
     } finally {
         try { fs.rmSync(runsRoot, { recursive: true, force: true }); } catch {}
     }
@@ -113,7 +128,13 @@ async function runOrchestratorFixesRegressionSuite() {
     assert(sanitized.includes('[REDACTED_MASTER_DATA]'), 'Must replace with redaction marker');
     console.log('  ✓ Test 2.1: sanitizeMasterDataReferences cleanses master stores and RawValuesJson');
 
-    // Test 2.2: OutboundContextGate strictly BLOCKS unminimized master-data references
+    // Test 2.2: sanitizeMasterDataReferences does NOT over-sanitize legitimate code
+    const legitCode = 'public class VulnerabilityReport { public string connectionString; public int RawValuesCount; }';
+    const preserved = sanitizeMasterDataReferences(legitCode);
+    assert.strictEqual(preserved, legitCode, 'Legitimate code identifiers must not be modified');
+    console.log('  ✓ Test 2.2: sanitizeMasterDataReferences preserves legitimate source context without over-sanitizing');
+
+    // Test 2.3: OutboundContextGate strictly BLOCKS unminimized master-data references
     const gate = new OutboundContextGate();
     assert.throws(() => {
         gate.assertAllowed({
@@ -122,16 +143,26 @@ async function runOrchestratorFixesRegressionSuite() {
             runId: 'reg-test-2'
         });
     }, /MASTER-DATA-REFERENCE/, 'Gate must block unminimized master-data store reference');
-    console.log('  ✓ Test 2.2: OutboundContextGate fail-closed blocking of master data references preserved');
+    console.log('  ✓ Test 2.3: OutboundContextGate fail-closed blocking of master data references preserved');
 
-    // Test 2.3: Sanitized prompt passes OutboundContextGate cleanly
+    // Test 2.4: Sanitized prompt passes OutboundContextGate cleanly
     const allowed = gate.evaluate({
         prompt: `Please analyze this finding: Title: SQL Injection, Location: src/App.cs, Metadata: ${sanitized}`,
         targetPaths: ['src/App.cs'],
         runId: 'reg-test-3'
     });
     assert.strictEqual(allowed.allowed, true, 'Sanitized prompt must pass outbound gate');
-    console.log('  ✓ Test 2.3: Sanitized prompt passes outbound context gate without violations');
+    console.log('  ✓ Test 2.4: Sanitized prompt passes outbound context gate without violations');
+
+    // Test 2.5: Sensitive data alongside redacted master data cannot pass through (fail-closed)
+    assert.throws(() => {
+        gate.assertAllowed({
+            prompt: `Analysis with [REDACTED_MASTER_DATA] but leaking key: AKIAIOSFODNN7EXAMPLE`,
+            targetPaths: ['src/App.cs'],
+            runId: 'reg-test-3b'
+        });
+    }, /SEC-KEY-AWS/, 'Actual sensitive data must still be blocked even if master data is redacted');
+    console.log('  ✓ Test 2.5: Actual sensitive data strictly blocked fail-closed even with master data redacted');
 
     // -------------------------------------------------------------
     // CATEGORY 3: High-Entropy Test Literals & Documented Fixtures
@@ -148,16 +179,55 @@ async function runOrchestratorFixesRegressionSuite() {
     }, /SEC-HIGH-ENTROPY/, 'Genuine high-entropy secret must be blocked');
     console.log('  ✓ Test 3.1: Genuine high-entropy secret-like literal blocked (SEC-HIGH-ENTROPY)');
 
-    // Test 3.2: Documented test fixtures (test_fixture_*, mock_*) pass without false-positive block
+    // Test 3.2: Documented test fixtures (explicitly registered) pass without false-positive block
     const testFixtureScreen = gate.evaluate({
         prompt: 'Unit test mock output: apiKey = "test_fixture_api_key_1234567890"',
         targetPaths: ['src/App.cs'],
         runId: 'reg-test-5'
     });
-    assert.strictEqual(testFixtureScreen.allowed, true, 'Documented test fixture must not trigger false-positive block');
-    console.log('  ✓ Test 3.2: Documented test fixture accepted cleanly without suppressing genuine detection');
-    assert.strictEqual(testFixtureScreen.allowed, true, 'Documented test fixture must not trigger SEC-HIGH-ENTROPY');
-    console.log('  ✓ Test 3.2: Documented test fixture accepted cleanly without suppressing genuine detection');
+    assert.strictEqual(testFixtureScreen.allowed, true, 'Registered test fixture must pass outbound gate');
+    console.log('  ✓ Test 3.2: Explicitly registered test fixture accepted cleanly without false positives');
+
+    // Test 3.3: Genuine secrets with fixture-like prefixes are STRICTLY BLOCKED (no prefix bypass)
+    assert.throws(() => {
+        gate.assertAllowed({
+            prompt: 'Test using: "test-fixture-8f7e6d5c4b3a2190fedcba9876543210"',
+            targetPaths: ['src/App.cs'],
+            runId: 'reg-test-prefix-1'
+        });
+    }, /SEC-HIGH-ENTROPY/, 'High-entropy secret with test-fixture- prefix must be blocked');
+
+    assert.throws(() => {
+        gate.assertAllowed({
+            prompt: 'Mock config: apiKey = "test_fixture_8f7e6d5c4b3a2190fedcba9876543210"',
+            targetPaths: ['src/App.cs'],
+            runId: 'reg-test-prefix-2'
+        });
+    }, /SEC-CRED-ASSIGN/, 'Credential assignment with test_fixture prefix must be blocked if unregistered/high-entropy');
+
+    assert.throws(() => {
+        gate.assertAllowed({
+            prompt: 'Token mock: "mock_ghp_1234567890abcdef1234567890abcdef12345678"',
+            targetPaths: ['src/App.cs'],
+            runId: 'reg-test-prefix-3'
+        });
+    }, /(?:SEC-KEY-GITHUB|SEC-HIGH-ENTROPY)/, 'GitHub token with mock_ prefix must be blocked');
+
+    assert.throws(() => {
+        gate.assertAllowed({
+            prompt: 'Sample key: "sample-AKIAIOSFODNN7EXAMPLE"',
+            targetPaths: ['src/App.cs'],
+            runId: 'reg-test-prefix-4'
+        });
+    }, /(?:SEC-KEY-AWS|SEC-HIGH-ENTROPY)/, 'AWS key with sample- prefix must be blocked');
+    console.log('  ✓ Test 3.3: Genuine secrets with fixture-like prefixes strictly blocked across rules');
+
+    // Test 3.4: Discrepancy investigation: 4.36 bits/char on AIzaSyD-... vs 3.85 threshold
+    const { calculateShannonEntropy } = require('../../extension/outboundContextGate');
+    const aizaEntropy = calculateShannonEntropy('AIzaSyD-SecretKey123456789');
+    assert(Math.abs(aizaEntropy - 4.36) < 0.05, `AIzaSyD entropy must be ~4.36 bits/char (got ${aizaEntropy.toFixed(2)})`);
+    assert(aizaEntropy >= 3.85, 'Calculated entropy 4.36 exceeds configured policy threshold 3.85');
+    console.log(`  ✓ Test 3.4: Entropy discrepancy investigated (4.36 bits/char exceeds gate threshold of 3.85)`);
 
     // -------------------------------------------------------------
     // CATEGORY 4: Content Injection Screen INJ-002 & Error Detail

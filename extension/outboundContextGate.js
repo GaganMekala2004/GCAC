@@ -16,6 +16,9 @@ const DEFAULT_POLICY = Object.freeze({
     maxFiles: 1,
     minHighEntropyLength: 20,
     minHighEntropyBitsPerChar: 3.85,
+    allowedTestFixtures: new Set([
+        'test_fixture_api_key_1234567890'
+    ]),
     blockedPathPatterns: [
         /(?:^|[\\/])\.env(?:\.[^\\/\s]+)?$/i,
         /\.(?:pem|key|pfx|p12|jks|keystore)$/i,
@@ -92,7 +95,7 @@ const SECRET_RULES = [
     {
         id: 'SEC-CRED-ASSIGN',
         reason: 'Hardcoded credential or API secret assignment detected',
-        regex: /["']?(?:password|passwd|secret|client_secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)["']?\s*[:=]\s*["'](?!\$\{|@Microsoft\.KeyVault|Environment\.|<|test[-_]?fixture|mock[-_]|sample[-_]|placeholder|redacted|example)[A-Za-z0-9_+=/.!@#$%^&*-]{8,}["']/i
+        regex: /["']?(?:password|passwd|secret|client_secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)["']?\s*[:=]\s*["'](?!\$\{|@Microsoft\.KeyVault|Environment\.|<|\[REDACTED)[A-Za-z0-9_+=/.!@#$%^&*-]{8,}["']/i
     },
     {
         id: 'SEC-BEARER',
@@ -244,9 +247,21 @@ class OutboundContextGate {
         }
 
         // 6. Inspect for secrets, credentials, API keys, private keys
+        const allowedFixtures = this.policy.allowedTestFixtures instanceof Set
+            ? this.policy.allowedTestFixtures
+            : new Set(Array.isArray(this.policy.allowedTestFixtures) ? this.policy.allowedTestFixtures : []);
+
         for (const rule of SECRET_RULES) {
             const match = rule.regex.exec(combinedText);
             if (match) {
+                // If SEC-CRED-ASSIGN matches an explicitly registered test fixture without high-entropy suffix, allow it
+                if (rule.id === 'SEC-CRED-ASSIGN') {
+                    const candidateMatch = match[0].match(/["']([^"']+)["']\s*$/);
+                    const assignedVal = candidateMatch ? candidateMatch[1] : '';
+                    if (allowedFixtures.has(assignedVal) && !this._detectHighEntropyLiteral(`"${assignedVal}"`)) {
+                        continue;
+                    }
+                }
                 const lineNum = this._findLineNumber(combinedText, match.index);
                 return recordDecision(
                     'BLOCK',
@@ -386,11 +401,47 @@ class OutboundContextGate {
         // Inspect quoted literals >= minHighEntropyLength characters that contain mixed classes
         const literalRegex = /["']([A-Za-z0-9+/=_-]{20,})["']/g;
         let match;
+        const allowedFixtures = this.policy.allowedTestFixtures instanceof Set
+            ? this.policy.allowedTestFixtures
+            : new Set(Array.isArray(this.policy.allowedTestFixtures) ? this.policy.allowedTestFixtures : []);
+
         while ((match = literalRegex.exec(text)) !== null) {
             const candidate = match[1];
-            // Skip clear placeholders, documented test fixtures, URLs, or repetitive single-case snake/kebab symbols
+
+            // Explicitly registered test fixtures without high-entropy payload are permitted
+            if (allowedFixtures.has(candidate)) {
+                continue;
+            }
+
+            // Inspect prefix-bearing fixture or mock candidates (e.g. test_fixture_..., mock_..., sample_...)
+            const prefixMatch = /^(?:placeholder|redacted|masked|example|sample|test[-_]?fixture|test[-_]?data|mock[-_])[_-]?(.*)$/i.exec(candidate);
+            if (prefixMatch) {
+                const suffix = prefixMatch[1];
+                // If candidate has a fixture prefix but the suffix contains a high-entropy secret (>=16 chars, mixed classes), block it
+                if (suffix && suffix.length >= 16 && /[0-9]/.test(suffix) && /[A-Za-z]/.test(suffix)) {
+                    const suffixEntropy = calculateShannonEntropy(suffix);
+                    if (suffixEntropy >= this.policy.minHighEntropyBitsPerChar) {
+                        return {
+                            bitsPerChar: suffixEntropy,
+                            line: this._findLineNumber(text, match.index)
+                        };
+                    }
+                }
+                // Also block known structured key formats even with a fixture prefix (e.g. mock_AKIA..., test_fixture_ghp_...)
+                if (/(?:AKIA|ASIA)[0-9A-Z]{16}\b|(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b|[sr]k_(?:live|test)_[0-9A-Za-z]{8,}\b/.test(candidate)) {
+                    return {
+                        bitsPerChar: calculateShannonEntropy(candidate),
+                        line: this._findLineNumber(text, match.index)
+                    };
+                }
+                // Suffix is benign / short / non-secret
+                if (!suffix || !/[0-9]/.test(suffix) || !/[A-Za-z]/.test(suffix) || suffix.length < 16) {
+                    continue;
+                }
+            }
+
+            // Skip repetitive single-case snake/kebab symbols without mixed char types
             if (/^(?:[A-Z0-9_-]+|[a-z0-9-]+)$/.test(candidate)) continue;
-            if (/^(?:placeholder|redacted|masked|example|sample|test[-_]?fixture|test[-_]?data|mock[-_])/i.test(candidate)) continue;
             if (!/[0-9]/.test(candidate) || !/[A-Za-z]/.test(candidate)) continue;
 
             const bitsPerChar = calculateShannonEntropy(candidate);

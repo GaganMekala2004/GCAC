@@ -226,6 +226,8 @@ class IsolatedWorkspaceManager {
 
         // 5. Verify expected target file is available inside isolated worktree (if provided)
         let isolatedTargetFile = null;
+        const nestedWorktrees = [];
+
         if (expectedFileRelPath && typeof expectedFileRelPath === 'string') {
             const cleanRel = expectedFileRelPath.replace(/\\/g, '/').replace(/^\.?\//, '');
             let candidateInRepo = assertPathWithinWorkspace(path.join(safeIsolatedRepo, cleanRel), safeIsolatedRepo);
@@ -247,20 +249,49 @@ class IsolatedWorkspaceManager {
             } else if (candidateInWorktree && fs.existsSync(candidateInWorktree) && fs.statSync(candidateInWorktree).isFile()) {
                 isolatedTargetFile = candidateInWorktree;
             } else {
-                // Check if the expected target file exists on disk in safeRepoAbs (e.g. submodule / gitlink omitted by git worktree add)
+                // If expected target file sits in a nested Git repository / submodule within safeRepoAbs,
+                // materialize that entire nested repository as an isolated detached worktree.
+                // Never perform single-file loose copies that break Git tracking and leave dependencies missing.
                 const sourceOnDisk = path.join(safeRepoAbs, cleanRel);
                 if (fs.existsSync(sourceOnDisk) && fs.statSync(sourceOnDisk).isFile()) {
-                    const destInIsolated = path.join(safeIsolatedRepo, cleanRel);
-                    fs.mkdirSync(path.dirname(destInIsolated), { recursive: true });
-                    fs.copyFileSync(sourceOnDisk, destInIsolated);
-                    if (fs.existsSync(destInIsolated)) {
-                        isolatedTargetFile = destInIsolated;
+                    let nestedRepoDir = path.dirname(sourceOnDisk);
+                    let foundNestedGit = null;
+                    while (nestedRepoDir && nestedRepoDir.length >= safeRepoAbs.length) {
+                        if (fs.existsSync(path.join(nestedRepoDir, '.git')) && nestedRepoDir !== gitTopLevel) {
+                            foundNestedGit = nestedRepoDir;
+                            break;
+                        }
+                        const p = path.dirname(nestedRepoDir);
+                        if (p === nestedRepoDir) break;
+                        nestedRepoDir = p;
+                    }
+
+                    if (foundNestedGit) {
+                        const relSub = path.relative(safeRepoAbs, foundNestedGit);
+                        const destSubWorktree = path.join(safeIsolatedRepo, relSub);
+                        try {
+                            if (fs.existsSync(destSubWorktree)) {
+                                fs.rmSync(destSubWorktree, { recursive: true, force: true });
+                            }
+                            const subHead = this._runGit(foundNestedGit, ['rev-parse', '--verify', 'HEAD']);
+                            this._runGit(foundNestedGit, ['worktree', 'add', '--detach', destSubWorktree, subHead]);
+                            nestedWorktrees.push({ worktreeDir: destSubWorktree, gitRoot: foundNestedGit });
+                            const targetInSub = path.join(destSubWorktree, path.relative(foundNestedGit, sourceOnDisk));
+                            if (fs.existsSync(targetInSub) && fs.statSync(targetInSub).isFile()) {
+                                isolatedTargetFile = targetInSub;
+                            }
+                        } catch (subErr) {
+                            this.cleanupWorkspace({ runDir: safeRunDir, worktreeDir, gitRoot: gitTopLevel, nestedWorktrees });
+                            throw new IsolatedWorkspaceBlockedError(
+                                `Failed to materialize nested git repository at '${relSub}' into isolated worktree: ${subErr.message}`
+                            );
+                        }
                     }
                 }
             }
 
             if (!isolatedTargetFile) {
-                this.cleanupWorkspace({ runDir: safeRunDir, worktreeDir, gitRoot: gitTopLevel });
+                this.cleanupWorkspace({ runDir: safeRunDir, worktreeDir, gitRoot: gitTopLevel, nestedWorktrees });
                 throw new IsolatedWorkspaceBlockedError(`Expected target file '${expectedFileRelPath}' not found inside isolated worktree.`);
             }
         }
@@ -297,6 +328,7 @@ class IsolatedWorkspaceManager {
             isolatedRepoPath: safeIsolatedRepo,
             isolatedTargetFile,
             agentContextDir,
+            nestedWorktrees,
             excludedConfidentialPaths: excludedDetected,
             createdAt: new Date().toISOString()
         };
@@ -362,6 +394,18 @@ class IsolatedWorkspaceManager {
             throw new IsolatedWorkspaceBlockedError(
                 `Refusing cleanup outside designated run root '${this.runsRoot}': '${targetRunDir}'.`
             );
+        }
+
+        if (Array.isArray(handle.nestedWorktrees)) {
+            for (const nested of handle.nestedWorktrees) {
+                if (nested.gitRoot && nested.worktreeDir && fs.existsSync(nested.gitRoot)) {
+                    const safeSubWorktree = assertPathWithinWorkspace(nested.worktreeDir, safeRunDir);
+                    if (safeSubWorktree) {
+                        try { this._runGit(nested.gitRoot, ['worktree', 'remove', '--force', safeSubWorktree]); } catch {}
+                        try { this._runGit(nested.gitRoot, ['worktree', 'prune']); } catch {}
+                    }
+                }
+            }
         }
 
         if (handle.gitRoot && handle.worktreeDir && fs.existsSync(handle.gitRoot)) {
