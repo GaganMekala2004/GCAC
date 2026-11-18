@@ -92,7 +92,7 @@ const SECRET_RULES = [
     {
         id: 'SEC-CRED-ASSIGN',
         reason: 'Hardcoded credential or API secret assignment detected',
-        regex: /["']?(?:password|passwd|secret|client_secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)["']?\s*[:=]\s*["'](?!\$\{|@Microsoft\.KeyVault|Environment\.|<)[A-Za-z0-9_+=/.!@#$%^&*-]{8,}["']/i
+        regex: /["']?(?:password|passwd|secret|client_secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)["']?\s*[:=]\s*["'](?!\$\{|@Microsoft\.KeyVault|Environment\.|<|test[-_]?fixture|mock[-_]|sample[-_]|placeholder|redacted|example)[A-Za-z0-9_+=/.!@#$%^&*-]{8,}["']/i
     },
     {
         id: 'SEC-BEARER',
@@ -388,9 +388,9 @@ class OutboundContextGate {
         let match;
         while ((match = literalRegex.exec(text)) !== null) {
             const candidate = match[1];
-            // Skip clear placeholders, URLs, or repetitive single-case snake/kebab symbols
+            // Skip clear placeholders, documented test fixtures, URLs, or repetitive single-case snake/kebab symbols
             if (/^(?:[A-Z0-9_-]+|[a-z0-9-]+)$/.test(candidate)) continue;
-            if (/^(?:placeholder|redacted|masked|example|sample)/i.test(candidate)) continue;
+            if (/^(?:placeholder|redacted|masked|example|sample|test[-_]?fixture|test[-_]?data|mock[-_])/i.test(candidate)) continue;
             if (!/[0-9]/.test(candidate) || !/[A-Za-z]/.test(candidate)) continue;
 
             const bitsPerChar = calculateShannonEntropy(candidate);

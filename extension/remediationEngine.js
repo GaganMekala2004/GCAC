@@ -20,7 +20,7 @@ const {
     toLegacyCsvTestDisplay,
     evaluateFinalRemediationOutcome
 } = require('./outcomeContract');
-const { buildMinimizedSingleFinding } = require('./dataMinimization');
+const { buildMinimizedSingleFinding, sanitizeMasterDataReferences } = require('./dataMinimization');
 const { enforceSeverityGovernance } = require('./severityGovernance');
 const {
     ContentInjectionScreen,
@@ -1323,6 +1323,9 @@ class RemediationEngine {
 
         if (this.isLocalDevelopment) assertDevelopmentRepository(this.registry, resolvedRepositoryPath, options.workspaceTrusted);
         const minimizedFinding = buildMinimizedSingleFinding(finding);
+        if (ctxValidation.normalizedTargetRelPath) {
+            minimizedFinding.Location_Path = ctxValidation.normalizedTargetRelPath;
+        }
 
         let existingState = this.loadRunState(vulnerabilityId);
         if (existingState?.executionMode && existingState.executionMode !== this.executionMode && (isApproved || options.retryFromStage)) {
@@ -1411,6 +1414,18 @@ class RemediationEngine {
             canonicalStages = existingState.stages.map(s => ({ ...s }));
         }
         onProgress({ type: 'RUN_STARTED', stageId: 'intake', stageNumber: 1, summary: `Initialized isolated run for ${vulnerabilityId}` });
+        
+        // Preflight validation step (Category 1)
+        const candidatePreflightPath = ctxValidation.targetFileResolvedAbs || path.resolve(resolvedRepositoryPath, minimizedFinding.Location_Path || '');
+        const preflightTargetExists = Boolean(candidatePreflightPath && fs.existsSync(candidatePreflightPath));
+        log('PREFLIGHT', `Preflight Validation: Resolved Repo='${resolvedRepositoryPath}', Normalized Target='${minimizedFinding.Location_Path}', FileExists=${preflightTargetExists}`);
+        onProgress({
+            type: 'STAGE_PROGRESS',
+            stageId: 'intake',
+            stageNumber: 1,
+            summary: `Preflight: repository root '${resolvedRepositoryPath}', target '${minimizedFinding.Location_Path}', exists: ${preflightTargetExists}`
+        });
+
         onProgress({ type: 'STAGE_COMPLETE', stageId: 'intake', stageNumber: 1, summary: `Finding '${minimizedFinding.Vulnerability_ID}' mapped to repository ${resolvedRepositoryPath}.` });
 
         // Preserve Stage 5 P0-A suppression check on Stage 4 resume
@@ -1661,7 +1676,7 @@ class RemediationEngine {
         log('DISCOVERY', `Connected to real LLM backend: ${activeModelName} (${availableModels[0].family || availableModels[0].vendor})`);
 
         const sourceRedactor = createCredentialRedactor();
-        const modelSourceCode = sourceRedactor.redact(sourceCode);
+        const modelSourceCode = sanitizeMasterDataReferences(sourceRedactor.redact(sourceCode));
         const findingLine = Math.max(1, Number(minimizedFinding.Line_Number) || 1);
         const contextStart = Math.max(0, findingLine - 21);
         const numberedCode = modelSourceCode

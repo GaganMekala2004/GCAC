@@ -25,14 +25,35 @@ const SCREEN_OUTCOME = Object.freeze({
     BLOCK: 'BLOCK'
 });
 
+function getRuleReason(ruleId) {
+    if (typeof STRUCTURED_INJECTION_RULES !== 'undefined') {
+        const r1 = STRUCTURED_INJECTION_RULES.find(r => r.id === ruleId);
+        if (r1) return r1.reason;
+    }
+    if (typeof AMBIGUOUS_HOLD_RULES !== 'undefined') {
+        const r2 = AMBIGUOUS_HOLD_RULES.find(r => r.id === ruleId);
+        if (r2) return r2.reason;
+    }
+    if (ruleId === 'INJ-011') return 'Encoded instruction smuggling payload detected in untrusted content.';
+    return 'Untrusted content blocked by security policy.';
+}
+
 class ContentInjectionBlockedError extends Error {
-    constructor(decision) {
+    constructor(decision = {}) {
+        const outcome = decision.outcome || 'BLOCK';
+        const ruleId = decision.ruleId || 'INJ-UNKNOWN';
+        const reason = decision.reason || getRuleReason(ruleId);
+        const runId = decision.runId || 'unknown';
+        const source = decision.contentSource || 'unknown';
+        const policy = decision.policyVersion || 'GCAC-PH2-INJ-1.0';
         super(
-            `ContentInjectionScreen ${decision.outcome} (${decision.ruleId}): ${decision.reason} ` +
-            `[runId=${decision.runId}, source=${decision.contentSource}, policy=${decision.policyVersion}]`
+            `ContentInjectionScreen ${outcome} (${ruleId}): ${reason} ` +
+            `[runId=${runId}, source=${source}, policy=${policy}]`
         );
         this.name = 'ContentInjectionBlockedError';
-        this.decision = decision;
+        this.decision = { ...decision, outcome, ruleId, reason, policyVersion: policy };
+        this.ruleId = ruleId;
+        this.reason = reason;
     }
 }
 
@@ -352,6 +373,8 @@ class ContentInjectionScreen {
             trustClass,
             ruleId,
             outcome,
+            reason,
+            category: primary ? primary.category : 'NONE',
             policyVersion: this.policyVersion,
             timestamp: new Date().toISOString(),
             redactedLocation: redactedLoc,
@@ -372,6 +395,7 @@ class ContentInjectionScreen {
             outcome,
             ruleId,
             reason,
+            category: primary ? primary.category : 'NONE',
             matches,
             record
         };
@@ -385,7 +409,7 @@ class ContentInjectionScreen {
         if (res.outcome === SCREEN_OUTCOME.BLOCK ||
             res.outcome === SCREEN_OUTCOME.QUARANTINE ||
             (blockOnHold && res.outcome === SCREEN_OUTCOME.HOLD_FOR_REVIEW)) {
-            throw new ContentInjectionBlockedError(res.record);
+            throw new ContentInjectionBlockedError({ ...res.record, reason: res.reason, category: res.category });
         }
         return res;
     }

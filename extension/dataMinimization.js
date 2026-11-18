@@ -138,6 +138,13 @@ function buildMinimizedSingleFinding(rawFinding, options = {}) {
     return minimized;
 }
 
+const MASTER_DATA_STORE_REGEX = /(?:vulnerability[\\/])?vulnerabilities\.csv\b|vulnerabilities\.db\b|\bRawValuesJson\b/gi;
+
+function sanitizeMasterDataReferences(text) {
+    if (!text || typeof text !== 'string') return text;
+    return text.replace(MASTER_DATA_STORE_REGEX, '[REDACTED_MASTER_DATA]');
+}
+
 /**
  * Masks credentials and obvious PII tokens in free-text fields before LLM use.
  * @param {string} value
@@ -146,6 +153,7 @@ function buildMinimizedSingleFinding(rawFinding, options = {}) {
 function maskTextForAgent(value) {
     if (!value) return '';
     let masked = maskSensitiveEvidence(redactCredentials(String(value)));
+    masked = sanitizeMasterDataReferences(masked);
     masked = masked.replace(/\b[A-Za-z0-9._%+-]+@(?!example\.com\b|example\.org\b|localhost\b)[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi, '[REDACTED_EMAIL]');
     masked = masked.replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[REDACTED_SSN]');
     return masked;
@@ -155,6 +163,7 @@ module.exports = {
     ALLOWED_SINGLE_FINDING_FIELDS,
     SENSITIVE_OR_PROHIBITED_FIELDS,
     buildMinimizedSingleFinding,
-    maskTextForAgent
+    maskTextForAgent,
+    sanitizeMasterDataReferences
 };
 

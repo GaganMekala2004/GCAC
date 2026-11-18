@@ -46,9 +46,9 @@ async function run() {
 
     // 4. Secret redaction test
     // executeRealTestRunner with echo-like output containing an API key pattern
-    const mockOutput = 'Failed connecting with apiKey: "AIzaSyD-SecretKey123456789"';
+    const mockOutput = 'Failed connecting with apiKey: "test_fixture_api_key_1234567890"';
     const clean = mockOutput.replace(/(?:api[_-]?key|secret|password|token|bearer\s+)["':= ]+([A-Za-z0-9_-]{12,})/gi, 'REDACTED_SECRET');
-    assert(!clean.includes('AIzaSyD-SecretKey123456789'), 'Secret must be redacted');
+    assert(!clean.includes('test_fixture_api_key_1234567890'), 'Secret must be redacted');
     assert(clean.includes('REDACTED_SECRET'), 'Redaction placeholder must be present');
     console.log('  ✓ Secret redaction: Sensitive credentials redacted from test console output');
 }

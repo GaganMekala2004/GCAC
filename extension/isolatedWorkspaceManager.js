@@ -227,13 +227,39 @@ class IsolatedWorkspaceManager {
         // 5. Verify expected target file is available inside isolated worktree (if provided)
         let isolatedTargetFile = null;
         if (expectedFileRelPath && typeof expectedFileRelPath === 'string') {
-            const candidateInRepo = assertPathWithinWorkspace(path.join(safeIsolatedRepo, expectedFileRelPath), safeIsolatedRepo);
-            const candidateInWorktree = assertPathWithinWorkspace(path.join(worktreeDir, expectedFileRelPath), worktreeDir);
+            const cleanRel = expectedFileRelPath.replace(/\\/g, '/').replace(/^\.?\//, '');
+            let candidateInRepo = assertPathWithinWorkspace(path.join(safeIsolatedRepo, cleanRel), safeIsolatedRepo);
+            let candidateInWorktree = assertPathWithinWorkspace(path.join(worktreeDir, cleanRel), worktreeDir);
+
+            // If cleanRel was relative to workspaceRoot rather than safeRepoAbs, adjust relative to safeRepoAbs
+            if ((!candidateInRepo || !fs.existsSync(candidateInRepo)) && safeRepoAbs !== this.workspaceRoot) {
+                const wsFull = path.join(this.workspaceRoot, cleanRel);
+                if (fs.existsSync(wsFull)) {
+                    const relFromSafe = path.relative(safeRepoAbs, wsFull).replace(/\\/g, '/');
+                    if (!relFromSafe.startsWith('..')) {
+                        candidateInRepo = assertPathWithinWorkspace(path.join(safeIsolatedRepo, relFromSafe), safeIsolatedRepo);
+                    }
+                }
+            }
+
             if (candidateInRepo && fs.existsSync(candidateInRepo) && fs.statSync(candidateInRepo).isFile()) {
                 isolatedTargetFile = candidateInRepo;
             } else if (candidateInWorktree && fs.existsSync(candidateInWorktree) && fs.statSync(candidateInWorktree).isFile()) {
                 isolatedTargetFile = candidateInWorktree;
             } else {
+                // Check if the expected target file exists on disk in safeRepoAbs (e.g. submodule / gitlink omitted by git worktree add)
+                const sourceOnDisk = path.join(safeRepoAbs, cleanRel);
+                if (fs.existsSync(sourceOnDisk) && fs.statSync(sourceOnDisk).isFile()) {
+                    const destInIsolated = path.join(safeIsolatedRepo, cleanRel);
+                    fs.mkdirSync(path.dirname(destInIsolated), { recursive: true });
+                    fs.copyFileSync(sourceOnDisk, destInIsolated);
+                    if (fs.existsSync(destInIsolated)) {
+                        isolatedTargetFile = destInIsolated;
+                    }
+                }
+            }
+
+            if (!isolatedTargetFile) {
                 this.cleanupWorkspace({ runDir: safeRunDir, worktreeDir, gitRoot: gitTopLevel });
                 throw new IsolatedWorkspaceBlockedError(`Expected target file '${expectedFileRelPath}' not found inside isolated worktree.`);
             }

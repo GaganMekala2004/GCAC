@@ -798,6 +798,67 @@ function validateFindingContextContract(finding = {}, options = {}) {
         }
     }
 
+    // Resolve nested repositories, submodules, or workspace-specific paths (Category 1)
+    let effectiveTargetRelPath = norm.filePath || norm.locationPath || '';
+    let targetFileResolvedAbs = null;
+    if (resolvedRepo && effectiveTargetRelPath) {
+        const cleanRel = effectiveTargetRelPath.replace(/\\/g, '/').replace(/^\.?\//, '');
+        let candidateFile = path.resolve(resolvedRepo, cleanRel);
+        if (!fs.existsSync(candidateFile)) {
+            for (const root of authorizedRoots) {
+                const alt = path.resolve(root, cleanRel);
+                if (fs.existsSync(alt)) {
+                    candidateFile = alt;
+                    break;
+                }
+            }
+        }
+
+        // If file not found in ephemeral workspace, check registered repos for matching relative subpath
+        if (!fs.existsSync(candidateFile) && registry && cleanRel.includes('/repository/')) {
+            const afterRepo = cleanRel.split('/repository/')[1];
+            if (afterRepo) {
+                for (const reg of registry.getAllLocalRepositories ? registry.getAllLocalRepositories() : []) {
+                    const candidateInReg = path.join(reg.canonicalRepositoryPath, afterRepo);
+                    if (fs.existsSync(candidateInReg)) {
+                        candidateFile = candidateInReg;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (fs.existsSync(candidateFile) && fs.statSync(candidateFile).isFile()) {
+            targetFileResolvedAbs = candidateFile;
+            // Ascend from target file directory to locate the closest enclosing Git repository root
+            let currDir = path.dirname(candidateFile);
+            let closestEnclosingGit = null;
+            while (currDir && currDir.length >= 3) {
+                const gitMarker = path.join(currDir, '.git');
+                if (fs.existsSync(gitMarker)) {
+                    closestEnclosingGit = currDir;
+                    break;
+                }
+                const parent = path.dirname(currDir);
+                if (parent === currDir) break;
+                currDir = parent;
+            }
+
+            if (closestEnclosingGit && closestEnclosingGit !== resolvedRepo) {
+                const canonEnclosing = canonicalizePath(closestEnclosingGit);
+                const authEnclosing = authorizedRoots.length > 0
+                    ? assertPathWithinAuthorizedRoots(canonEnclosing, authorizedRoots)
+                    : { canonicalPath: canonEnclosing };
+                if (authEnclosing) {
+                    resolvedRepo = authEnclosing.canonicalPath;
+                    effectiveTargetRelPath = path.relative(resolvedRepo, candidateFile).replace(/\\/g, '/');
+                }
+            } else if (closestEnclosingGit === resolvedRepo) {
+                effectiveTargetRelPath = path.relative(resolvedRepo, candidateFile).replace(/\\/g, '/');
+            }
+        }
+    }
+
     if (!resolvedRepo) {
         return {
             valid: false,
@@ -829,6 +890,9 @@ function validateFindingContextContract(finding = {}, options = {}) {
         valid: true,
         requiresMapping: false,
         resolvedRepositoryPath: resolvedRepo,
+        normalizedTargetRelPath: effectiveTargetRelPath,
+        targetFileResolvedAbs,
+        targetFileExists: Boolean(targetFileResolvedAbs && fs.existsSync(targetFileResolvedAbs)),
         context
     };
 }

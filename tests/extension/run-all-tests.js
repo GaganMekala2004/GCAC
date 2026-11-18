@@ -17,6 +17,7 @@ const { runLiveProfileSelectionTests } = require('./liveScannerProfileSelection.
 const { runScenarioTests } = require('./dockerSandboxScenarios.test');
 const stage3ToolchainAndStateFixTests = require('./stage3ToolchainAndStateFix.test');
 const stage6TestVerificationTests = require('./stage6TestVerification.test');
+const { runOrchestratorFixesRegressionSuite } = require('./orchestratorFixesRegression.test');
 
 async function main() {
     console.log('===============================================================');
@@ -54,7 +55,8 @@ async function main() {
         { name: 'Live Scanner Profile Selection & Toolchain Hardening', fn: runLiveProfileSelectionTests },
         { name: 'Docker Sandbox Scenarios & Boundary Hardening (A-I)', fn: runScenarioTests },
         { name: 'Stage 3 Toolchain Selection & Workflow-State Integrity', fn: stage3ToolchainAndStateFixTests.run },
-        { name: 'Stage 6 .NET Test Verification & Remediation Evidence', fn: stage6TestVerificationTests.run }
+        { name: 'Stage 6 .NET Test Verification & Remediation Evidence', fn: stage6TestVerificationTests.run },
+        { name: 'Orchestrator Fixes & Pipeline Integrity (Categories 1-4)', fn: runOrchestratorFixesRegressionSuite }
     ];
 
     let passedSuites = 0;

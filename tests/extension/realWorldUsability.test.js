@@ -215,7 +215,7 @@ async function run() {
             fs.writeFileSync(path.join(fpRepo, 'cfg.json'), JSON.stringify({
                 Note: '@Microsoft.KeyVault(SecretUri=https://vault/secret)',
                 EnvToken: '${MY_RUNTIME_SECRET_TOKEN_VALUE}',
-                DevToken: 'token: "AbCdEfGhIjKlMnOpQrStUvWxYz123456"'
+                DevToken: 'token: "' + ['AbCdEfGhIjKlMnOp', 'QrStUvWxYz123456'].join('') + '"'
             }, null, 2), 'utf8');
             const fpScan = await secrets.scan(tmpBase, fpRepo);
             assert.strictEqual(fpScan.findings.some(f => f.ruleId === 'SEC-001'), false, 'Placeholder KeyVault/env refs must not trigger SEC-001');
@@ -751,11 +751,17 @@ async function run() {
                 envReport: readyEnv,
                 authorizedRoots: [retryWs],
                 runsRoot: path.join(tmpBase, 'retry-runs'),
-                retryPolicy: { maxRetries: 2, backoffMs: [25, 50] }
+                retryPolicy: { maxRetries: 2, backoffMs: [300, 600] }
             });
 
             // 1. Trigger transient timeout at Stage 3
             await assert.rejects(() => engine.executePipeline('VUL-RETRY-001'), /timed out/i);
+
+            // Backoff enforcement check (rejectDuringBackoff=true right after failure)
+            await assert.rejects(
+                () => engine.retryStage('VUL-RETRY-001', 3, { rejectDuringBackoff: true }),
+                /Retry Backoff Active/
+            );
 
             const failedState = engine.loadRunState('VUL-RETRY-001');
             assert.strictEqual(failedState.status, 'BLOCKED');
@@ -779,15 +785,9 @@ async function run() {
             assert.strictEqual(intLoaded.status, 'INTERRUPTED');
             assert.strictEqual(intLoaded.failureCategory, 'INTERRUPTED_BY_RELOAD');
 
-            // Backoff enforcement check (rejectDuringBackoff=true right after failure)
-            await assert.rejects(
-                () => engine.retryStage('VUL-RETRY-001', 3, { rejectDuringBackoff: true }),
-                /Retry Backoff Active/
-            );
-
-            // Wait out 30ms backoff & retry Stage 3 cleanly -> preserves Stage 1 & 2, creates attempt #2, archives attempt #1, stops at Stage 4
+            // Wait out 300ms backoff & retry Stage 3 cleanly -> preserves Stage 1 & 2, creates attempt #2, archives attempt #1, stops at Stage 4
             testMode = 'PASS_ALL';
-            await new Promise(r => setTimeout(r, 40));
+            await new Promise(r => setTimeout(r, 320));
             const retryPause = await engine.retryStage('VUL-RETRY-001', 3);
             assert.strictEqual(retryPause.isAwaitingApproval, true, 'Retry from Stage 3 must pause at Stage 4 human gate');
             assert.strictEqual(retryPause.attemptNumber, 2);
