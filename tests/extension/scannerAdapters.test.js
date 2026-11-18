@@ -56,7 +56,8 @@ async function run() {
         controller.registerScanner(codeqlScanner);
 
         const scannersInfo = controller.getScannersInfo();
-        assert.strictEqual(scannersInfo.length, 4, 'Should have 4 unique scanner adapters registered');
+        assert.strictEqual(scannersInfo.length, 6, 'Four local scanners and two opt-in providers must be registered');
+        assert.deepStrictEqual(scannersInfo.filter(s => controller.scanners.get(s.id).optIn).map(s => s.id).sort(), ['ai-candidate', 'osv']);
         assert(scannersInfo.some(s => s.id === 'secrets-config'));
         assert(scannersInfo.some(s => s.id === 'dotnet-security'));
         assert(scannersInfo.some(s => s.id === 'nuget-audit'));

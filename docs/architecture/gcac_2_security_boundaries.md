@@ -1,0 +1,10 @@
+# Security boundaries
+
+- A trusted Extension Host selects a provider. Webview requests for direct remediation accept a finding ID. Repository and provider settings come from trusted host state. Webview CSP blocks network access.
+- Ollama connects to numeric loopback on the Extension Host. In remote development this is the remote host. API discovery excludes remote-backed models and inference checks the model again. Trust in the runtime itself is a deployment prerequisite.
+- External AI needs an exact canonical repository path in the user-level machine setting gcac.cloudApprovedRepositories. The list defaults to empty. GCAC_DISABLE_CLOUD_AI=1 on the Extension Host denies cloud AI. Workspace overrides cannot grant permission. A native modal presents the screened prompt for each transmission.
+- The external credential is supplied through masked native input and VS Code SecretStorage. Transport sends credentials only to api.openai.com. External calls use TLS, an approved origin and a public IPv4 address selected during socket lookup. Redirects fail. Deadlines and response byte limits bound requests. Response bodies from failed services are excluded from diagnostics.
+- Both model paths minimize context, redact credentials and apply the outbound gate. Candidate findings and model responses are untrusted. Neither model adapter receives filesystem, process or tool callbacks.
+- The engine checks current run identity, source scope and the reviewed diff. Its execution gateway retains pinned container image, offline execution, test discovery and re-scan requirements. Model-provided PASS and lifecycle completion are insufficient for finding closure.
+- The new optional scanners require a fresh explicit selection. OSV requires approval of the package list. Candidate review requires approved saved source lines. Changes to the input during analysis invalidate the result.
+- Local-development acceptance uses disposable fixtures and explicitly labelled automated consent. Enterprise deployment still needs an independent review of identity enforcement, repository classification, supply-chain trust, source retention and native Copilot tool permissions.

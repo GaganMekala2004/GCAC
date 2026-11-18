@@ -53,6 +53,7 @@ let scanController = null;
 let reScanVerifier = null;
 let registry = null;
 let currentWorkspaceRoot = '';
+let providerHost;
 let extensionRootPath = path.resolve(__dirname, '..');
 let currentCsvPath = '';
 let hasUserInitiatedScan = false;
@@ -87,6 +88,9 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'openLocation',
     'getSourceCode',
     'launchCopilot',
+    'configureProvider',
+    'providerStatus',
+    'runProvider',
     'loadReports',
     'loadReportContent',
     'viewDiff',
@@ -201,12 +205,12 @@ async function requestPublicationConsent(vulnerabilityId) {
 }
 
 async function requestLocalDiffConsent(vulnerabilityId) {
-    if (!engine?.isLocalDevelopment) return {};
     const state = engine.loadRunState(vulnerabilityId);
+    if (!engine?.isLocalDevelopment && (!state?.provider || state.provider.id === 'copilot')) return {};
     if (!state?.proposedDiffSha256 || !state.patchDiff) throw new Error('No real proposed diff is available for local consent.');
     await vscode.commands.executeCommand('gcac.viewDiff', vulnerabilityId);
     const answer = await vscode.window.showInformationMessage(
-        `LOCAL_DEVELOPMENT: Apply this exact diff in the isolated worktree? Finding ${vulnerabilityId}; run ${state.runId}; SHA-256 ${state.proposedDiffSha256}. Local consent is not enterprise authentication. Native Copilot tools remain outside GCAC interception.`,
+        `${engine.executionMode}: Apply this exact diff in the isolated worktree? Finding ${vulnerabilityId}; run ${state.runId}; SHA-256 ${state.proposedDiffSha256}. Local consent is not enterprise authentication. Native Copilot tools remain outside GCAC interception.`,
         { modal: true }, 'Apply this diff');
     if (answer !== 'Apply this diff') throw new Error('Local developer declined or cancelled exact-diff consent.');
     return { approvedRunId: state.runId, approvedDiffSha256: state.proposedDiffSha256 };
@@ -243,6 +247,7 @@ function buildConfigPayload(extra = {}) {
         : 0;
     return {
         type: 'CONFIG_UPDATED',
+        provider: providerHost?.selection() || { id: 'copilot' },
         executionMode: engine?.executionMode || 'ENTERPRISE',
         activeRepo: currentScanTarget || currentWorkspaceRoot,
         activeRepoPath: activeTargetAbs,
@@ -329,7 +334,7 @@ function getCombinedFindings(csvPath, store, options = {}) {
             includeHistorical: options.includeHistorical === true
         });
         for (const r of scannedList) {
-            r.Source_Origin = 'LocalScanner';
+            r.Source_Origin ||= 'LocalScanner';
         }
         return canonicalRows([...csvList, ...scannedList]);
     } catch (e) {
@@ -407,6 +412,9 @@ function validateWebviewMessage(message) {
     if (!ALLOWED_IPC_COMMANDS.has(message.command)) {
         return { valid: false, error: `Unauthorized IPC command: '${message.command}'` };
     }
+    if (['configureProvider','providerStatus','runProvider'].includes(message.command) &&
+        (Object.keys(message).some(key => !['command','vulnerabilityId'].includes(key)) ||
+        (message.command === 'runProvider' && !message.vulnerabilityId))) return { valid: false, error: 'Invalid provider action' };
     if (message.vulnerabilityId !== undefined) {
         if (typeof message.vulnerabilityId !== 'string' || !VULN_ID_REGEX.test(message.vulnerabilityId)) {
             return { valid: false, error: `Invalid vulnerability ID format: '${message.vulnerabilityId}'` };
@@ -461,6 +469,7 @@ function broadcast(message) {
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+    providerHost = new (require('./providers/host').ProviderHost)(vscode, context);
     extensionRootPath = context?.extensionUri?.fsPath || path.resolve(__dirname, '..');
     currentWorkspaceRoot = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0
         ? vscode.workspace.workspaceFolders[0].uri.fsPath
@@ -493,6 +502,7 @@ function activate(context) {
 
     engine = new RemediationEngine(currentWorkspaceRoot, currentCsvPath, {
         extensionRoot: extensionRootPath,
+        providerHost,
         publicationService: githubPublicationService(),
         findingsStore,
         reScanVerifier,
@@ -561,6 +571,12 @@ function activate(context) {
                 { modal: true }, 'Approve migration contract');
             if (answer !== 'Approve migration contract') return;
             engine.approveCryptoMigrationContract(id, { acknowledged: true, legacyData: 'NONE' });
+            if (state.provider && state.provider.id !== 'copilot') {
+                await engine.executePipeline(id, {provider:state.provider, workspaceTrusted:vscode.workspace.isTrusted,
+                    authorizedRoots:buildAuthorizedRoots(), onProgress:event => broadcast({type:'REMEDIATION_PROGRESS',event})});
+                broadcast({type:'DETAILS_LOADED',details:loadVulnerabilityDetails(currentWorkspaceRoot,id)});
+                return;
+            }
             await vscode.commands.executeCommand('workbench.action.chat.open', { query: `@vulnerability-orchestrator /remediate-vulnerability ${id}`, isPartialQuery: false });
         } catch (error) { vscode.window.showErrorMessage(error.message); }
     }));
@@ -1102,6 +1118,7 @@ async function handleWebviewMessage(message, webview) {
     if (!engine) {
         engine = new RemediationEngine(currentWorkspaceRoot, currentCsvPath, {
             extensionRoot: extensionRootPath,
+            providerHost,
             publicationService: githubPublicationService(),
             findingsStore,
             reScanVerifier,
@@ -1400,6 +1417,7 @@ async function handleWebviewMessage(message, webview) {
                 const liveState = engine.loadRunState(message.vulnerabilityId);
                 if (liveState) {
                     details.runState = liveState;
+                    details.provider = liveState.provider;
                     details.runId = liveState.runId || details.runId || null;
                     details.attemptId = liveState.attemptId || details.attemptId || null;
                     details.attemptNumber = Number(liveState.attemptNumber || details.attemptNumber || 1);
@@ -1534,6 +1552,22 @@ async function handleWebviewMessage(message, webview) {
                 }
                 const scanResult = await scanController.startScan({
                     scannerIds: message.scannerIds,
+                    selectCandidateContext: async root => {
+                        const selected = providerHost.selection();
+                        if (selected.id === 'copilot') throw Error('Choose a direct inference provider for candidate review.');
+                        const items = vscode.window.visibleTextEditors.filter(editor => !editor.selection.isEmpty &&
+                            editor.document.uri.scheme === 'file' && !editor.document.isDirty &&
+                            assertPathWithinWorkspace(editor.document.uri.fsPath,root)).map(editor => ({
+                                label: path.relative(root,editor.document.uri.fsPath),
+                                description: 'Lines ' + (editor.selection.start.line+1) + '–' + (editor.selection.end.line+1),
+                                file:editor.document.uri.fsPath,start:editor.selection.start.line+1,end:editor.selection.end.line+1
+                            }));
+                        if (!items.length) throw Error('Select up to 60 lines in a saved source editor and use the Remediation sidebar.');
+                        const item = await vscode.window.showQuickPick(items,{title:'Approve selected lines for ' + selected.id + ' · ' + selected.model});
+                        if (item) return {...item,provider:selected.id,model:selected.model,client:providerHost.client(selected,root)};
+                    },
+                    approvePackages: async packages => (await vscode.window.showWarningMessage(
+                        'Query api.osv.dev with these public npm package versions?', {modal:true,detail:packages.join('\n')}, 'Query OSV')) === 'Query OSV',
                     mode: message.scanMode || message.mode || 'comprehensive',
                     bypassCache: Boolean(message.bypassCache),
                     targetRepo: targetPath,
@@ -2139,6 +2173,21 @@ async function handleWebviewMessage(message, webview) {
             break;
         }
 
+        case 'providerStatus': {
+            if (!vscode.workspace.isTrusted) return;
+            const status = await providerHost.status(resolveAuthorizedTarget(currentScanTarget || currentWorkspaceRoot));
+            webview.postMessage({ type:'PROVIDER_STATUS', status });
+            break;
+        }
+        case 'configureProvider': {
+            if (!vscode.workspace.isTrusted) return;
+            try {
+                await providerHost.configure(resolveAuthorizedTarget(currentScanTarget || currentWorkspaceRoot));
+                broadcast(buildConfigPayload());
+            } catch (error) { webview.postMessage({ type: 'ACTION_FEEDBACK', text: error.message, status: 'error' }); }
+            break;
+        }
+        case 'runProvider':
         case 'launchCopilot': {
             if (vscode.workspace && !vscode.workspace.isTrusted) {
                 vscode.window.showErrorMessage('GCAC: Copilot agent invocation is disabled in Restricted Mode. Please trust this workspace.');
@@ -2163,6 +2212,9 @@ async function handleWebviewMessage(message, webview) {
                 return;
             }
 
+            if (finding.Source_Classification === 'AI_CANDIDATE' || finding.Is_Historical === 'true') {
+                webview.postMessage({type:'ACTION_FEEDBACK',text:'Remediation requires a current, independently confirmed finding.',status:'warning'}); return;
+            }
             const promptRes = buildCopilotRemediationPrompt(finding, currentCsvPath, {
                 authorizedRoots: buildAuthorizedRoots(),
                 registry
@@ -2187,11 +2239,24 @@ async function handleWebviewMessage(message, webview) {
                 return;
             }
 
+            if (message.command === 'runProvider') {
+                try {
+                    const provider = providerHost.selection();
+                    if (provider.id === 'copilot') throw Error('Select a direct inference provider first.');
+                    await engine.executePipeline(finding.Vulnerability_ID, {
+                        provider, workspaceTrusted: vscode.workspace.isTrusted, authorizedRoots: buildAuthorizedRoots(),
+                        onProgress: event => broadcast({ type: 'REMEDIATION_PROGRESS', event })
+                    });
+                } catch (error) { webview.postMessage({ type: 'ACTION_FEEDBACK', text: error.message, status: 'error' }); }
+                await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: finding.Vulnerability_ID }, webview);
+                break;
+            }
             const query = promptRes.query;
             try {
-                vscode.commands.executeCommand('workbench.action.chat.open', { query, isPartialQuery: false });
+                await require('./providers/copilot').copilot.handoff(vscode.commands, query);
             } catch (e) {
-                console.warn('Could not execute workbench.action.chat.open:', e.message);
+                webview.postMessage({ type: 'ACTION_FEEDBACK', text: 'Could not open Copilot Chat.', status: 'error' });
+                return;
             }
 
             let handoffRes = null;

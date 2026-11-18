@@ -45,7 +45,7 @@ class LlmClient {
                 
                 // Fallback: If empty, query all chat models and filter
                 if (!copilotModels || copilotModels.length === 0) {
-                    copilotModels = await vscode.lm.selectChatModels();
+                    copilotModels = (await vscode.lm.selectChatModels()).filter(model => model.vendor === 'copilot');
                 }
 
                 if (copilotModels && copilotModels.length > 0) {

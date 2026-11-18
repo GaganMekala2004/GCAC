@@ -675,6 +675,8 @@
                                             </svg>
                                             <span>Run with Copilot</span>
                                         </button>
+                                        <button class="btn btn-secondary u-hidden" id="runProvider">Run remediation</button>
+                                        <span id="runProviderIdentity"></span>
                                         <button class="btn btn-secondary btn-sm" id="btnOpenLocation"
                                             title="Jump to source file in VS Code">
                                             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
@@ -1113,12 +1115,19 @@
 
                         <!-- Registered Scanners Grid -->
                         <div class="scanners-grid-section">
-                            <div class="section-heading">Approved Local Scanner Adapters</div>
+                            <div class="section-heading">Detection providers</div>
                             <div class="scanners-cards-grid" id="scannersCardsGrid">
                                 <!-- Dynamically populated via dashboard.js -->
                             </div>
                         </div>
 
+                        <div class="scan-scope-card">
+                            <div class="card-heading">AI provider</div>
+                            <p id="providerSelection">GitHub Copilot (default)</p>
+                            <button class="btn btn-secondary" id="configureProvider">Configure provider and model</button>
+                            <button class="btn btn-secondary" id="checkProvider">Check availability</button>
+                            <p role="status" id="providerStatus"></p>
+                        </div>
                         <!-- Scan Configuration & Scope -->
                         <div class="scan-scope-card">
                             <div class="card-heading">Scan Mode, Execution Scope &amp; Selectors</div>
@@ -1139,6 +1148,8 @@
                                 Comprehensive Scan runs all selected SAST, SCA, secrets/configuration, and optional CodeQL analyzers (CodeQL runs only when installed).
                             </div>
                             <div class="scan-options-row">
+                                <label class="scan-checkbox-label"><input type="checkbox" id="chkCandidate">AI candidate review of selected lines</label>
+                                <label class="scan-checkbox-label"><input type="checkbox" id="chkOsv">OSV public npm dependency intelligence</label>
                                 <label class="scan-checkbox-label">
                                     <input type="checkbox" id="chkScanSecrets" checked>
                                     <span><strong>Local Secrets &amp; Configuration</strong> (CWE-798, CWE-327,

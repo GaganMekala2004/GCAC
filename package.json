@@ -2,7 +2,7 @@
   "name": "gcac-vulnerability-remediation",
   "displayName": "GCAC Vulnerability Remediation Hub",
   "description": "Local Multi-Agent Security Remediation and Governance Dashboard for VS Code",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "publisher": "gcac",
   "engines": {
     "vscode": "^1.90.0"
@@ -99,7 +99,21 @@
           }
         ]
       }
-    ]
+    ],
+    "configuration": {
+      "title": "GCAC",
+      "properties": {
+        "gcac.cloudApprovedRepositories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "scope": "machine",
+          "default": [],
+          "description": "User-approved canonical repository paths classified for source sharing with api.openai.com. Every inference request also requires consent."
+        }
+      }
+    }
   },
   "capabilities": {
     "untrustedWorkspaces": {
@@ -108,7 +122,12 @@
     }
   },
   "scripts": {
-    "test": "node tests/extension/run-all-tests.js",
-    "start:preview": "node scripts/preview-dashboard.js"
+    "test": "node tests/extension/run-all-tests.js && node --test tests/extension/providerCompatibility.test.js tests/extension/directProviders.test.js tests/extension/optionalDetection.test.js",
+    "start:preview": "node scripts/preview-dashboard.js",
+    "package:vsix": "vsce package --no-dependencies"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ksgl-rohith/GCAC.git"
   }
 }

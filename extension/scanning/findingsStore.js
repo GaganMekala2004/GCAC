@@ -46,7 +46,7 @@ class FindingsStore {
     }
 
     _dedupeKey(finding) {
-        return `${this._repoKey(finding)}::${finding.findingFingerprint || ''}`;
+        return `${this._repoKey(finding)}::${finding.scannerId}::${finding.findingFingerprint || ''}`;
     }
 
     _nextUniqueFindingId(existingFindings, scannerId) {
@@ -167,6 +167,8 @@ class FindingsStore {
                 match.lastSeenScanId = match.scanId;
                 match.isHistorical = false;
                 match.evidence = finding.evidence || match.evidence;
+                if (finding.rawSourceReference) match.rawSourceReference = finding.rawSourceReference;
+                if (finding.originalSeverity !== undefined) match.originalSeverity = finding.originalSeverity;
                 match.evidenceRef = finding.evidenceRef || match.evidenceRef;
                 match.detectionMethod = finding.detectionMethod || match.detectionMethod;
                 if (finding.repository) match.repository = finding.repository;
@@ -199,7 +201,8 @@ class FindingsStore {
                 const itemRepoKey = this._repoKey(item);
                 if (itemRepoKey && itemRepoKey !== scannedRepoKey) {
                     item.isHistorical = true;
-                } else if (allowMarkAbsentHistorical && itemRepoKey === scannedRepoKey && !freshKeys.has(key)) {
+                } else if (allowMarkAbsentHistorical && itemRepoKey === scannedRepoKey && !freshKeys.has(key) &&
+                    (!options.scannedProviderIds || options.scannedProviderIds.includes(item.scannerId))) {
                     item.isHistorical = true;
                 }
             }

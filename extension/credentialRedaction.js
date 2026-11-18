@@ -19,6 +19,7 @@ function createCredentialRedactor() {
         return value
             .replace(/-----BEGIN\s+(?:(?:RSA|EC|DSA|OPENSSH|PGP)\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(?:(?:RSA|EC|DSA|OPENSSH|PGP)\s+)?PRIVATE\s+KEY-----/g, token)
             .replace(/\b[sr]k_(?:live|test)_[0-9A-Za-z]{8,}\b/g, token)
+            .replace(/\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b/g, token)
             .replace(/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, token)
             .replace(/\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b|\bgithub_pat_[A-Za-z0-9_]{20,}\b/g, token)
             .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, token)

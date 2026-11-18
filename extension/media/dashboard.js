@@ -1053,6 +1053,11 @@
             });
         }
 
+        document.getElementById('checkProvider')?.addEventListener('click', () => postToHost({ command: 'providerStatus' }));
+        document.getElementById('configureProvider')?.addEventListener('click', () => postToHost({ command: 'configureProvider' }));
+        document.getElementById('runProvider')?.addEventListener('click', () => {
+            if (selectedVulnerability) postToHost({ command: 'runProvider', vulnerabilityId: selectedVulnerability.Vulnerability_ID });
+        });
         // Action Buttons in Inspector
         if (btnLaunchCopilot) {
             btnLaunchCopilot.addEventListener('click', () => {
@@ -1321,8 +1326,24 @@
             if (!message) return;
 
             switch (message.type) {
+                case 'PROVIDER_STATUS':
+                    if (message.status.id === currentConfig.provider?.id && message.status.model === currentConfig.provider?.model)
+                        document.getElementById('providerStatus').textContent = message.status.message;
+                    break;
                 case 'CONFIG_UPDATED':
+                    {
+                        const provider = message.provider || {id:'copilot'};
+                        const label = provider.id === 'copilot' ? 'GitHub Copilot (default)' :
+                            provider.id === 'ollama' ? 'Ollama on Extension Host loopback · ' + provider.model :
+                            'OpenAI · ' + provider.model + ' · repository permission and per-request consent required';
+                        document.getElementById('providerSelection').textContent = label;
+                        document.getElementById('providerStatus').textContent = '';
+                        const button = document.getElementById('runProvider');
+                        button.classList.toggle('u-hidden', provider.id === 'copilot');
+                        button.textContent = 'Run with ' + provider.id;
+                    }
                     currentConfig = {
+                        provider: message.provider,
                         executionMode: message.executionMode || 'ENTERPRISE',
                         activeRepo: message.activeRepo || '',
                         activeRepoPath: message.activeRepoPath || '',
@@ -2647,6 +2668,10 @@
     // Inspector Details & Stepper Rendering
     // --------------------------------------------------------------------------
     function renderInspectorDetails(details) {
+        const identity = details?.provider || details?.runState?.provider;
+        const proposal = details?.runState?.proposalSource;
+        document.getElementById('runProviderIdentity').textContent = identity
+            ? [identity.id, identity.model, proposal?.kind === 'DOTNET_REPAIR_RECIPE' ? '.NET repair recipe' : ''].filter(Boolean).join(' · ') : '';
         if (!details) return;
 
         // 1. Render Stepper
@@ -3228,6 +3253,8 @@
     // --------------------------------------------------------------------------
     function triggerScanExecution() {
         const scannerIds = [];
+        if (document.getElementById('chkCandidate')?.checked) scannerIds.push('ai-candidate');
+        if (document.getElementById('chkOsv')?.checked) scannerIds.push('osv');
         if (chkScanSecrets && chkScanSecrets.checked) scannerIds.push('secrets-config-scanner');
         if (chkScanDotnet && chkScanDotnet.checked) scannerIds.push('dotnet-security-scanner');
         if (chkScanNuget && chkScanNuget.checked) scannerIds.push('nuget-audit-scanner');

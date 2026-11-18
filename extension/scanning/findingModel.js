@@ -121,6 +121,7 @@ class NormalizedFinding {
         this.title = data.title || 'Security Finding';
         this.description = data.description || '';
         this.severity = this._normalizeSeverity(data.severity);
+        if (data.originalSeverity !== undefined) this.originalSeverity = data.originalSeverity;
         this.confidence = data.confidence || null; // 'High' | 'Medium' | 'Low' | null
         this.detectionMethod = data.detectionMethod || (data.classificationType === 'POTENTIAL_SECRET_REVIEW' ? 'HEURISTIC_PATTERN' : 'ANALYZER_RULE');
         this.cwe = data.cwe || null; // e.g. 'CWE-798', 'CWE-89'
@@ -164,6 +165,7 @@ class NormalizedFinding {
     _normalizeSeverity(sev) {
         if (!sev) return SEVERITY_LEVELS.MEDIUM;
         const s = sev.toString().toUpperCase();
+        if (s === 'UNKNOWN') return 'Unknown';
         if (s.includes('CRIT')) return SEVERITY_LEVELS.CRITICAL;
         if (s.includes('HIGH') || s === 'ERROR') return SEVERITY_LEVELS.HIGH;
         if (s.includes('MED') || s === 'WARNING') return SEVERITY_LEVELS.MEDIUM;
@@ -185,7 +187,7 @@ class NormalizedFinding {
             Vulnerability_ID: this.findingId,
             Context_Schema_Version: this.contextSchemaVersion || 'GCAC-FINDING-CTX-1.0',
             Source_Type: 'SCANNER',
-            Source_Origin: 'LocalScanner',
+            Source_Origin: this.sourceClassification,
             Scanner_ID: this.scannerId,
             Rule_ID: this.ruleId,
             Scanner_Version: this.scannerVersion,
@@ -220,14 +222,14 @@ class NormalizedFinding {
             Internet_Facing: 'false',
             Product_Owner: 'Security Team',
             Primary_Manager: 'Engineering Lead',
-            Requires_Human_Review: (this.classificationType === 'POTENTIAL_SECRET_REVIEW' || !this.repository || !this.applicationNumber) ? 'true' : 'false',
+            Requires_Human_Review: (this.sourceClassification === 'AI_CANDIDATE' || this.classificationType === 'POTENTIAL_SECRET_REVIEW' || !this.repository || !this.applicationNumber) ? 'true' : 'false',
             Agent_Code_Analysis_Output: this.description,
             Agent_Unit_Test_Output: '',
             Agent_Remediation_Output: '',
             Agent_Regression_Output: '',
             Agent_Final_Validation_Output: '',
             Agent_Documentation_Output: '',
-            Remediation_Status: this.status === 'Resolved' ? 'Remediated' : (this.status === 'Detected' ? 'Pending' : (this.status || 'Pending')),
+            Remediation_Status: this.sourceClassification === 'AI_CANDIDATE' ? 'AI_CANDIDATE' : this.status === 'Resolved' ? 'Remediated' : (this.status === 'Detected' ? 'Pending' : (this.status || 'Pending')),
             Final_Validation_Status: 'Pending',
             Final_Confidence_Score: '0',
             Test_Status: 'Pending',

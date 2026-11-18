@@ -61,6 +61,8 @@ class ScanController {
         this.registerScanner(new DotnetSecurityScanner());
         this.registerScanner(new NuGetAuditScanner());
         this.registerScanner(new SecretsConfigScanner());
+        this.registerScanner(new (require('./adapters/osv').OsvScanner)());
+        this.registerScanner(new (require('./adapters/aiCandidate').CandidateScanner)());
         this.registerScanner(new CodeQLScanner({ workspaceRoot, extensionRoot: this.extensionRoot }));
 
         this.isScanning = false;
@@ -265,7 +267,7 @@ class ScanController {
             const hasExplicitSelection = Array.isArray(scanRequest.scannerIds) && scanRequest.scannerIds.length > 0;
             const selectedIds = hasExplicitSelection
                 ? scanRequest.scannerIds
-                : (scanMode === 'quick' ? QUICK_MODE_SCANNERS.filter(id => this.scanners.has(id)) : allRegisteredIds);
+                : (scanMode === 'quick' ? QUICK_MODE_SCANNERS.filter(id => this.scanners.has(id)) : allRegisteredIds.filter(id => !this.scanners.get(id).optIn));
 
             const activeAdapters = [];
             const seenAdapters = new Set();
@@ -280,11 +282,13 @@ class ScanController {
             }
 
             const omittedScanners = allRegisteredIds.filter(id => !seenAdapters.has(id));
-            const coverageDisclosure = scanMode === 'quick'
+            const baseDisclosure = scanMode === 'quick'
                 ? `Quick Scan covers fast local secrets and configuration checks only (${activeAdapters.map(a => a.id).join(', ')}). Omitted analyzers (${omittedScanners.join(', ') || 'none'}): not equivalent to a comprehensive security assessment.`
                 : (seenAdapters.has('codeql')
                     ? 'Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.'
                     : `Comprehensive Scan executed with explicitly selected analyzers (${activeAdapters.map(a => a.id).join(', ')}); omitted: ${omittedScanners.join(', ') || 'none'}.`);
+
+            const coverageDisclosure = activeAdapters.some(a => a.optIn) ? 'Selected adapters: ' + activeAdapters.map(a => a.name).join(', ') + '. OSV covers approved public npm versions. AI review covers only selected lines.' : baseDisclosure;
 
             emitProgress({
                 type: 'SCAN_STARTED',
@@ -331,7 +335,7 @@ class ScanController {
                 const ingestStats = this.findingsStore.ingestScanFindings([], scanId, {
                     canonicalRepositoryId: repoContext.canonicalRepositoryId,
                     repositoryRoot: repoContext.repositoryRoot,
-                    fullScanCompleted: true
+                    fullScanCompleted: true, scannedProviderIds: activeAdapters.map(a => a.id)
                 });
 
                 const metrics = {
@@ -480,7 +484,7 @@ class ScanController {
                 });
 
                 let cacheDescriptor = null;
-                if (useCache && scanner.id !== 'nuget-audit' && inputFingerprint && repoContext.canonicalRepositoryId) {
+                if (useCache && !scanner.optIn && scanner.id !== 'nuget-audit' && inputFingerprint && repoContext.canonicalRepositoryId) {
                     const tCache0 = process.hrtime.bigint();
                     const ruleConfigHash = stableHashObject({
                         scannerId: scanner.id,
@@ -547,6 +551,8 @@ class ScanController {
                         scanMode,
                         // Let adapters choose a workload-appropriate default.
                         timeoutMs: scanRequest.scannerTimeouts?.[scanner.id] ?? scanRequest.timeoutMs,
+                        selectCandidateContext: scanRequest.selectCandidateContext,
+                        approvePackages: scanRequest.approvePackages,
                         advisorySnapshotPath: scanRequest.advisorySnapshotPath,
                         extensionRoot: this.extensionRoot,
                         repoContext,
@@ -689,7 +695,8 @@ class ScanController {
             const ingestStats = this.findingsStore.ingestScanFindings(allDiscoveredFindings, scanId, {
                 canonicalRepositoryId: repoContext.canonicalRepositoryId,
                 repositoryRoot: repoContext.repositoryRoot,
-                fullScanCompleted: !hasScannerFailures
+                fullScanCompleted: !hasScannerFailures && !activeAdapters.some(a => a.optIn),
+                scannedProviderIds: activeAdapters.map(a => a.id)
             });
 
             const findingsSummary = {
@@ -707,6 +714,8 @@ class ScanController {
                 overallStatus = 'Cancelled';
             } else if (allNoInputs) {
                 overallStatus = 'No Scannable Inputs';
+            } else if (!hasScannerFailures && scannerResults.some(r => r.status === SCANNER_STATUS.PARTIAL)) {
+                overallStatus = 'Partial';
             } else if (hasScannerFailures) {
                 overallStatus = (allDiscoveredFindings.length > 0 || hasSuccessfulScanner) ? 'Partial' : 'Failed';
             }
@@ -744,7 +753,7 @@ class ScanController {
                 cancelled: wasCancelled,
                 timedOut: anyTimedOut,
                 noScannableInputs: allNoInputs,
-                unverifiedCoverage: hasScannerFailures,
+                unverifiedCoverage: hasScannerFailures || overallStatus === 'Partial',
                 scannersCount: activeAdapters.length,
                 scannerSummary: scannerResults.map(r => ({
                     id: r.scannerId,
@@ -788,7 +797,7 @@ class ScanController {
                 timedOut: anyTimedOut,
                 noScannableInputs: allNoInputs,
                 reasonCode: wasCancelled ? 'SCAN_CANCELLED' : (allNoInputs ? 'NO_SCANNABLE_INPUTS' : null),
-                unverifiedCoverage: hasScannerFailures,
+                unverifiedCoverage: hasScannerFailures || overallStatus === 'Partial',
                 timestamp: sessionRecord.timestamp,
                 durationMs: totalDuration,
                 scannersExecuted: activeAdapters.length,

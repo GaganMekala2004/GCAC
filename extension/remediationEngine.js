@@ -120,6 +120,7 @@ class RemediationEngine {
         this.reScanVerifier = options.reScanVerifier || null;
         this.extensionRoot = options.extensionRoot || path.resolve(__dirname, '..');
         this.llmClient = options.llmClient || llmClient;
+        this.providerHost = options.providerHost;
         this.runBaselineTests = options.testRunner?.runBaselineTests || runBaselineTests;
         this.runPostFixTests = options.testRunner?.runPostFixTests || runPostFixTests;
         this.compileProposal = options.compileProposal || require('./proposalCompilation').compileProposal;
@@ -1285,6 +1286,7 @@ class RemediationEngine {
         if (!finding && this.findingsStore) {
             const scannedItem = this.findingsStore.getFindingById(vulnerabilityId);
             if (scannedItem) {
+                if (scannedItem.sourceClassification === 'AI_CANDIDATE' || scannedItem.isHistorical) throw Error('Requires a current, independently confirmed finding');
                 finding = scannedItem.toCsvCompatibleRecord();
                 isScannedFinding = true;
             }
@@ -1349,6 +1351,10 @@ class RemediationEngine {
         }
 
         if (isApproved && !isFinalApproved) {
+            if (existingState?.provider && existingState.provider.id !== 'copilot' && !isFinalApproved && !options.retryFromStage &&
+                (options.approvedRunId !== existingState.runId || options.approvedDiffSha256 !== existingState.proposedDiffSha256)) {
+                throw new Error('LOCAL_APPROVAL_DIFF_MISMATCH: Consent must match the current provider run and reviewed diff.');
+            }
             if (this.isLocalDevelopment && !(Number(options.retryFromStage) >= 6 && existingState?.patchAppliedAtStage5 && existingState?.approvalRecord) && (!existingState || options.approvedDiffSha256 !== existingState.proposedDiffSha256 || options.approvedRunId !== existingState.runId)) {
                 throw new Error('LOCAL_APPROVAL_DIFF_MISMATCH: Explicit consent must name the current run and exact proposed diff digest.');
             }
@@ -1385,6 +1391,8 @@ class RemediationEngine {
         }
 
         const isRetryExecution = Boolean(options.retryFromStage || options.attemptId || options.revisionFeedback);
+        const provider = ((isApproved || isRetryExecution) ? existingState?.provider : options.provider) || { id: 'copilot' };
+        const modelClient = provider.id === 'copilot' ? this.llmClient : this.providerHost.client(provider, resolvedRepositoryPath);
         const runId = ((isApproved || isRetryExecution) && existingState && existingState.runId)
             ? (options.runId || existingState.runId)
             : crypto.randomUUID();
@@ -1625,6 +1633,7 @@ class RemediationEngine {
             canonicalStages[1].summary = remediationDecision.blockingReason;
             for (let i = 2; i < canonicalStages.length; i++) canonicalStages[i].status = 'not_started';
             this.saveRunState(finding.Vulnerability_ID, {
+                provider,
                 runId, attemptId, attemptNumber, vulnerabilityId: finding.Vulnerability_ID,
                 repositoryId: activeRepoIdRef, status: 'MANUAL_REVIEW', isManualReview: true,
                 baseTargetSha256: baseSourceSha256, targetRelPath, sourceFilePath,
@@ -1651,7 +1660,7 @@ class RemediationEngine {
         }
 
         // Verify real LLM is available before proceeding
-        const availableModels = await this.llmClient.getAvailableModels();
+        const availableModels = await modelClient.getAvailableModels({ cancellationToken: options.cancellationToken });
         if (availableModels.length === 0) {
             const errText = 'No real Language Model available. Please ensure GitHub Copilot is installed and active in VS Code (or configure an LLM API provider). The pipeline strictly prohibits fake templates.';
             log('ERROR', errText);
@@ -1676,6 +1685,7 @@ class RemediationEngine {
             findingContext: minimizedFinding
         };
 
+        let proposalSource = existingState?.runId === runId ? existingState.proposalSource : null;
         let patchDiff = existingState?.patchDiff || '';
         let fullRemediatedCode = existingState?.fullRemediatedCode || '';
         let approvedFilePaths = existingState?.approvedFilePaths || [];
@@ -1696,6 +1706,7 @@ class RemediationEngine {
             currentStageNumber = Math.max(2, retryStageFloor <= 4 ? retryStageFloor : 2);
             currentStageId = currentStageNumber === 3 ? 'analysis' : 'classification';
             this.saveRunState(finding.Vulnerability_ID, {
+                provider,
                 runId,
                 attemptId,
                 attemptNumber,
@@ -1772,11 +1783,11 @@ Perform an objective ADVISORY classification (scanner severity remains authorita
 }`;
 
             try {
-                classification = await this.llmClient.generateJson(classifyPrompt, llmCallContext);
+                classification = await modelClient.generateJson(classifyPrompt, { ...llmCallContext, operation: 'classification' });
             } catch (err) {
-                if (err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
+                if (modelClient.strict || err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
                 log('CLASSIFY', `LLM JSON parse note: ${err.message}. Retrying with completion...`);
-                const fallbackText = await this.llmClient.generateCompletion(classifyPrompt, llmCallContext);
+                const fallbackText = await modelClient.generateCompletion(classifyPrompt, llmCallContext);
                 this._screenUntrustedText(fallbackText, 'llm:classificationFallback', TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
                 classification = {
                     cwe: minimizedFinding.Detailed_Name || 'CWE-Unknown',
@@ -1868,10 +1879,10 @@ Perform complete analysis and return a JSON object with EXACTLY these keys:
 }`;
 
             try {
-                rca = await this.llmClient.generateJson(rcaPrompt, llmCallContext);
+                rca = await modelClient.generateJson(rcaPrompt, { ...llmCallContext, operation: 'analysis' });
             } catch (err) {
-                if (err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
-                const rawRca = await this.llmClient.generateCompletion(rcaPrompt, llmCallContext);
+                if (modelClient.strict || err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
+                const rawRca = await modelClient.generateCompletion(rcaPrompt, llmCallContext);
                 this._screenUntrustedText(rawRca, 'llm:rcaFallback', TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
                 rca = {
                     dataFlow: `Source parameter propagates unvalidated to sensitive sink execution in ${path.basename(targetRelPath)}.`,
@@ -2029,7 +2040,7 @@ Return exactly this JSON shape:
             for (let proposalAttempt = 1; proposalAttempt <= proposalLimit; proposalAttempt++) {
                 if (options.cancellationToken?.isCancellationRequested) throw new Error('Remediation cancelled before patch proposal.');
                 const usingRecipe = proposalAttempt === 4;
-                const remediationResponse = usingRecipe ? repairProposal : sourceRedactor.restore(await this.llmClient.generateCompletion(remediationPrompt + patchFeedback, { ...llmCallContext, sourceCode: modelSourceCode }));
+                const remediationResponse = usingRecipe ? repairProposal : sourceRedactor.restore(await modelClient.generateCompletion(remediationPrompt + patchFeedback, { ...llmCallContext, operation: 'proposal', sourceCode: modelSourceCode }));
                 this._screenUntrustedText(remediationResponse, usingRecipe ? 'recipe:dotnetSourcePattern' : 'llm:remediationProposal',
                     usingRecipe ? TRUST_CLASSES.UNTRUSTED_SOURCE_CODE : TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
                 if (usingRecipe) {
@@ -2076,6 +2087,12 @@ Return exactly this JSON shape:
                         chainEvents.push({ timestamp: now(), stage: 'PROPOSAL', eventType: 'CANDIDATE_COMPILED', payload: proposalCompilation });
                     }
                     const canonicalProposalSha256 = computeDiffSha256(patchDiff);
+                    proposalSource = {
+                        contractVersion: 1, kind: usingRecipe ? 'DOTNET_REPAIR_RECIPE' : 'MODEL_PROPOSAL',
+                        provider: usingRecipe ? null : provider.id,
+                        model: usingRecipe ? null : provider.model || modelClient.lastUsedModel || null,
+                        diffSha256: canonicalProposalSha256
+                    };
                     if (rawProposalSha256 !== canonicalProposalSha256) {
                         log('REMEDIATE', 'Rebuilt diff metadata with Git from exact, unique source edits; isolated source unchanged.');
                         chainEvents.push({ timestamp: new Date().toISOString(), stage: 'PROPOSAL', eventType: 'PATCH_CANONICALIZED',
@@ -2166,6 +2183,8 @@ Return exactly this JSON shape:
         }
 
         const stage4StatePayload = {
+            provider, proposalSource,
+            providerRequests: [...((isApproved || isRetryExecution) ? existingState?.providerRequests || [] : []), ...(modelClient.requests || [])],
             executionMode: this.executionMode,
             developmentBaselineConsent: existingState?.developmentBaselineConsent || null,
             runId,
@@ -2608,13 +2627,13 @@ Return a JSON object with EXACTLY these keys:
         let securityReview = null;
         try {
             if (options.cancellationToken?.isCancellationRequested) throw new Error('Cancelled before model security review; no review executed.');
-            securityReview = await this.llmClient.generateJson(auditPrompt, {
-                ...llmCallContext,
+            securityReview = await modelClient.generateJson(auditPrompt, {
+                ...llmCallContext, operation: 'review',
                 sourceCode: patchDiff
             });
             this._screenUntrustedText(JSON.stringify(securityReview), 'llm:securityReview', TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
         } catch (err) {
-            if (err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
+            if (modelClient.strict || err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
             securityReview = {
                 rating: 'NOT_VERIFIED',
                 summary: `Independent security audit fallback (${err.message}): evaluating deterministic test outcome ${postTestOutcome}.`,
@@ -2637,6 +2656,10 @@ Return a JSON object with EXACTLY these keys:
             suppressionDetected: stageSuppressionDetected
         });
 
+        if (modelClient.requests?.length) {
+            const reviewRequest = modelClient.requests.findLast(request => request.operation === 'review');
+            if (reviewRequest) currentState.providerRequests.push(reviewRequest);
+        }
         delete securityReview.score;
         if (outcomeEvaluation.finalValidationOutcome !== OUTCOME_STATUS.PASSED) {
             securityReview.rating = outcomeEvaluation.legacyFinalValidationStatus;
@@ -3263,11 +3286,13 @@ Return a JSON object with EXACTLY these keys:
                 failedDiagnostics.passed = false;
             }
 
-            const prev = this.loadRunState(vulnerabilityId) || existingState || {};
+            const saved = this.loadRunState(vulnerabilityId) || existingState;
+            const prev = saved?.runId === runId ? saved : {};
             const failedState = {
                 executionMode: this.executionMode,
                 localOutcome: this.isLocalDevelopment ? (prerequisiteBlocked ? 'BLOCKED' : 'FAILED') : undefined,
                 ...prev,
+                provider,
                 runId,
                 attemptId,
                 attemptNumber,

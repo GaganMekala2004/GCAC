@@ -1,0 +1,10 @@
+**/*
+!README.md
+!package.json
+!extension/**/*.js
+!extension/media/*.html
+!extension/media/*.css
+!extension/config/*.json
+!.github/agents/*.agent.md
+!.github/copilot-instructions.md
+!scripts/setup-codeql.js

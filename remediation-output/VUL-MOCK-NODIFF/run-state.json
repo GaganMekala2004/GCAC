@@ -1,7 +1,7 @@
 {
   "runId": "run-nodiff-1",
   "vulnerabilityId": "VUL-MOCK-NODIFF",
-  "status": "IN_PROGRESS",
+  "status": "INTERRUPTED",
   "workflowLifecycle": "WAITING_APPROVAL",
   "stages": [
     {
@@ -273,6 +273,10 @@
   "formalClosure": "IN_REMEDIATION",
   "findingState": "IN_REMEDIATION",
   "handoff": null,
-  "updatedAt": "2026-11-17T03:11:06.260Z",
-  "terminalBanner": ""
+  "updatedAt": "2026-11-18T02:44:15.635Z",
+  "terminalBanner": "",
+  "failedStage": 1,
+  "failureCategory": "INTERRUPTED_BY_RELOAD",
+  "failureReason": "Execution interrupted before completion (VS Code reload or extension host restart).",
+  "lastFailureAt": "2026-11-18T02:44:15.634Z"
 }
