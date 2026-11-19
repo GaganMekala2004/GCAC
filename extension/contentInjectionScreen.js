@@ -385,7 +385,7 @@ class ContentInjectionScreen {
         if (res.outcome === SCREEN_OUTCOME.BLOCK ||
             res.outcome === SCREEN_OUTCOME.QUARANTINE ||
             (blockOnHold && res.outcome === SCREEN_OUTCOME.HOLD_FOR_REVIEW)) {
-            throw new ContentInjectionBlockedError(res.record);
+            throw new ContentInjectionBlockedError({ ...res.record, reason: res.reason });
         }
         return res;
     }

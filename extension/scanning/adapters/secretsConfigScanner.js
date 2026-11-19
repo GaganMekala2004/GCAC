@@ -8,7 +8,7 @@ const {
     maskSensitiveEvidence,
     inferTechnologyFromFilePath
 } = require('../findingModel');
-const { assertPathWithinAuthorizedRoots, canonicalizePath } = require('../../repositoryContext');
+const { assertPathWithinAuthorizedRoots, canonicalizePath, isSeparateRepositoryDirectory } = require('../../repositoryContext');
 
 const PLACEHOLDER_VALUE_REGEX = /(?:^|["'])(?:\$\{[^}]+\}|@Microsoft\.KeyVault|Environment\.GetEnvironmentVariable|process\.env\.|<[^>]+>|REDACTED|PLACEHOLDER|EXAMPLE|YOUR[_-]|CHANGE[_-]?ME|DUMMY|SAMPLE)/i;
 
@@ -108,7 +108,7 @@ class SecretsConfigScanner extends ScannerAdapter {
         super({
             id: 'secrets-config',
             name: 'Local Secrets & Configuration Analyzer',
-            version: '1.3.1',
+            version: '1.3.2',
             supportedLanguages: ['csharp', 'dotnet', 'java', 'json', 'xml', 'javascript', 'config'],
             supportedCategories: [
                 'CWE-798 (Hardcoded Credentials)',
@@ -154,7 +154,7 @@ class SecretsConfigScanner extends ScannerAdapter {
                 if (entry.name.startsWith('.') && entry.name !== '.env') continue;
                 const fullPath = path.join(canonicalDir, entry.name);
                 if (entry.isDirectory()) {
-                    if (!IGNORED_DIRS.has(entry.name)) {
+                    if (!IGNORED_DIRS.has(entry.name) && !isSeparateRepositoryDirectory(fullPath)) {
                         this._collectFiles(fullPath, allowedRoots, collected, stats);
                     }
                 } else if (entry.isFile()) {

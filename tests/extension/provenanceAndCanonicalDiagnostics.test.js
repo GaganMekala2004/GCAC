@@ -25,6 +25,19 @@ async function run() {
             assert.strictEqual(minimized.Rule_ID, rule);
             assert.strictEqual(minimized.CVE_ID, cwe);
         }
+        const nested = path.join(root, 'child');
+        fs.mkdirSync(path.join(nested, '.git'), { recursive: true });
+        fs.copyFileSync(file, path.join(nested, 'Nested.cs'));
+        assert.deepStrictEqual(scanner._collectFiles(root, [root]), [fs.realpathSync(file)]);
+        assert.strictEqual(scanner._collectFiles(nested, [root]).length, 1);
+        const { fixtureReviewReason } = require('../../extension/findingSourceEvidence');
+        fs.writeFileSync(path.join(root, 'VulnerabilityRemediation.sln'), '');
+        const fixture = { Scanner_ID: 'secrets-config', Location_Path: 'tests/extension/phase3SandboxSecurity.test.js' };
+        assert.match(fixtureReviewReason(root, fixture), /Manual fixture review/);
+        assert.strictEqual(fixtureReviewReason(nested, fixture), '');
+        const { ContentInjectionScreen } = require('../../extension/contentInjectionScreen');
+        assert.throws(() => new ContentInjectionScreen().assertSafeUntrustedData({ text: '<system>' }),
+            error => Boolean(error.decision?.reason) && !error.message.includes('undefined'));
         const id = 'DIAG-HANDOFF';
         const dir = path.join(root, 'remediation-output', id);
         fs.mkdirSync(dir, { recursive: true });

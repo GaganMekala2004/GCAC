@@ -84,7 +84,7 @@ EndGlobal`);
 
 writeFile('payments-api/src/PaymentsAPI/PaymentsAPI.csproj', `<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -150,7 +150,7 @@ public class LegacyCrypto
 // 3. inventory-manager
 writeFile('inventory-manager/src/InventoryManager/InventoryManager.csproj', `<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -182,7 +182,7 @@ writeFile('identity-provider/Infrastructure/IvantiConfig.json', `{
 // 5. storefront-api
 writeFile('storefront-api/src/StorefrontAPI/StorefrontAPI.csproj', `<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 </Project>`);
 
@@ -199,7 +199,7 @@ public class SearchController
 // 6. gcas-agentic-e2e-test-repo
 writeFile('gcas-agentic-e2e-test-repo/src/GcasE2ETestApi/GcasE2ETestApi.csproj', `<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 </Project>`);
 

@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const { isSeparateRepositoryDirectory } = require('../repositoryContext');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -221,9 +222,9 @@ function resolveProfileForRepository(repoRoot, finding = {}, profilesPath = DEFA
             let entries = [];
             try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
             for (const e of entries) {
-                if (['.git', 'node_modules', 'bin', 'obj'].includes(e.name)) continue;
+                if (['.git', 'node_modules', 'bin', 'obj', 'workspaces', 'remediation-output', 'output'].includes(e.name)) continue;
                 const full = path.join(dir, e.name);
-                if (e.isDirectory()) collectCsproj(full, depth + 1);
+                if (e.isDirectory() && !isSeparateRepositoryDirectory(full)) collectCsproj(full, depth + 1);
                 else if (e.isFile() && e.name.toLowerCase().endsWith('.csproj')) {
                     try {
                         extractFrameworksFromXml(fs.readFileSync(full, 'utf8'));

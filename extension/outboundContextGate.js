@@ -58,6 +58,14 @@ function calculateShannonEntropy(str) {
     return entropy;
 }
 
+function secretLiteralEntropy(candidate, minimum = DEFAULT_POLICY.minHighEntropyBitsPerChar) {
+    if (/^(?:[A-Z0-9_-]+|[a-z0-9-]+)$/.test(candidate) ||
+        /^(?:placeholder|redacted|masked|example|sample)/i.test(candidate) ||
+        !/[0-9]/.test(candidate) || !/[A-Za-z]/.test(candidate)) return 0;
+    const bits = calculateShannonEntropy(candidate);
+    return bits >= minimum ? bits : 0;
+}
+
 const SECRET_RULES = [
     {
         id: 'SEC-KEY-PRIVATE-KEY',
@@ -388,13 +396,8 @@ class OutboundContextGate {
         let match;
         while ((match = literalRegex.exec(text)) !== null) {
             const candidate = match[1];
-            // Skip clear placeholders, URLs, or repetitive single-case snake/kebab symbols
-            if (/^(?:[A-Z0-9_-]+|[a-z0-9-]+)$/.test(candidate)) continue;
-            if (/^(?:placeholder|redacted|masked|example|sample)/i.test(candidate)) continue;
-            if (!/[0-9]/.test(candidate) || !/[A-Za-z]/.test(candidate)) continue;
-
-            const bitsPerChar = calculateShannonEntropy(candidate);
-            if (bitsPerChar >= this.policy.minHighEntropyBitsPerChar) {
+            const bitsPerChar = secretLiteralEntropy(candidate, this.policy.minHighEntropyBitsPerChar);
+            if (bitsPerChar) {
                 return {
                     bitsPerChar,
                     line: this._findLineNumber(text, match.index)
@@ -433,5 +436,6 @@ module.exports = {
     OutboundContextGate,
     OutboundContextBlockedError,
     outboundContextGate: defaultGate,
-    calculateShannonEntropy
+    calculateShannonEntropy,
+    secretLiteralEntropy
 };

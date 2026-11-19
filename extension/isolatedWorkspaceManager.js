@@ -169,6 +169,23 @@ class IsolatedWorkspaceManager {
             throw new IsolatedWorkspaceBlockedError('Unable to resolve valid base commit SHA.');
         }
 
+        let committedTarget = null;
+        if (expectedFileRelPath) {
+            for (const base of new Set([safeRepoAbs, gitTopLevel])) {
+                const candidate = path.resolve(base, expectedFileRelPath);
+                if (!assertPathWithinWorkspace(candidate, safeRepoAbs)) continue;
+                const relative = path.relative(gitTopLevel, candidate).split(path.sep).join('/');
+                const entry = this._runGit(gitTopLevel, ['--literal-pathspecs', 'ls-tree', baseCommitSha, '--', relative]);
+                if (/^100(?:644|755) blob /.test(entry)) {
+                    committedTarget = relative;
+                    break;
+                }
+            }
+            if (!committedTarget) {
+                throw new IsolatedWorkspaceBlockedError('The target is not a regular file committed in the selected repository. Select the owning repository and re-scan its committed source.');
+            }
+        }
+
         // 4. Create strictly isolated per-run directories inside runsRoot
         const cleanRunSegment = `${vulnerabilityId.replace(/[^A-Za-z0-9_.-]/g, '_')}_${runId.replace(/[^A-Za-z0-9_.-]/g, '_')}`;
         const runDir = path.join(this.runsRoot, cleanRunSegment);
@@ -207,12 +224,13 @@ class IsolatedWorkspaceManager {
             for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
                 if (entry.isSymbolicLink()) continue;
                 if (entry.isDirectory()) {
-                    if (['.git', '.gcac', 'node_modules', 'bin', 'remediation-output', 'output'].includes(entry.name)) continue;
+                    if (['.git', '.gcac', 'node_modules', 'bin', 'remediation-output', 'output', 'workspaces'].includes(entry.name) || fs.existsSync(path.join(src, entry.name, '.git'))) continue;
                     if (entry.name === 'obj') {
                         const sourceObj = path.join(src, entry.name);
                         for (const file of fs.readdirSync(sourceObj, { withFileTypes: true })) {
                             if (!file.isFile() || !/^(?:project\.assets\.json|project\.nuget\.cache|[^/]+\.nuget\.(?:g\.props|g\.targets|dgspec\.json))$/i.test(file.name)) continue;
                             const target = path.join(dest, 'obj', file.name);
+                            if (assertPathWithinWorkspace(target, safeIsolatedRepo) !== target) continue;
                             fs.mkdirSync(path.dirname(target), { recursive: true });
                             fs.copyFileSync(path.join(sourceObj, file.name), target);
                         }
@@ -224,19 +242,10 @@ class IsolatedWorkspaceManager {
         };
         copyRestoreMetadata(safeRepoAbs, safeIsolatedRepo);
 
-        // 5. Verify expected target file is available inside isolated worktree (if provided)
-        let isolatedTargetFile = null;
-        if (expectedFileRelPath && typeof expectedFileRelPath === 'string') {
-            const candidateInRepo = assertPathWithinWorkspace(path.join(safeIsolatedRepo, expectedFileRelPath), safeIsolatedRepo);
-            const candidateInWorktree = assertPathWithinWorkspace(path.join(worktreeDir, expectedFileRelPath), worktreeDir);
-            if (candidateInRepo && fs.existsSync(candidateInRepo) && fs.statSync(candidateInRepo).isFile()) {
-                isolatedTargetFile = candidateInRepo;
-            } else if (candidateInWorktree && fs.existsSync(candidateInWorktree) && fs.statSync(candidateInWorktree).isFile()) {
-                isolatedTargetFile = candidateInWorktree;
-            } else {
-                this.cleanupWorkspace({ runDir: safeRunDir, worktreeDir, gitRoot: gitTopLevel });
-                throw new IsolatedWorkspaceBlockedError(`Expected target file '${expectedFileRelPath}' not found inside isolated worktree.`);
-            }
+        const isolatedTargetFile = committedTarget && assertPathWithinWorkspace(path.join(worktreeDir, committedTarget), safeIsolatedRepo);
+        if (committedTarget && (!isolatedTargetFile || !fs.statSync(isolatedTargetFile, { throwIfNoEntry: false })?.isFile())) {
+            this.cleanupWorkspace({ runDir: safeRunDir, worktreeDir, gitRoot: gitTopLevel });
+            throw new IsolatedWorkspaceBlockedError('Committed target file is unavailable in the isolated worktree.');
         }
 
         // 6. Prepare sanitized agent-facing context folder excluding master CSVs/DBs/confidential files

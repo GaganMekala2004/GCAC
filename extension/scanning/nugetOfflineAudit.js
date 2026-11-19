@@ -1,17 +1,18 @@
 'use strict';
 const fs = require('fs');
+const { isSeparateRepositoryDirectory } = require('../repositoryContext');
 const path = require('path');
 const { inRange, compareVersions } = require('./nugetAdvisories');
 
 function auditResolvedProjects(target, snapshot, abortSignal) {
     const projects = [];
-    const skipped = new Set(['.git', 'node_modules', 'bin', 'obj', 'packages', 'output', 'remediation-output']);
+    const skipped = new Set(['.git', 'node_modules', 'bin', 'obj', 'packages', 'output', 'remediation-output', 'workspaces', 'evidence']);
     const walk = dir => {
         if (abortSignal?.aborted) throw new Error('NuGet audit cancelled.');
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
             if (entry.isSymbolicLink()) continue;
             const full = path.join(dir, entry.name);
-            if (entry.isDirectory() && !entry.name.startsWith('.') && !skipped.has(entry.name)) walk(full);
+            if (entry.isDirectory() && !entry.name.startsWith('.') && !skipped.has(entry.name) && !isSeparateRepositoryDirectory(full)) walk(full);
             else if (entry.isFile() && entry.name.endsWith('.csproj')) projects.push(full);
         }
     };

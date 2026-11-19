@@ -19,6 +19,12 @@ const SENSITIVE_DIR_PATTERNS = [
     /(?:^|[\\/])\.(?:ssh|aws|azure|kube|gnupg|docker)(?:[\\/]|$)/i
 ];
 
+function isSeparateRepositoryDirectory(directory) {
+    return fs.existsSync(path.join(directory, '.git')) ||
+        (path.basename(directory) === 'sample-repos' &&
+         fs.existsSync(path.join(path.dirname(directory), 'VulnerabilityRemediation.sln')));
+}
+
 function canonicalizePath(targetPath) {
     if (!targetPath || typeof targetPath !== 'string') return '';
     const resolved = path.resolve(targetPath);
@@ -296,7 +302,7 @@ function discoverProjectManifests(targetRoot, maxDepth = 5) {
         for (const entry of entries) {
             if (entry.isSymbolicLink()) continue;
             if (entry.isDirectory()) {
-                if (IGNORED_SCAN_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
+                if (IGNORED_SCAN_DIRS.has(entry.name) || entry.name.startsWith('.') || isSeparateRepositoryDirectory(path.join(dir, entry.name))) continue;
                 walk(path.join(dir, entry.name), depth + 1);
             } else if (entry.isFile()) {
                 if (entry.name.startsWith('.') && entry.name !== '.env') continue;
@@ -836,6 +842,7 @@ function validateFindingContextContract(finding = {}, options = {}) {
 module.exports = {
     FINDING_CONTEXT_SCHEMA_VERSION,
     IGNORED_SCAN_DIRS,
+    isSeparateRepositoryDirectory,
     canonicalizePath,
     normalizePosix,
     isRemoteRepositoryReference,

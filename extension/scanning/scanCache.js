@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const { isSeparateRepositoryDirectory } = require('../repositoryContext');
 const path = require('path');
 const crypto = require('crypto');
 const { SCANNER_STATUS } = require('./findingModel');
@@ -17,6 +18,7 @@ const DEFAULT_IGNORED_DIRS = new Set([
     'TestResults',
     '.vs',
     '.vscode-test',
+    'workspaces',
     'remediation-output'
 ]);
 
@@ -100,7 +102,7 @@ async function computeInputFingerprint(targetPath, options = {}) {
                 if (entry.isSymbolicLink()) continue;
                 const full = path.join(dir, entry.name);
                 if (entry.isDirectory()) {
-                    if (ignoredDirs.has(entry.name) || entry.name.startsWith('.git')) {
+                    if (ignoredDirs.has(entry.name) || entry.name.startsWith('.git') || isSeparateRepositoryDirectory(full)) {
                         continue;
                     }
                     stack.push(full);

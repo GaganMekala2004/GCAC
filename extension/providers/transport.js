@@ -2,6 +2,7 @@
 const http = require('node:http');
 const https = require('node:https');
 const dns = require('node:dns');
+const { endpointFor } = require('./endpoints');
 const { BlockList } = require('node:net');
 
 const reserved = new BlockList();
@@ -32,10 +33,12 @@ function publicLookup(host, options, callback) {
     });
 }
 
-async function requestJson(url, { body, key, cancellationToken, signal: upstream, timeout = 90000 } = {}) {
+async function requestJson(url, { body, key, provider, endpoint, cancellationToken, signal: upstream, timeout = 90000 } = {}) {
     const local = url.origin === 'http://127.0.0.1:11434';
     if (url.username || url.password) throw Error('Destination credentials denied');
-    if (!local && !['https://api.openai.com', 'https://api.osv.dev'].includes(url.origin))
+    const base = provider ? endpointFor(provider, endpoint) : 'https://api.openai.com/v1/';
+    const apiRequest = ['models', 'chat/completions', 'messages'].some(route => url.href === new URL(route, base).href);
+    if (!local && url.origin !== 'https://api.osv.dev' && !apiRequest)
         throw Error('Destination denied');
     const signal = new AbortController();
     const abort = () => signal.abort();
@@ -47,9 +50,13 @@ async function requestJson(url, { body, key, cancellationToken, signal: upstream
         return await new Promise((resolve, reject) => {
             const headers = { Accept: 'application/json' };
             if (body) headers['Content-Type'] = 'application/json';
-            if (key && url.origin !== 'https://api.openai.com')
+            if (key && !apiRequest)
                 return reject(Error('Credential destination denied'));
-            if (key) headers.Authorization = 'Bearer ' + key;
+            if (key && provider === 'anthropic') {
+                headers['x-api-key'] = key;
+                headers['anthropic-version'] = '2023-06-01';
+            } else if (key && provider === 'azure') headers['api-key'] = key;
+            else if (key) headers.Authorization = 'Bearer ' + key;
             const req = (local ? http : https).request(
                 url,
                 {

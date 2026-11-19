@@ -22,9 +22,11 @@ class FixtureConsent extends LocalPoCApprovalProvider {
     }
 }
 async function main() {
-    const externalFixture = process.env.GCAC_TEST_OPENAI_FIXTURE === '1';
+    const fixtureProvider = process.env.GCAC_TEST_CLAUDE_FIXTURE === '1' ? 'anthropic' :
+        process.env.GCAC_TEST_OPENAI_FIXTURE === '1' ? 'openai' : null;
+    const externalFixture = Boolean(fixtureProvider);
     const defective = process.argv[2] === 'defective';
-    const providerId = externalFixture ? 'openai' : 'ollama';
+    const providerId = fixtureProvider || 'ollama';
     const model = externalFixture ? 'contract-fixture' : process.env.GCAC_TEST_OLLAMA_MODEL;
     assert(model, 'Select an installed model explicitly');
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'gcac-direct-'));
@@ -133,7 +135,7 @@ public class CredentialTests {
             client: (p) => {
                 assert.deepEqual(p, { id: providerId, model });
                 const adapter = externalFixture
-                    ? require('../tests/fixtures/openaiCredentialFixture').openaiCredentialFixture(defective)
+                    ? require('../tests/fixtures/openaiCredentialFixture').openaiCredentialFixture(defective, fixtureProvider)
                     : new Ollama();
                 return new DirectClient(adapter, model);
             }

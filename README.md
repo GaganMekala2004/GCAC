@@ -1,6 +1,9 @@
 # Prototype_GCAS — Agentic AI Vulnerability Remediation Platform
 
-[![.NET 9.0](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/)
+**Using GCAC in VS Code?** Start with the [GCAC user manual](docs/SETUP.md) to open the dashboard, choose a model, set up project scanners, and review a fix. The CLI examples below describe the separate .NET prototype. For supported stacks, scan size limits, verification boundaries, and pilot planning, see the [GCAC scope guide](docs/SCOPE.md).
+
+
+[![.NET 10.0](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/)
 [![Tests](https://img.shields.io/badge/Tests-41%20Passed-brightgreen.svg)]()
 [![MCP Server](https://img.shields.io/badge/MCP-Protocol%202024--11--05-blue.svg)](https://modelcontextprotocol.io/)
 [![Security Guardrails](https://img.shields.io/badge/Guardrails-HITL%20Enforced-orange.svg)]()
@@ -86,7 +89,7 @@
 ## Quick Start Guide
 
 ### Prerequisites
-- **.NET 9.0 SDK** (`dotnet --version`)
+- **.NET 10.0 SDK** (`dotnet --version`)
 - **Git 2.30+** (`git --version`)
 - **Visual Studio Code** or **Antigravity IDE**
 

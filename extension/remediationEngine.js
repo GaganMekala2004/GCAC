@@ -1,7 +1,7 @@
 const { createRunCancellation } = require('./runCancellation');
 const { EXECUTION_MODE, resolveExecutionMode, assertDevelopmentRepository, canAcknowledgeMissingBaseline, developmentConclusion } = require('./executionMode');
 const { applyExactPatch, extractProposedPatch, canonicalizeProposedPatch, patchFromExactEdits } = require('./patchApplication');
-const { assertCurrentFinding } = require('./findingSourceEvidence');
+const { assertCurrentFinding, fixtureReviewReason } = require('./findingSourceEvidence');
 const { isBaselineEligible } = require('./baselineEligibility');
 const { createCredentialRedactor } = require('./credentialRedaction');
 const fs = require('fs');
@@ -1323,6 +1323,8 @@ class RemediationEngine {
         const findingContext = ctxValidation.context;
         const resolvedRepositoryPath = ctxValidation.resolvedRepositoryPath;
 
+        const reviewReason = fixtureReviewReason(resolvedRepositoryPath, finding);
+        if (reviewReason) throw new Error(reviewReason);
         if (this.isLocalDevelopment) assertDevelopmentRepository(this.registry, resolvedRepositoryPath, options.workspaceTrusted);
         const minimizedFinding = buildMinimizedSingleFinding(finding);
 
@@ -1670,7 +1672,7 @@ class RemediationEngine {
         log('DISCOVERY', `Connected to real LLM backend: ${activeModelName} (${availableModels[0].family || availableModels[0].vendor})`);
 
         const sourceRedactor = createCredentialRedactor();
-        const modelSourceCode = sourceRedactor.redact(sourceCode);
+        const modelSourceCode = sourceRedactor.redactSource(sourceCode);
         const findingLine = Math.max(1, Number(minimizedFinding.Line_Number) || 1);
         const contextStart = Math.max(0, findingLine - 21);
         const numberedCode = modelSourceCode
@@ -1762,17 +1764,12 @@ Analyze this minimized single-vulnerability finding:
 - File Location: ${targetRelPath} (Line ${minimizedFinding.Line_Number || 1})
 - Guidance: ${minimizedFinding.Remediation_Guidance || 'Apply secure coding best practices.'}
 
-Source-to-sink execution metadata (heuristic; never invent absent database execution):
-${JSON.stringify(sourceToSinkEvidence?.executionEvidence || { formalTaintProofSupplied: sourceToSinkEvidence?.formalTaintProofSupplied === true })}
-
-Source Code Context:
-\`\`\`
-${numberedCode.slice(0, 2000)}
-\`\`\`
+Scanner rule: ${minimizedFinding.Rule_ID || 'unspecified'}
+Classify the reported finding from its scanner metadata. Leave unverified execution details unknown.
 
 Perform an objective ADVISORY classification (scanner severity remains authoritative) and return JSON with EXACTLY these keys:
 {
-  "cwe": "<Formal CWE identifier and name, e.g. CWE-89 SQL Injection>",
+  "cwe": "<Formal CWE identifier and name matching this finding>",
   "severity": "<Advisory severity: Critical | High | Medium | Low>",
   "exploitability": "<High | Medium | Low with concise justification>",
   "route": "<SpecializedAction | 3PP | ConfigUpdate | ArchitecturalMigration>",
@@ -1783,11 +1780,11 @@ Perform an objective ADVISORY classification (scanner severity remains authorita
 }`;
 
             try {
-                classification = await modelClient.generateJson(classifyPrompt, { ...llmCallContext, operation: 'classification' });
+                classification = await modelClient.generateJson(classifyPrompt, { ...llmCallContext, sourceCode: '', operation: 'classification' });
             } catch (err) {
                 if (modelClient.strict || err.name === 'OutboundContextBlockedError' || (options.cancellationToken?.isCancellationRequested && currentStageNumber < 6)) throw err;
                 log('CLASSIFY', `LLM JSON parse note: ${err.message}. Retrying with completion...`);
-                const fallbackText = await modelClient.generateCompletion(classifyPrompt, llmCallContext);
+                const fallbackText = await modelClient.generateCompletion(classifyPrompt, { ...llmCallContext, sourceCode: '' });
                 this._screenUntrustedText(fallbackText, 'llm:classificationFallback', TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
                 classification = {
                     cwe: minimizedFinding.Detailed_Name || 'CWE-Unknown',
@@ -2102,15 +2099,15 @@ Return exactly this JSON shape:
                     if (error.failureCategory !== 'PATCH_INVALID') throw error;
                     const diagnosticsDir = path.join(this.remOutputDir, finding.Vulnerability_ID, 'attempts', attemptId, 'patch-proposals');
                     fs.mkdirSync(diagnosticsDir, { recursive: true });
-                    fs.writeFileSync(path.join(diagnosticsDir, `proposal-${proposalAttempt}.response.txt`), sourceRedactor.redact(remediationResponse));
-                    fs.writeFileSync(path.join(diagnosticsDir, `proposal-${proposalAttempt}.patch`), sourceRedactor.redact(patchDiff || remediationResponse));
+                    fs.writeFileSync(path.join(diagnosticsDir, `proposal-${proposalAttempt}.response.txt`), sourceRedactor.redactSource(remediationResponse));
+                    fs.writeFileSync(path.join(diagnosticsDir, `proposal-${proposalAttempt}.patch`), sourceRedactor.redactSource(patchDiff || remediationResponse));
                     fs.writeFileSync(path.join(diagnosticsDir, `proposal-${proposalAttempt}.json`), JSON.stringify({
                         baseCommitSha: isolatedWorkspace.baseCommitSha, sourceSha256: baseSourceSha256,
                         diagnostic: error.patchDiagnostic, failureCategory: error.failureCategory
                     }, null, 2));
                     if (proposalAttempt === proposalLimit) throw error;
                     log('REMEDIATE', `Proposal ${proposalAttempt} rejected: ${error.message} Regenerating before approval.`);
-                    patchFeedback = `\nThe previous proposal failed validation: ${error.message}\nReturn corrected JSON edits. Copy oldText verbatim from the original source; include every existing line within it.\nPrevious rejected response:\n${sourceRedactor.redact(remediationResponse)}\n`;
+                    patchFeedback = `\nThe previous proposal failed validation: ${error.message}\nReturn corrected JSON edits. Copy oldText verbatim from the original source; include every existing line within it.\nPrevious rejected response:\n${sourceRedactor.redactSource(remediationResponse)}\n`;
                     continue;
                 }
                 pendingApprovalRequest = createApprovalRequest({

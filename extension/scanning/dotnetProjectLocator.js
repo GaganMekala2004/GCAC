@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const { isSeparateRepositoryDirectory } = require('../repositoryContext');
 const path = require('path');
 
 const IGNORED_DIRS = new Set([
@@ -42,7 +43,7 @@ function findDotnetProjectBelow(targetDir, maxDepth = 4) {
         if (depth < maxDepth) {
             for (const entry of entries) {
                 if (entry.isSymbolicLink()) continue;
-                if (entry.isDirectory() && !IGNORED_DIRS.has(entry.name) && !entry.name.startsWith('.')) {
+                if (entry.isDirectory() && !IGNORED_DIRS.has(entry.name) && !entry.name.startsWith('.') && !isSeparateRepositoryDirectory(path.join(dir, entry.name))) {
                     queue.push({ dir: path.join(dir, entry.name), depth: depth + 1 });
                 }
             }

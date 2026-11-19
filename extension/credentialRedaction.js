@@ -1,6 +1,5 @@
 'use strict';
-// Deliberately recognizes known credential forms only. Unknown/high-entropy
-// material must still be rejected by OutboundContextGate after minimization.
+const { secretLiteralEntropy } = require('./outboundContextGate');
 function createCredentialRedactor() {
     const secrets = new Map();
     let currentInput = '';
@@ -27,6 +26,12 @@ function createCredentialRedactor() {
             .replace(/((?:Password|Pwd|AccountKey|SharedAccessKey)\s*=\s*)([^;\r\n"']{6,})/gi, (_, prefix, secret) => prefix + (/^(?:<|\$\{|@Microsoft\.KeyVault)/.test(secret) ? secret : token(secret)))
             .replace(/(["']?(?:password|passwd|secret|client_secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)["']?\s*[:=]\s*["'])([^"'\r\n]{8,})(["'])/gi, (_, prefix, secret, suffix) => prefix + (/^(?:<|\$\{|@Microsoft\.KeyVault|Environment\.)/.test(secret) ? secret : token(secret)) + suffix);
     }
+    // Only source text gets reversible entropy masking. All outbound requests
+    // still pass through the gate, including model feedback and metadata.
+    function redactSource(value) {
+        return redact(value).replace(/(["'])([A-Za-z0-9+/=_-]{20,})(["'])/g,
+            (literal, left, body, right) => secretLiteralEntropy(body) ? left + token(body) + right : literal);
+    }
     // Local reconstruction preserves exact patch context. Never send this map
     // or reconstructed proposal back to a model without redacting it again.
     function restore(value) {
@@ -34,7 +39,7 @@ function createCredentialRedactor() {
         for (const [secret, placeholder] of secrets) result = result.split(placeholder).join(secret);
         return result;
     }
-    return { redact, restore };
+    return { redact, redactSource, restore };
 }
 function redactCredentials(value) { return createCredentialRedactor().redact(value); }
 module.exports = { createCredentialRedactor, redactCredentials };

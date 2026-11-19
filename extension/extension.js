@@ -1063,6 +1063,8 @@ function resolveSourceFilePath(workspaceRoot, repository, targetPath, authorized
  * Canonical Copilot Chat remediation prompt builder (Block C).
  * Enforces SEC-02 fail-closed metadata validation and never emits empty scan arguments.
  */
+const { fixtureReviewReason } = require('./findingSourceEvidence');
+
 function buildCopilotRemediationPrompt(finding, csvPath = '', options = {}) {
     const authRoots = Array.isArray(options.authorizedRoots) && options.authorizedRoots.length > 0
         ? options.authorizedRoots
@@ -1083,6 +1085,8 @@ function buildCopilotRemediationPrompt(finding, csvPath = '', options = {}) {
         };
     }
 
+    const reason = fixtureReviewReason(ctxCheck.resolvedRepositoryPath, finding);
+    if (reason) return { ok: false, reasonCode: 'FIXTURE_REVIEW', reason, finding };
     const ctx = ctxCheck.context;
     const isScanned = ctx.sourceOrigin === 'LocalScanner' || Boolean(ctx.scanExecutionId || ctx.scannerId);
     const hasCsv = !isScanned && Boolean(csvPath && String(csvPath).trim().length > 0);
@@ -2224,7 +2228,7 @@ async function handleWebviewMessage(message, webview) {
                 if (vscode.window && typeof vscode.window.showWarningMessage === 'function') {
                     vscode.window.showWarningMessage(promptRes.reason);
                 }
-                webview.postMessage({
+                if (promptRes.requiresMapping) webview.postMessage({
                     type: 'REPOSITORY_MAPPING_REQUIRED',
                     vulnerabilityId: finding.Vulnerability_ID,
                     reasonCode: promptRes.reasonCode,

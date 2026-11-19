@@ -1,5 +1,7 @@
 **/*
 !README.md
+!docs/SETUP.md
+!docs/SCOPE.md
 !package.json
 !extension/**/*.js
 !extension/media/*.html

@@ -16,6 +16,12 @@ async function run() {
     const gate = new OutboundContextGate();
     assert.strictEqual(gate.evaluate({ prompt: source, filePath: 'appsettings.json' }).allowed, false);
     assert.strictEqual(gate.evaluate({ prompt: clean, filePath: 'appsettings.json' }).allowed, true);
+    const opaque = '"aBx9Cdy2EfGz78hJKlmN4OpQrStUv"';
+    assert.strictEqual(gate.evaluate({ prompt: opaque }).decision.ruleId, 'SEC-HIGH-ENTROPY');
+    const masked = redactor.redactSource(opaque);
+    assert(!masked.includes(opaque.slice(1, -1)));
+    assert.strictEqual(redactor.restore(masked), opaque);
+    assert(gate.evaluate({ prompt: masked }).allowed);
     const client = new LlmClient();
     let inspected;
     client.getAvailableModels = async () => [];

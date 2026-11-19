@@ -2,7 +2,7 @@
   "name": "gcac-vulnerability-remediation",
   "displayName": "GCAC Vulnerability Remediation Hub",
   "description": "Local Multi-Agent Security Remediation and Governance Dashboard for VS Code",
-  "version": "2.0.0",
+  "version": "2.0.2",
   "publisher": "gcac",
   "engines": {
     "vscode": "^1.90.0"
@@ -111,6 +111,31 @@
           "scope": "machine",
           "default": [],
           "description": "User-approved canonical repository paths classified for source sharing with api.openai.com. Every inference request also requires consent."
+        },
+        "gcac.externalRepositoryAccess": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "repository",
+              "provider",
+              "endpoint"
+            ],
+            "properties": {
+              "repository": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "endpoint": {
+                "type": "string"
+              }
+            }
+          },
+          "scope": "machine",
+          "default": [],
+          "description": "Repository and API endpoint pairs approved from the GCAC provider picker. Remove an entry to revoke access."
         }
       }
     }

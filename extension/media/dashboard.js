@@ -1327,7 +1327,7 @@
 
             switch (message.type) {
                 case 'PROVIDER_STATUS':
-                    if (message.status.id === currentConfig.provider?.id && message.status.model === currentConfig.provider?.model)
+                    if (message.status.id === currentConfig.provider?.id && message.status.model === currentConfig.provider?.model && message.status.endpoint === currentConfig.provider?.endpoint)
                         document.getElementById('providerStatus').textContent = message.status.message;
                     break;
                 case 'CONFIG_UPDATED':
@@ -1335,7 +1335,7 @@
                         const provider = message.provider || {id:'copilot'};
                         const label = provider.id === 'copilot' ? 'GitHub Copilot (default)' :
                             provider.id === 'ollama' ? 'Ollama on Extension Host loopback · ' + provider.model :
-                            'OpenAI · ' + provider.model + ' · repository permission and per-request consent required';
+                            (provider.endpoint || ({openai: 'OpenAI', anthropic: 'Anthropic Claude', gemini: 'Google Gemini'})[provider.id] || provider.id) + ' · ' + provider.model + ' · repository permission and per-request consent required';
                         document.getElementById('providerSelection').textContent = label;
                         document.getElementById('providerStatus').textContent = '';
                         const button = document.getElementById('runProvider');

@@ -1,6 +1,7 @@
 'use strict';
 
 const { execFileSync, spawn } = require('child_process');
+const { isSeparateRepositoryDirectory } = require('../../repositoryContext');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
@@ -11,12 +12,17 @@ const { findExecutableOnPath } = require('../../sandbox/environmentDiscovery');
 
 const _codeqlVersionCache = new Map();
 
+const excludedDirectories = new Set(['.git', '.gcac', 'node_modules', 'bin', 'obj', 'output', 'remediation-output', 'workspaces', 'evidence']);
+function skipDirectory(dir) {
+    return excludedDirectories.has(path.basename(dir)) || isSeparateRepositoryDirectory(dir);
+}
+
 class CodeQLScanner extends ScannerAdapter {
     constructor(options = {}) {
         super({
             id: 'codeql',
             name: 'GitHub CodeQL (Semantic SAST)',
-            version: '2.20.0',
+            version: '2.20.1',
             description: 'Semantic static analysis via the official GitHub CodeQL CLI. Detects SQL Injection, XSS, Path Traversal, Command Injection, and hardcoded credentials using data-flow queries.',
             supportedLanguages: ['csharp', 'java', 'javascript', 'typescript', 'python', 'cpp', 'go'],
             supportedCategories: [
@@ -193,7 +199,10 @@ class CodeQLScanner extends ScannerAdapter {
                         if (e.isSymbolicLink()) continue;
                         if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'bin' || e.name === 'obj') continue;
                         const full = path.join(dir, e.name);
-                        if (e.isDirectory()) { scanDir(full, depth + 1); continue; }
+                        if (e.isDirectory()) {
+                            if (!skipDirectory(full)) scanDir(full, depth + 1);
+                            continue;
+                        }
                         if (e.isFile()) checkFile(full, e.name);
                     }
                 };
@@ -431,10 +440,13 @@ class CodeQLScanner extends ScannerAdapter {
             // Buildless extraction may restore packages and write obj files.
             // A disposable copy prevents interference with concurrent adapters.
             fs.mkdirSync(stagedSourceRoot);
-            const excluded = new Set(['.git', 'node_modules', 'bin', 'obj', 'output', 'remediation-output']);
             fs.cpSync(scanTarget, fs.statSync(scanTarget).isDirectory() ? stagedSourceRoot : path.join(stagedSourceRoot, path.basename(scanTarget)), {
                 recursive: true,
-                filter: source => !fs.lstatSync(source).isSymbolicLink() && (source === scanTarget || !excluded.has(path.basename(source)))
+                filter: source => {
+                    const stat = fs.lstatSync(source);
+                    return !stat.isSymbolicLink() && (source === scanTarget ||
+                        (path.basename(source) !== '.git' && (!stat.isDirectory() || !skipDirectory(source))));
+                }
             });
             const createArgs = [
                 'database', 'create',

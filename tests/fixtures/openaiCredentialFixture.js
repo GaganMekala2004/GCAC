@@ -1,7 +1,8 @@
 // Explicit external transport fixture. Docker, git, the scanner and the engine remain real.
 const { OpenAIChat } = require('../../extension/providers/openai');
-function openaiCredentialFixture(defective) {
+function openaiCredentialFixture(defective, id = 'openai') {
     return new OpenAIChat({
+        id,
         allowed: () => true,
         consent: () => true,
         secrets: { get: () => 'automated-contract-fixture' },
@@ -48,6 +49,10 @@ function openaiCredentialFixture(defective) {
                     summary: 'Authored test review fixture',
                     auditChecks: ['Test and scanner results are independently checked by the engine.']
                 };
+            if (id === 'anthropic') {
+                if (url.href !== 'https://api.anthropic.com/v1/messages') throw Error('Incorrect Claude endpoint');
+                return { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(value) }] };
+            }
             return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(value) } }] };
         }
     });
