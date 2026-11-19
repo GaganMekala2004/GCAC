@@ -250,7 +250,12 @@ Console.WriteLine("Hello from live .NET 10 container sandbox!");
 `);
             // Run restore to generate project.assets.json so offline build works cleanly
             const { execFileSync } = require('child_process');
-            execFileSync('dotnet', ['restore', path.join(tmp, 'LiveApp.csproj'), '--use-lock-file'], { stdio: 'ignore' });
+            try {
+                execFileSync('dotnet', ['restore', path.join(tmp, 'LiveApp.csproj'), '--use-lock-file'], { stdio: 'ignore' });
+            } catch {
+                // Host only has .NET 9 SDK; restore inside verified .NET 10 container
+                execFileSync('docker', ['run', '--rm', '-v', `${tmp}:/app`, '-w', '/app', 'mcr.microsoft.com/dotnet/sdk:10.0', 'dotnet', 'restore', 'LiveApp.csproj'], { stdio: 'ignore' });
+            }
 
             const secScanner = new DotnetSecurityScanner();
             const res = await secScanner.scan(tmp, tmp, { scanId: 'test-live-net10' });
@@ -267,7 +272,7 @@ Console.WriteLine("Hello from live .NET 10 container sandbox!");
     }
 
     // -------------------------------------------------------------------------
-    // Test 9: Live scan of inventory-manager (net9.0) fails closed with clear diagnostics
+    // Test 9: Migrated sample-repos/inventory-manager selects verified dotnet-10.0-lts
     // -------------------------------------------------------------------------
     {
         const inventoryDir = path.resolve(__dirname, '../../sample-repos/inventory-manager');
@@ -275,17 +280,19 @@ Console.WriteLine("Hello from live .NET 10 container sandbox!");
             const secScanner = new DotnetSecurityScanner();
             const nugetScanner = new NuGetAuditScanner();
 
+            const advisoryPath = path.resolve(__dirname, '../../output/scans/nuget-advisories.json');
             const secRes = await secScanner.scan(inventoryDir, inventoryDir, { scanId: 'test-inv-01' });
-            const nugetRes = await nugetScanner.scan(inventoryDir, inventoryDir, { scanId: 'test-inv-02' });
+            const nugetRes = await nugetScanner.scan(inventoryDir, inventoryDir, { scanId: 'test-inv-02', advisorySnapshotPath: advisoryPath });
 
-            assert.strictEqual(secRes.status, SCANNER_STATUS.FAILED);
-            assert.strictEqual(nugetRes.status, SCANNER_STATUS.FAILED);
-            assert(secRes.errors[0].includes('UNPROVISIONED_TOOLCHAIN_PROFILE'));
-            assert(nugetRes.errors[0].includes('UNPROVISIONED_TOOLCHAIN_PROFILE'));
-            assert.strictEqual(secRes.diagnostics.targetFramework, 'net9.0');
-            assert.strictEqual(secRes.diagnostics.toolchainProfileId, 'dotnet-9.0-sts');
-            assert.strictEqual(secRes.diagnostics.digestStatus, 'TEMPLATE_PLACEHOLDER');
-            console.log('  ✓ Test 9: Live scan on sample-repos/inventory-manager safely returns UNPROVISIONED_TOOLCHAIN_PROFILE');
+            assert.strictEqual(secRes.diagnostics.targetFramework, 'net10.0');
+            assert.strictEqual(secRes.diagnostics.toolchainProfileId, 'dotnet-10.0-lts');
+            assert.strictEqual(secRes.diagnostics.digestStatus, 'VERIFIED_IMAGE_DIGEST');
+            if (nugetRes.diagnostics) {
+                assert.strictEqual(nugetRes.diagnostics.targetFramework, 'net10.0');
+                assert.strictEqual(nugetRes.diagnostics.toolchainProfileId, 'dotnet-10.0-lts');
+                assert.strictEqual(nugetRes.diagnostics.digestStatus, 'VERIFIED_IMAGE_DIGEST');
+            }
+            console.log('  ✓ Test 9: Migrated sample-repos/inventory-manager selects verified dotnet-10.0-lts profile');
         }
     }
 

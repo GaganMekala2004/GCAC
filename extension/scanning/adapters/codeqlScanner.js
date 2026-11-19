@@ -191,7 +191,7 @@ class CodeQLScanner extends ScannerAdapter {
                     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
                     for (const e of entries) {
                         if (e.isSymbolicLink()) continue;
-                        if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'bin' || e.name === 'obj') continue;
+                        if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'bin' || e.name === 'obj' || e.name === 'workspaces' || e.name === 'output' || e.name === 'remediation-output' || e.name === 'evidence' || e.name === 'TestResults' || e.name === '.gcac') continue;
                         const full = path.join(dir, e.name);
                         if (e.isDirectory()) { scanDir(full, depth + 1); continue; }
                         if (e.isFile()) checkFile(full, e.name);
@@ -307,6 +307,16 @@ class CodeQLScanner extends ScannerAdapter {
                     const tech = inferTechnologyFromFilePath(normalizedPath, meta.technology || '');
                     const lineNum = region.startLine || 1;
 
+                    let repoName = meta.repository || '';
+                    let repoRoot = meta.repositoryRoot || '';
+                    if (normalizedPath.startsWith('sample-repos/')) {
+                        const parts = normalizedPath.split('/');
+                        repoName = `${parts[0]}/${parts[1]}`;
+                        if (effectiveRoot) {
+                            repoRoot = path.join(effectiveRoot, parts[0], parts[1]);
+                        }
+                    }
+
                     const finding = new NormalizedFinding({
                         scanId,
                         scannerId:        this.id,
@@ -326,8 +336,8 @@ class CodeQLScanner extends ScannerAdapter {
                         remediationGuidance: remGuidance,
                         sourceClassification: 'LocalScanner',
                         classificationType:   'CONFIRMED_RULE_VIOLATION',
-                        repository:       meta.repository || '',
-                        repositoryRoot:   meta.repositoryRoot || '',
+                        repository:       repoName,
+                        repositoryRoot:   repoRoot,
                         canonicalRepositoryId: meta.canonicalRepositoryId || '',
                         applicationNumber: meta.applicationNumber || '',
                         applicationName:  meta.applicationName || '',
@@ -431,7 +441,7 @@ class CodeQLScanner extends ScannerAdapter {
             // Buildless extraction may restore packages and write obj files.
             // A disposable copy prevents interference with concurrent adapters.
             fs.mkdirSync(stagedSourceRoot);
-            const excluded = new Set(['.git', 'node_modules', 'bin', 'obj', 'output', 'remediation-output']);
+            const excluded = new Set(['.git', 'node_modules', 'bin', 'obj', 'output', 'remediation-output', 'workspaces', 'TestResults', 'evidence', '.gcac']);
             fs.cpSync(scanTarget, fs.statSync(scanTarget).isDirectory() ? stagedSourceRoot : path.join(stagedSourceRoot, path.basename(scanTarget)), {
                 recursive: true,
                 filter: source => !fs.lstatSync(source).isSymbolicLink() && (source === scanTarget || !excluded.has(path.basename(source)))

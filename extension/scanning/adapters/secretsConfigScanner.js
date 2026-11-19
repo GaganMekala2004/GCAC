@@ -217,13 +217,17 @@ class SecretsConfigScanner extends ScannerAdapter {
         }
 
         // Extract repository provenance (never drop external repo metadata!)
+        const wsRel = workspaceRoot ? path.relative(workspaceRoot, filePath).replace(/\\/g, '/') : '';
         let repoName = meta.repository || '';
-        if (!repoName) {
-            const wsRel = workspaceRoot ? path.relative(workspaceRoot, filePath).replace(/\\/g, '/') : '';
-            if (wsRel.startsWith('sample-repos/')) {
-                const parts = wsRel.split('/');
-                repoName = `${parts[0]}/${parts[1]}`;
-            } else if (effectiveRoot) {
+        let repoRoot = meta.repositoryRoot || '';
+        if (wsRel.startsWith('sample-repos/')) {
+            const parts = wsRel.split('/');
+            repoName = `${parts[0]}/${parts[1]}`;
+            if (workspaceRoot) {
+                repoRoot = path.join(workspaceRoot, parts[0], parts[1]);
+            }
+        } else if (!repoName) {
+            if (effectiveRoot) {
                 repoName = canonicalizePath(effectiveRoot);
             }
         }
@@ -278,7 +282,7 @@ class SecretsConfigScanner extends ScannerAdapter {
                     remediationGuidance: rule.remediationGuidance,
                     classificationType: rule.classificationType,
                     repository: repoName,
-                    repositoryRoot: meta.repositoryRoot || '',
+                    repositoryRoot: repoRoot || meta.repositoryRoot || '',
                     canonicalRepositoryId: meta.canonicalRepositoryId || '',
                     applicationNumber: meta.applicationNumber || '',
                     applicationName: meta.applicationName || '',
