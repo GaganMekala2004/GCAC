@@ -1,13 +1,13 @@
 // Explicit external transport fixture. Docker, git, the scanner and the engine remain real.
 const { OpenAIChat } = require('../../extension/providers/openai');
-function openaiCredentialFixture(defective, id = 'openai') {
+function openaiCredentialFixture(defective, id = 'openai', endpoint) {
     return new OpenAIChat({
-        id,
+        id, endpoint,
         allowed: () => true,
         consent: () => true,
         secrets: { get: () => 'automated-contract-fixture' },
         send: async (url, options) => {
-            if (url.pathname === '/v1/models') return { data: [{ id: 'contract-fixture' }] };
+            if (url.pathname.endsWith('/models')) return { data: [{ id: 'contract-fixture' }] };
             const prompt = options.body.messages[0].content;
             let value;
             if (prompt.includes('Classification Agent'))

@@ -44,7 +44,12 @@ async function requestJson(url, { body, key, provider, endpoint, cancellationTok
     const abort = () => signal.abort();
     upstream?.addEventListener('abort', abort, { once: true });
     if (upstream?.aborted || cancellationToken?.isCancellationRequested) abort();
-    const timer = setTimeout(() => signal.abort(), timeout);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+        timedOut = true;
+        signal.abort();
+    }, timeout);
+    const abortMessage = () => timedOut ? `Provider request timed out after ${timeout} ms` : 'Provider request cancelled';
     const subscription = cancellationToken?.onCancellationRequested(() => signal.abort());
     try {
         return await new Promise((resolve, reject) => {
@@ -68,7 +73,7 @@ async function requestJson(url, { body, key, provider, endpoint, cancellationTok
                     lookup: local ? undefined : publicLookup
                 },
                 (res) => {
-                    res.on('error', () => reject(Error('Provider response interrupted')));
+                    res.on('error', () => reject(Error(signal.signal.aborted ? abortMessage() : 'Provider response interrupted')));
                     if (res.statusCode !== 200 && res.statusCode !== 429) {
                         const error = Error('Provider HTTP ' + res.statusCode);
                         error.status = res.statusCode;
@@ -112,7 +117,7 @@ async function requestJson(url, { body, key, provider, endpoint, cancellationTok
             req.on('error', (cause) => {
                 const error = Error(
                     signal.signal.aborted
-                        ? 'Provider request cancelled or timed out'
+                        ? abortMessage()
                         : 'Provider connection unavailable'
                 );
                 error.retryable =

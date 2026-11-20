@@ -418,11 +418,16 @@ class ContainerSandboxBackend extends ExecutionBackend {
         if (preparedEnv.policy.requirePrePulledImage !== false) {
             try {
                 this.execFileFn(preparedEnv.binaryPath, ['image', 'inspect', preparedEnv.policy.imageRef], {
-                    timeout: 5000,
-                    stdio: 'ignore',
+                    timeout: 30000,
+                    stdio: ['ignore', 'ignore', 'pipe'],
                     shell: false
                 });
-            } catch {
+            } catch (error) {
+                const missing = /no such (?:image|object)|image not known/i.test(String(error.stderr || ''));
+                const reasonCode = missing ? 'TOOLCHAIN_IMAGE_UNAVAILABLE' : 'SANDBOX_UNAVAILABLE';
+                const reason = missing
+                    ? `Approved image '${preparedEnv.policy.imageRef}' is absent. Run '${preparedEnv.runtime} pull ${preparedEnv.policy.imageRef}', then retry.`
+                    : `Could not inspect the approved image with ${preparedEnv.runtime}${error.code === 'ETIMEDOUT' ? ' within 30 seconds' : ''}. Check the container runtime and retry.`;
                 const endTs = new Date();
                 const evidence = {
                     instanceId: preparedEnv.instanceId,
@@ -434,9 +439,9 @@ class ContainerSandboxBackend extends ExecutionBackend {
                     lifecycleState: SANDBOX_LIFECYCLE_STATES.BLOCKED,
                     machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
                     status: 'COULD NOT RUN',
-                    failureCategory: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
-                    reasonCode: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
-                    reason: `Approved digest-pinned image '${preparedEnv.policy.imageRef}' is absent from the local cache. Provision it with '${preparedEnv.runtime} pull ${preparedEnv.policy.imageRef}', then run again.`,
+                    failureCategory: reasonCode,
+                    reasonCode,
+                    reason,
                     imageDigest: preparedEnv.policy.imageRef,
                     executable: request.executable,
                     args: request.args || [],
@@ -448,9 +453,9 @@ class ContainerSandboxBackend extends ExecutionBackend {
                     timedOut: false,
                     cancelled: false,
                     stdout: '',
-                    stderr: `Approved digest-pinned image '${preparedEnv.policy.imageRef}' is absent from the local cache. Provision it with '${preparedEnv.runtime} pull ${preparedEnv.policy.imageRef}', then run again.`,
+                    stderr: reason,
                     outputArtifactHashes: {},
-                    summary: `COULD NOT RUN (TOOLCHAIN_IMAGE_UNAVAILABLE) — Approved digest-pinned image '${preparedEnv.policy.imageRef}' is absent from the local cache. Provision it with '${preparedEnv.runtime} pull ${preparedEnv.policy.imageRef}', then run again.`
+                    summary: `COULD NOT RUN (${reasonCode}) — ${reason}`
                 };
                 this.collectedEvidence.set(preparedEnv.instanceId, evidence);
                 return evidence;

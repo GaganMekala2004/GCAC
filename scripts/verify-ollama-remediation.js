@@ -23,12 +23,14 @@ class FixtureConsent extends LocalPoCApprovalProvider {
 }
 async function main() {
     const fixtureProvider = process.env.GCAC_TEST_CLAUDE_FIXTURE === '1' ? 'anthropic' :
-        process.env.GCAC_TEST_OPENAI_FIXTURE === '1' ? 'openai' : null;
+        process.env.GCAC_TEST_OPENAI_FIXTURE === '1' ? 'openai' : process.env.GCAC_TEST_EXTERNAL_FIXTURE;
     const externalFixture = Boolean(fixtureProvider);
     const defective = process.argv[2] === 'defective';
     const providerId = fixtureProvider || 'ollama';
     const model = externalFixture ? 'contract-fixture' : process.env.GCAC_TEST_OLLAMA_MODEL;
     assert(model, 'Select an installed model explicitly');
+    const endpoints = { azure: 'https://fixture.openai.azure.com/openai/v1/', compatible: 'https://fixture.example/v1/' };
+    const selection = { id: providerId, model, ...(endpoints[providerId] ? { endpoint: endpoints[providerId] } : {}) };
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'gcac-direct-'));
     const extensionRoot = path.resolve(__dirname, '..');
     const repo = new WorkspaceStagingManager({
@@ -133,9 +135,9 @@ public class CredentialTests {
         findingsStore: store,
         providerHost: {
             client: (p) => {
-                assert.deepEqual(p, { id: providerId, model });
+                assert.deepEqual(p, selection);
                 const adapter = externalFixture
-                    ? require('../tests/fixtures/openaiCredentialFixture').openaiCredentialFixture(defective, fixtureProvider)
+                    ? require('../tests/fixtures/openaiCredentialFixture').openaiCredentialFixture(defective, fixtureProvider, p.endpoint)
                     : new Ollama();
                 return new DirectClient(adapter, model);
             }
@@ -152,7 +154,7 @@ public class CredentialTests {
     const id = finding.findingId;
     const start = () => engine.executePipeline(id, {
         workspaceTrusted: true,
-        provider: { id: providerId, model }
+        provider: selection
     });
     if (missingTests) {
         await assert.rejects(start(), /BLOCKED \(BaselineTest\)/);

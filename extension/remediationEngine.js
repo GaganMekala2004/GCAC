@@ -1780,7 +1780,7 @@ Analyze this minimized single-vulnerability finding:
 Scanner rule: ${minimizedFinding.Rule_ID || 'unspecified'}
 Classify the reported finding from its scanner metadata. Leave unverified execution details unknown.
 
-Perform an objective ADVISORY classification (scanner severity remains authoritative) and return JSON with EXACTLY these keys:
+Perform an objective ADVISORY classification (scanner severity remains authoritative). Use a JSON number between 0 and 100 for confidence. Return JSON with EXACTLY these keys:
 {
   "cwe": "<Formal CWE identifier and name matching this finding>",
   "severity": "<Advisory severity: Critical | High | Medium | Low>",
@@ -1788,7 +1788,7 @@ Perform an objective ADVISORY classification (scanner severity remains authorita
   "route": "<SpecializedAction | 3PP | ConfigUpdate | ArchitecturalMigration>",
   "strategy": "<Targeted remediation strategy in 1-2 sentences>",
   "attackVector": "<Primary attack vector and prerequisites>",
-  "confidence": "<number 0-100>",
+  "confidence": 0,
   "summary": "<1-2 sentence executive classification summary>"
 }`;
 

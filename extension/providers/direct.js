@@ -120,6 +120,8 @@ class Ollama {
         await this.check(model, options);
         const result = await this.call('/api/chat', {
             ...options,
+            // Local model loading and generation share this request deadline.
+            timeout: options.timeout ?? 300000,
             body: {
                 model,
                 stream: false,

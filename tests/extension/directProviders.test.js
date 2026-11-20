@@ -107,11 +107,11 @@ test('request deadline and cancellation dispose the transport before accepting a
         return req;
     });
     const url = new URL('http://127.0.0.1:11434/api/tags');
-    await assert.rejects(requestJson(url, { timeout: 10 }), /timed out/);
+    await assert.rejects(requestJson(url, { timeout: 10 }), /timed out after 10 ms/);
     const token = createRunCancellation();
     const pending = requestJson(url, { cancellationToken: token });
     token.cancel();
-    await assert.rejects(pending, /cancelled/);
+    await assert.rejects(pending, /^Error: Provider request cancelled$/);
 });
 test('provider configuration obtains the API key through a masked native prompt and only persists it to SecretStorage', async () => {
     const saved = new Map();
