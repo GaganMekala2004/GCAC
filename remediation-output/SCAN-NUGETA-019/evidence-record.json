@@ -1,0 +1,156 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "138a5202-ea90-42af-8cd3-288b1c3f8a93",
+  "findingId": "SCAN-NUGETA-019",
+  "findingFingerprint": "3cf8f91f03a641da",
+  "applicationId": "APP-E2E-001",
+  "stage": 4,
+  "timestamp": "2026-11-20T04:18:23.375Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "d738bd6ebe0ac6925d7bd526abc3478f0473e66476b5478dabe8eeceadf676d2",
+    "baseSourceSha256": "d32b3ca37d5b39af66c3d4ec50ec179b7fcff3b7fce3ca1049bd2c54704e744c",
+    "baseCommitSha": "7075159c77b3ed28fc2ca45b67c754fff799178d"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "138a5202-ea90-42af-8cd3-288b1c3f8a93",
+      "contentSource": "finding:SCAN-NUGETA-019",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T04:18:23.240Z",
+      "redactedLocation": "GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "138a5202-ea90-42af-8cd3-288b1c3f8a93",
+      "contentSource": "source:src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T04:18:23.373Z",
+      "redactedLocation": "GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "138a5202-ea90-42af-8cd3-288b1c3f8a93",
+      "contentSource": "repo:README.md",
+      "trustClass": "UNTRUSTED_README",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T04:18:23.373Z",
+      "redactedLocation": "README.md",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [],
+  "testCommand": "N/A",
+  "actualExitCode": null,
+  "testResultCounts": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": null,
+  "approvalReference": null,
+  "proposedDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "appliedDiffSha256": null,
+  "filesChanged": [],
+  "scopeVerificationOutcome": "NOT_APPLIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-NUGETA-019",
+    "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+    "affectedComponent": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "MEDIUM",
+    "selectedTier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+    "recommendedStrategy": "Manual dependency advisory review required.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Vulnerable third-party package cannot be patched safely via runtime configuration alone."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Dependency vulnerability lacks a verified Fixed_Version or manifest ownership permission; routing to manual review."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": false,
+        "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+      }
+    ],
+    "requiresManualReview": true,
+    "automatedExecutionAllowed": false,
+    "disposition": "MANUAL_REVIEW",
+    "blockingReason": "Dependency upgrade missing verified target version or approved manifest ownership.",
+    "manualReviewPlan": []
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+    "executionEvidence": null,
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "Unresolved (inspect method parameters)",
+      "file": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "line": 1,
+      "snippet": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">"
+    },
+    "dataPropagationEvidence": [],
+    "dangerousSink": {
+      "file": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "line": 1,
+      "snippet": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">"
+    },
+    "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+    "affectedFile": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+    "affectedFunction": "UnknownMethod",
+    "affectedLines": "Line 1",
+    "proposedRemediation": "Upgrade package 'Newtonsoft.Json' to a secure version verified against https://github.com/advisories/GHSA-5crp-9r3c-p9vr.",
+    "baselineTestEvidence": {
+      "status": "NOT_EXECUTED",
+      "command": null,
+      "exitCode": null,
+      "summary": "No reproducible baseline test runner executed yet; documented static inspection evidence."
+    }
+  },
+  "sandboxExecution": null,
+  "publication": null,
+  "sbomEvidence": null,
+  "finalOutcome": {
+    "scannerOutcome": "NOT_VERIFIED",
+    "testOutcome": "UNTESTED",
+    "workflowOutcome": "BLOCKED",
+    "finalValidationOutcome": "BLOCKED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE",
+    "legacyRemediationStatus": "Manual Review Required",
+    "legacyFinalValidationStatus": "BLOCKED",
+    "isResolved": false,
+    "blockingReasons": [
+      "Dependency upgrade missing verified target version or approved manifest ownership."
+    ]
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

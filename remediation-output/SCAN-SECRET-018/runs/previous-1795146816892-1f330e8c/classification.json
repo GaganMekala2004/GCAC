@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-327 - Use of Broken Cryptographic Algorithm (DES/MD5)",
+  "severity": "HIGH",
+  "exploitability": "High due to the widespread knowledge of vulnerabilities in DES and MD5, making it easy for attackers to exploit.",
+  "route": "ArchitecturalMigration",
+  "strategy": "Migrate cryptographic functions to use AES-256 for encryption and SHA-256/SHA-512 for hashing to ensure stronger security.",
+  "attackVector": "Exploitation of weak encryption algorithms in data transmission or storage, requiring access to the encrypted data.",
+  "confidence": 90,
+  "summary": "The use of DES in the LegacyCrypto class poses a significant security risk due to its known vulnerabilities, necessitating immediate remediation.",
+  "vulnerabilityId": "SCAN-SECRET-018",
+  "scannerProvenance": {
+    "scannerId": "secrets-config",
+    "ruleId": "SEC-003",
+    "cwe": "CWE-327",
+    "detectionMethod": "DETERMINISTIC_REGEX"
+  },
+  "advisoryCwe": "CWE-327 Use of Broken Cryptographic Algorithm",
+  "classificationMismatch": false,
+  "cveId": "CWE-327",
+  "originalScannerSeverity": "HIGH",
+  "advisoryAiClassification": {
+    "cwe": "CWE-327 Use of Broken Cryptographic Algorithm",
+    "advisorySuggestedSeverity": "HIGH",
+    "route": "ArchitecturalMigration",
+    "exploitability": "High due to the widespread knowledge of vulnerabilities in DES and MD5, making it easy for attackers to exploit.",
+    "strategy": "Migrate cryptographic functions to use AES-256 for encryption and SHA-256/SHA-512 for hashing to ensure stronger security.",
+    "attackVector": "Exploitation of weak encryption algorithms in data transmission or storage, requiring access to the encrypted data.",
+    "summary": "The use of DES in the LegacyCrypto class poses a significant security risk due to its known vulnerabilities, necessitating immediate remediation.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 90,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

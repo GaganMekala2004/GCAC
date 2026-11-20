@@ -1,0 +1,8 @@
+{
+  "dataFlow": "The method Generate receives 'receiptId' as a parameter, which is untrusted input. This input is directly concatenated into a command string that is executed via Process.Start, leading to potential command injection.",
+  "rootCause": "Line 9 is vulnerable due to the direct use of untrusted input 'receiptId' in a shell command, allowing an attacker to execute arbitrary commands.",
+  "securityImpact": "An attacker could execute arbitrary commands on the server, potentially compromising confidentiality, integrity, and availability of the system.",
+  "proposedFix": "Use a secure method to generate the receipt without invoking a shell command, such as directly calling a method that handles receipt generation.",
+  "affectedLines": "Lines 7-10",
+  "summary": "The root cause of the vulnerability is the direct execution of a shell command with untrusted input, allowing for OS command injection."
+}

@@ -1,10 +1,10 @@
 {
   "rating": "PASS",
-  "summary": "The proposed remediation effectively eliminates the SQL injection vulnerability by using parameterized queries. All genuine tests executed passed successfully, confirming the fix.",
+  "summary": "The proposed remediation effectively eliminates the SQL injection vulnerability by using parameterized queries. All genuine tests executed passed successfully, and the re-scan confirmed the absence of the original vulnerability.",
   "auditChecks": [
-    "Tests total: 1, Passed: 1",
-    "Post-remediation re-scan status: RESOLVED",
-    "Original security vulnerability (CWE-89) is absent from targeted re-scan"
+    "Tests executed: 1, Passed: 1",
+    "Re-scan status: RESOLVED",
+    "No failed, untested, or blocked tests"
   ],
   "machineOutcome": "PASSED",
   "evidenceChecklist": {
@@ -37,7 +37,7 @@
         "label": "Root cause analysis documented",
         "status": "PASS",
         "required": true,
-        "detail": "The root cause of the vulnerability is the use of unparameterized SQL queries that directly incorporate user input, exposing the application to SQL injection risks."
+        "detail": "The root cause of the vulnerability is the use of unparameterized SQL queries that directly incorporate user input, allowing for potential SQL injection attacks."
       },
       {
         "id": "SOURCE_TO_SINK_EVIDENCE",
@@ -72,14 +72,14 @@
         "label": "Originating scanner post-fix re-scan verified",
         "status": "PASS",
         "required": true,
-        "detail": "Original security vulnerability (CWE-89) is completely absent from targeted re-scan (Local Secrets & Configuration Analyzer v1.3.1) with verified post-fix tests and 0 regressions."
+        "detail": "Original security vulnerability (CWE-89) is completely absent from targeted re-scan (Local Secrets & Configuration Analyzer v1.3.2) with verified post-fix tests and 0 regressions."
       },
       {
         "id": "INDEPENDENT_SECURITY_CHECKS",
         "label": "Security suppression & regression validation passed",
         "status": "PASS",
         "required": true,
-        "detail": "The proposed remediation effectively eliminates the SQL injection vulnerability by using parameterized queries. All genuine tests executed passed successfully, confirming the fix."
+        "detail": "The proposed remediation effectively eliminates the SQL injection vulnerability by using parameterized queries. All genuine tests executed passed successfully, and the re-scan confirmed the absence of the original vulnerability."
       },
       {
         "id": "SECRET_MANAGER_REPLACEMENT",

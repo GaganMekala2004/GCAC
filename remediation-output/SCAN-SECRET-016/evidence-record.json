@@ -1,60 +1,60 @@
 {
   "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
-  "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
+  "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
   "findingId": "SCAN-SECRET-016",
   "findingFingerprint": "58fd28730867fb5b",
   "applicationId": "APP-1001",
   "stage": 9,
-  "timestamp": "2026-11-16T15:42:27.280Z",
+  "timestamp": "2026-11-20T03:50:24.156Z",
   "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
   "bundleVersion": "2.0.0",
   "inputReferenceHashes": {
-    "minimizedFindingSha256": "008555c1de60d2dda106c16470a7df144832da1819e9c341b74ee45eebd9d3e3",
+    "minimizedFindingSha256": "b3b580e9013465a440162255970dc010c0bcb0300441d7251330e105a351f5b7",
     "baseSourceSha256": "deb6b611fb3009c578c4af6a3ecdac85b4ff82914ecf6854d05ce963d6fdd316",
     "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f"
   },
   "contentScreeningDecisions": [
     {
-      "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
+      "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
       "contentSource": "finding:SCAN-SECRET-016",
       "trustClass": "UNTRUSTED_SCANNER_FINDING",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T15:42:19.493Z",
+      "timestamp": "2026-11-20T03:50:14.189Z",
       "redactedLocation": "Controllers/PaymentController.cs",
       "matchCount": 0
     },
     {
-      "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
+      "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
       "contentSource": "source:src/PaymentsAPI/Controllers/PaymentController.cs",
       "trustClass": "UNTRUSTED_SOURCE_CODE",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T15:42:19.499Z",
+      "timestamp": "2026-11-20T03:50:14.194Z",
       "redactedLocation": "Controllers/PaymentController.cs",
       "matchCount": 0
     },
     {
-      "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
+      "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
       "contentSource": "sandbox:DOTNET_TEST",
       "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T15:42:26.025Z",
-      "redactedLocation": "SCAN-SECRET-016_356b8716-d54d-4ae2-8277-f4aeeb18ebed/worktree",
+      "timestamp": "2026-11-20T03:50:22.590Z",
+      "redactedLocation": "SCAN-SECRET-016_072611a2-b49d-43a6-953a-4ea7cb9854df/worktree",
       "matchCount": 0
     },
     {
-      "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
+      "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
       "contentSource": "llm:securityReview",
       "trustClass": "UNTRUSTED_MODEL_RESPONSE",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T15:42:27.247Z",
+      "timestamp": "2026-11-20T03:50:24.128Z",
       "redactedLocation": "Controllers/PaymentController.cs",
       "matchCount": 0
     }
@@ -66,7 +66,7 @@
       "executable": "dotnet",
       "allowlisted": true,
       "exitCode": 0,
-      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-016_356b8716-d54d-4ae2-8277-f4aeeb18ebed/worktree"
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-016_072611a2-b49d-43a6-953a-4ea7cb9854df/worktree"
     }
   ],
   "testCommand": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
@@ -84,7 +84,7 @@
     "newFindingsCount": 0
   },
   "approvalReference": {
-    "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
+    "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
     "decision": "APPROVED",
     "approvalMode": "LOCAL_POC_APPROVAL",
     "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
@@ -92,8 +92,8 @@
     "approvedFilePaths": [
       "src/PaymentsAPI/Controllers/PaymentController.cs"
     ],
-    "expiresAt": "2026-11-17T15:41:51.384Z",
-    "timestamp": "2026-11-16T15:41:53.659Z"
+    "expiresAt": "2026-11-21T03:49:31.454Z",
+    "timestamp": "2026-11-20T03:49:54.200Z"
   },
   "proposedDiffSha256": "f9b02be618b425d53fd533f11ecaf612c8c5998a3768b03a572c3ad425ea41e5",
   "appliedDiffSha256": "f9b02be618b425d53fd533f11ecaf612c8c5998a3768b03a572c3ad425ea41e5",
@@ -143,7 +143,8 @@
     "requiresManualReview": false,
     "automatedExecutionAllowed": true,
     "disposition": "AUTOMATED_CANDIDATE",
-    "blockingReason": null
+    "blockingReason": null,
+    "manualReviewPlan": []
   },
   "sourceToSinkEvidence": {
     "vulnerabilityType": "SQL_INJECTION",
@@ -171,7 +172,7 @@
     "affectedFile": "src/PaymentsAPI/Controllers/PaymentController.cs",
     "affectedFunction": "Process(PaymentRequest request)",
     "affectedLines": "Lines 15-16",
-    "proposedRemediation": "Use parameterized queries by replacing the concatenation with SqlParameter objects to safely pass user input into the SQL command.",
+    "proposedRemediation": "Use parameterized queries by replacing the concatenation with parameters in the SqlCommand to safely handle user input.",
     "baselineTestEvidence": {
       "status": "PASS",
       "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
@@ -190,14 +191,14 @@
     "dependencyWarnings": [
       "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
     ],
-    "instanceId": "gcac-12e04ae1aa2b",
+    "instanceId": "gcac-8d925773bf2c",
     "timedOut": false,
     "cancelled": false,
     "gatewayAuditDecisions": [
       {
-        "timestamp": "2026-11-16T15:41:41.901Z",
-        "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
-        "instanceId": "gcac-595781148d83",
+        "timestamp": "2026-11-20T03:49:15.252Z",
+        "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
+        "instanceId": "gcac-c7fde0c811cc",
         "vulnerabilityId": "SCAN-SECRET-016",
         "operation": "DOTNET_TEST",
         "toolchainProfileId": "dotnet-10.0-lts",
@@ -208,9 +209,22 @@
         "policyVersion": "GCAC-PH3-GW-1.0"
       },
       {
-        "timestamp": "2026-11-16T15:41:55.601Z",
-        "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
-        "instanceId": "gcac-2692aa5a1620",
+        "timestamp": "2026-11-20T03:49:28.140Z",
+        "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
+        "instanceId": "gcac-ee29eae38652",
+        "vulnerabilityId": "SCAN-SECRET-016",
+        "operation": "DOTNET_BUILD",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:49:56.448Z",
+        "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
+        "instanceId": "gcac-e08618178444",
         "vulnerabilityId": "SCAN-SECRET-016",
         "operation": "DOTNET_TEST",
         "toolchainProfileId": "dotnet-10.0-lts",
@@ -221,9 +235,9 @@
         "policyVersion": "GCAC-PH3-GW-1.0"
       },
       {
-        "timestamp": "2026-11-16T15:42:21.489Z",
-        "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
-        "instanceId": "gcac-12e04ae1aa2b",
+        "timestamp": "2026-11-20T03:50:16.196Z",
+        "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
+        "instanceId": "gcac-8d925773bf2c",
         "vulnerabilityId": "SCAN-SECRET-016",
         "operation": "DOTNET_TEST",
         "toolchainProfileId": "dotnet-10.0-lts",
@@ -236,12 +250,16 @@
     ],
     "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
   },
+  "publication": {
+    "status": "NOT_CONFIGURED",
+    "reason": "No origin remote. Final approval closes local evidence only; no GitHub PR can be created."
+  },
   "sbomEvidence": {
     "sbomStatus": "MANIFEST_INVENTORY_ONLY_EXTERNAL_CLI_NOT_AVAILABLE",
     "externalSbomCliStatus": "NOT_AVAILABLE",
     "format": "CycloneDX/1.5",
     "componentCount": 4,
-    "artifactHash": "b6ee19dc07f98149c9e440ccd2255371973d1853672ec1e7e01504a3e2be3226"
+    "artifactHash": "1bea42f76a2f0df2b64bfe43a7dc6a18094d63bbbcd9d35447ee4491ab422361"
   },
   "finalOutcome": {
     "scannerOutcome": "RESOLVED",

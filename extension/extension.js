@@ -206,7 +206,7 @@ async function requestPublicationConsent(vulnerabilityId) {
 
 async function requestLocalDiffConsent(vulnerabilityId) {
     const state = engine.loadRunState(vulnerabilityId);
-    if (!engine?.isLocalDevelopment && (!state?.provider || state.provider.id === 'copilot')) return {};
+    if (!engine?.isLocalDevelopment && (!state?.provider || state.provider.id === 'copilot')) return { approvedRunId: state?.runId, approvedDiffSha256: state?.proposedDiffSha256 };
     if (!state?.proposedDiffSha256 || !state.patchDiff) throw new Error('No real proposed diff is available for local consent.');
     await vscode.commands.executeCommand('gcac.viewDiff', vulnerabilityId);
     const answer = await vscode.window.showInformationMessage(
@@ -318,7 +318,7 @@ function getCombinedFindings(csvPath, store, options = {}) {
     const canonicalRows = rows => rows.map(row => {
         const state = engine?.loadRunState ? engine.loadRunState(row.Vulnerability_ID) : null;
         return { ...row, GCAC_Approval_Eligible: isStage4ConsentEligible(state),
-            GCAC_Run_ID: state?.runId || null, GCAC_Execution_Mode: state?.executionMode || engine?.executionMode || 'ENTERPRISE',
+            GCAC_Diff_SHA256: state?.proposedDiffSha256 || null, GCAC_Run_ID: state?.runId || null, GCAC_Execution_Mode: state?.executionMode || engine?.executionMode || 'ENTERPRISE',
             GCAC_Local_Outcome: state?.localOutcome || null,
             ...(state?.localOutcome ? { Remediation_Status: state.localOutcome } : {}) };
     });
@@ -377,6 +377,7 @@ function persistRejectionAndRollback(vulnerabilityId, newStatus) {
             } catch (e) { /* keep run state update best-effort */ }
         }
         runState.status = newStatus === 'Rejected' ? 'REJECTED' : 'FAILED';
+        if (newStatus === 'Rejected' && !runState.patchAppliedAtStage5) runState.approvalDecision = 'REJECTED_STAGE4';
         runState.stage4Approved = false;
         runState.updatedAt = new Date().toISOString();
         engine.saveRunState(vulnerabilityId, runState);
@@ -836,10 +837,12 @@ function activate(context) {
 
                 const isHumanApproved = isApproveCmd || isFinalApproveCmd;
                 const isFinalApproved = isFinalApproveCmd;
+                let reviewedProposal = {};
                 if (isHumanApproved) {
                     const boundRun = prompt.match(/\brun\s+"([^"]+)"/i)?.[1];
                     const boundDiff = prompt.match(/\bdiff\s+"([a-f0-9]{64})"/i)?.[1];
                     const current = engine.loadRunState(vulnId);
+                    if (isApproveCmd) reviewedProposal = { approvedRunId: current?.runId, approvedDiffSha256: current?.proposedDiffSha256 };
                     if ((boundRun && current?.runId !== boundRun) || (boundDiff && current?.proposedDiffSha256 !== boundDiff)) {
                         response.markdown('This approval belongs to an older run or diff. Review the current proposal before approving.');
                         return;
@@ -890,6 +893,7 @@ function activate(context) {
                     const publicationConsent = isFinalApproved ? await requestPublicationConsent(vulnId) : {};
                     const result = await engine.executePipeline(vulnId, {
                         ...localConsent,
+                        ...reviewedProposal,
                         ...publicationConsent,
                         cancellationToken: token,
                         isHumanApproved,
@@ -2007,10 +2011,14 @@ async function handleWebviewMessage(message, webview) {
                     });
                     return;
                 }
+                if (!isStage4ConsentEligible(existingRunState) || message.runId !== existingRunState.runId || message.diff !== existingRunState.proposedDiffSha256) {
+                    throw new Error('Refresh the finding and review its current pending patch before approving.');
+                }
                 const localConsent = await requestLocalDiffConsent(message.vulnerabilityId);
                 vscode.window.showInformationMessage(`Stage 4 Gate authorized for ${message.vulnerabilityId}. Executing genuine testing...`);
                 await engine.executePipeline(message.vulnerabilityId, {
                     ...localConsent,
+                    approvedRunId: message.runId, approvedDiffSha256: message.diff,
                     isHumanApproved: true,
                     isFinalApproved: false,
                     authorizedRoots: buildAuthorizedRoots(),

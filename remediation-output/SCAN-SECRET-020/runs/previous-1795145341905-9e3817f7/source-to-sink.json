@@ -1,0 +1,30 @@
+{
+  "vulnerabilityType": "XSS",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "Unresolved (inspect method parameters)",
+    "file": "src/PaymentsAPI/appsettings.json",
+    "line": 8,
+    "snippet": "\"ApiKey\": \"sk_live_99887766554433221100aabbccddeeff\","
+  },
+  "dataPropagationEvidence": [],
+  "dangerousSink": {
+    "file": "src/PaymentsAPI/appsettings.json",
+    "line": 8,
+    "snippet": "\"ApiKey\": \"sk_live_99887766554433221100aabbccddeeff\","
+  },
+  "missingValidationOrEncoding": "Untrusted output is emitted into HTML response without HTML encoding.",
+  "affectedFile": "src/PaymentsAPI/appsettings.json",
+  "affectedFunction": "UnknownMethod",
+  "affectedLines": "Lines 8",
+  "proposedRemediation": "Replace the hardcoded API key with a secure method of storing secrets, such as using environment variables or a secure secrets management service.",
+  "baselineTestEvidence": {
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+  }
+}

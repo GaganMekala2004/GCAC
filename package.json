@@ -2,7 +2,7 @@
   "name": "gcac-vulnerability-remediation",
   "displayName": "GCAC Vulnerability Remediation Hub",
   "description": "Local Multi-Agent Security Remediation and Governance Dashboard for VS Code",
-  "version": "2.0.2",
+  "version": "2.0.5",
   "publisher": "gcac",
   "engines": {
     "vscode": "^1.90.0"

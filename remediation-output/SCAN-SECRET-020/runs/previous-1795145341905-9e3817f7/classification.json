@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-798 - Hardcoded API Secret or Private Key",
+  "severity": "HIGH",
+  "exploitability": "High - The presence of a hardcoded API key can be easily exploited if the source code is exposed.",
+  "route": "ConfigUpdate",
+  "strategy": "Extract the hardcoded API key into environment variables or a secure key vault to enhance security.",
+  "attackVector": "An attacker with access to the source code can extract the API key and use it for unauthorized access.",
+  "confidence": 90,
+  "summary": "The hardcoded API key poses a significant security risk and should be remediated promptly.",
+  "vulnerabilityId": "SCAN-SECRET-020",
+  "scannerProvenance": {
+    "scannerId": "secrets-config",
+    "ruleId": "SEC-001",
+    "cwe": "CWE-798",
+    "detectionMethod": "DETERMINISTIC_REGEX"
+  },
+  "advisoryCwe": "CWE-798 Hardcoded API Secret or Private Key",
+  "classificationMismatch": false,
+  "cveId": "CWE-798",
+  "originalScannerSeverity": "HIGH",
+  "advisoryAiClassification": {
+    "cwe": "CWE-798 Hardcoded API Secret or Private Key",
+    "advisorySuggestedSeverity": "HIGH",
+    "route": "ConfigUpdate",
+    "exploitability": "High - The presence of a hardcoded API key can be easily exploited if the source code is exposed.",
+    "strategy": "Extract the hardcoded API key into environment variables or a secure key vault to enhance security.",
+    "attackVector": "An attacker with access to the source code can extract the API key and use it for unauthorized access.",
+    "summary": "The hardcoded API key poses a significant security risk and should be remediated promptly.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 90,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

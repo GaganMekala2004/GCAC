@@ -1,0 +1,13 @@
+diff --git a/src/PaymentsAPI/Controllers/ReceiptController.cs b/src/PaymentsAPI/Controllers/ReceiptController.cs
+index 15df30c..9bb8448 100644
+--- a/src/PaymentsAPI/Controllers/ReceiptController.cs
++++ b/src/PaymentsAPI/Controllers/ReceiptController.cs
+@@ -6,6 +6,6 @@ public class ReceiptController
+ {
+     public void Generate(string receiptId)
+     {
+-        Process.Start("cmd.exe", $"/c generate-receipt.bat {receiptId}");
++        GenerateReceipt(receiptId);
+     }
+ }
+\ No newline at end of file

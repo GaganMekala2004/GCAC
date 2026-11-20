@@ -138,7 +138,7 @@ function evaluateRemediationStrategy({ finding = {}, sourceCode = '', ownershipC
 
     // Evaluate Tier 3: Existing Dependency Upgrade
     if (!selectedTier && vulnType === VULNERABILITY_TYPES.DEPENDENCY_VULNERABILITY) {
-        if (hasFixedVersion && ownership.tier === OWNERSHIP_TIER.APPLICATION_AUTHORED) {
+        if (hasFixedVersion && ownership.editable && ownership.tier === OWNERSHIP_TIER.APPLICATION_AUTHORED) {
             alternativesEvaluated.push({
                 tier: REMEDIATION_LADDER[2],
                 feasible: true,

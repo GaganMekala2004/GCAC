@@ -14,7 +14,6 @@ const {
     loadAndVerifyToolchainRegistry,
     resolveProfileForRepository,
     assertProfileProvisioned,
-    isTemplateDigestProfile,
     ToolchainProfileError
 } = require('../../extension/sandbox/toolchainProfiles');
 
@@ -109,42 +108,10 @@ async function runStage3ToolchainAndStateFixTests() {
     }
 
     // -------------------------------------------------------------------------
-    // 2. Unsupported .NET 9 runtime handling (No false backward compatibility assumption)
-    // -------------------------------------------------------------------------
-    console.log('[TEST 2] Unsupported .NET 9 Runtime Handling');
-    {
-        assert(net9Profile, 'dotnet-9.0-sts profile exists in manifest');
-        assert.strictEqual(isTemplateDigestProfile(net9Profile), true, 'dotnet-9.0-sts must be recognized as template placeholder');
-        assert.strictEqual(net9Profile.digestStatus, 'TEMPLATE_PLACEHOLDER');
+    // Verify the dedicated .NET 9 SDK resolves without a framework migration.
+    assert.strictEqual(net9Profile.digestStatus, 'VERIFIED_IMAGE_DIGEST');
+    assert.doesNotThrow(() => assertProfileProvisioned(net9Profile));
 
-        const tmpNet9Repo = mkTempDir('net9-target-');
-        try {
-            fs.writeFileSync(path.join(tmpNet9Repo, 'App.csproj'),
-                '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework></PropertyGroup></Project>');
-
-            const resolvedNet9 = resolveProfileForRepository(tmpNet9Repo, { Technology: 'dotnet' }, PROFILES_PATH);
-            assert.strictEqual(resolvedNet9.profileId, 'dotnet-9.0-sts', 'Must resolve dotnet-9.0-sts profile for net9.0 project');
-
-            // Must NOT assume .NET 10 image can execute net9.0 binaries; assertProfileProvisioned must fail-closed
-            let caught = null;
-            try {
-                assertProfileProvisioned(resolvedNet9, { repositoryLabel: 'test-net9-repo' });
-            } catch (err) {
-                caught = err;
-            }
-            assert(caught, 'assertProfileProvisioned must fail closed for template placeholder profile');
-            assert.strictEqual(caught.code, 'UNPROVISIONED_TOOLCHAIN_PROFILE');
-            assert.strictEqual(caught.failureCategory, 'TOOLCHAIN_IMAGE_UNAVAILABLE');
-            assert.strictEqual(caught.machineStatus, 'COULD_NOT_RUN');
-            assert(caught.message.includes('uses template placeholder digest'), 'Error message must cite template placeholder digest');
-            assert(caught.message.includes('Auto-pull is disabled by container security policy'), 'Must note auto-pull disabled');
-        } finally {
-            cleanupTempDir(tmpNet9Repo);
-        }
-        console.log('  ✓ .NET 9 runtime not assumed compatible with .NET 10 SDK; fail-closed enforcement verified.');
-    }
-
-    // -------------------------------------------------------------------------
     // 3. Unavailable or placeholder image detection
     // -------------------------------------------------------------------------
     console.log('[TEST 3] Unavailable or Placeholder Image Detection');
@@ -152,7 +119,7 @@ async function runStage3ToolchainAndStateFixTests() {
         const dummyPlaceholderProfile = {
             profileId: 'mock-legacy-profile',
             supportedStack: 'dotnet',
-            targetFramework: 'net9.0',
+            targetFramework: 'net8.0',
             imageDigest: 'sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b',
             digestStatus: 'TEMPLATE_PLACEHOLDER'
         };
@@ -175,7 +142,7 @@ async function runStage3ToolchainAndStateFixTests() {
             vulnerabilityId: 'SCAN-SECRET-016',
             workspaceRef: PAYMENTS_API_DIR,
             operation: OPERATION_TYPES.DOTNET_TEST,
-            toolchainProfileId: 'dotnet-9.0-sts',
+            toolchainProfileId: 'dotnet-8.0-lts',
             policyVersion: EXECUTION_POLICY_VERSION,
             networkPolicy: 'NO_NETWORK',
             inputs: [],
@@ -201,7 +168,7 @@ async function runStage3ToolchainAndStateFixTests() {
         const tmpDir = mkTempDir('stage3-blocked-');
         try {
             fs.writeFileSync(path.join(tmpDir, 'Legacy.csproj'),
-                '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework></PropertyGroup></Project>');
+                '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>');
 
             const runnerRes = await executeRealTestRunner('dotnet', ['test'], tmpDir, {
                 workspaceRoot: WORKSPACE_ROOT,
@@ -282,8 +249,12 @@ async function runStage3ToolchainAndStateFixTests() {
     // -------------------------------------------------------------------------
     console.log('[TEST 6] Approval Disabled When Stage 3 Is Blocked');
     {
-        const store = new FindingsStore(WORKSPACE_ROOT);
-        const engine = new RemediationEngine(WORKSPACE_ROOT, null, { findingsStore: store });
+        const finding = { Vulnerability_ID: 'SCAN-SECRET-016', Repository: PAYMENTS_API_DIR,
+            Repository_Root: PAYMENTS_API_DIR, Application_Number: 'APP-1001',
+            Location_Path: 'src/PaymentsAPI/Controllers/PaymentController.cs' };
+        const findingsStore = { getFindingById: id => id === finding.Vulnerability_ID
+            ? { toCsvCompatibleRecord: () => finding } : null };
+        const engine = new RemediationEngine(WORKSPACE_ROOT, null, { findingsStore });
 
         // Attempting to execute Stage 4 approval on a blocked/untested run state must throw Gate Integrity Violation
         // The real finding can already have a passing baseline. Supply the
@@ -365,10 +336,10 @@ async function runStage3ToolchainAndStateFixTests() {
         const store = new FindingsStore(WORKSPACE_ROOT);
         const engine = new RemediationEngine(WORKSPACE_ROOT, null, { findingsStore: store });
 
-        const subNet9 = path.join(WORKSPACE_ROOT, 'sample-repos', 'test-net9-temp');
-        fs.mkdirSync(subNet9, { recursive: true });
-        fs.writeFileSync(path.join(subNet9, 'App.csproj'),
-            '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework></PropertyGroup></Project>');
+        const subNet8 = path.join(WORKSPACE_ROOT, 'sample-repos', 'test-net8-temp');
+        fs.mkdirSync(subNet8, { recursive: true });
+        fs.writeFileSync(path.join(subNet8, 'App.csproj'),
+            '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>');
 
         const runStateFile = path.join(WORKSPACE_ROOT, 'remediation-output', 'SCAN-SECRET-016', 'run-state.json');
         const backupContent = fs.existsSync(runStateFile) ? fs.readFileSync(runStateFile, 'utf8') : null;
@@ -386,11 +357,11 @@ async function runStage3ToolchainAndStateFixTests() {
                 findingSnapshot: {
                     Vulnerability_ID: 'SCAN-SECRET-016',
                     Application_Number: 'APP-1001',
-                    Repository: 'sample-repos/test-net9-temp',
-                    Repository_Root: subNet9
+                    Repository: 'sample-repos/test-net8-temp',
+                    Repository_Root: subNet8
                 },
                 diagnostics: {
-                    toolchainProfileId: 'dotnet-9.0-sts'
+                    toolchainProfileId: 'dotnet-8.0-lts'
                 }
             };
 
@@ -416,7 +387,7 @@ async function runStage3ToolchainAndStateFixTests() {
             if (backupContent) {
                 fs.writeFileSync(runStateFile, backupContent, 'utf8');
             }
-            fs.rmSync(subNet9, { recursive: true, force: true });
+            fs.rmSync(subNet8, { recursive: true, force: true });
         }
         console.log('  ✓ Retry disabled while toolchain is unavailable; zero retry quota consumed.');
     }

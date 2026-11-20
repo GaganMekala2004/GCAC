@@ -1,12 +1,12 @@
 {
   "cwe": "CWE-798 - Hardcoded API Secret or Private Key",
   "severity": "HIGH",
-  "exploitability": "High - The presence of a hardcoded API key can be easily exploited if the source code is exposed.",
+  "exploitability": "High - The presence of hardcoded API keys can lead to unauthorized access if the code is exposed.",
   "route": "ConfigUpdate",
   "strategy": "Extract the hardcoded API key into environment variables or a secure key vault to enhance security.",
-  "attackVector": "An attacker with access to the source code can extract the API key and use it for unauthorized access.",
-  "confidence": 90,
-  "summary": "The hardcoded API key poses a significant security risk and should be remediated promptly.",
+  "attackVector": "Unauthorized access via exposed API keys; requires access to the source code or configuration files.",
+  "confidence": 85,
+  "summary": "The application contains a hardcoded API key, posing a significant security risk that requires immediate remediation.",
   "vulnerabilityId": "SCAN-SECRET-020",
   "scannerProvenance": {
     "scannerId": "secrets-config",
@@ -22,13 +22,13 @@
     "cwe": "CWE-798 Hardcoded API Secret or Private Key",
     "advisorySuggestedSeverity": "HIGH",
     "route": "ConfigUpdate",
-    "exploitability": "High - The presence of a hardcoded API key can be easily exploited if the source code is exposed.",
+    "exploitability": "High - The presence of hardcoded API keys can lead to unauthorized access if the code is exposed.",
     "strategy": "Extract the hardcoded API key into environment variables or a secure key vault to enhance security.",
-    "attackVector": "An attacker with access to the source code can extract the API key and use it for unauthorized access.",
-    "summary": "The hardcoded API key poses a significant security risk and should be remediated promptly.",
+    "attackVector": "Unauthorized access via exposed API keys; requires access to the source code or configuration files.",
+    "summary": "The application contains a hardcoded API key, posing a significant security risk that requires immediate remediation.",
     "isNoActionSuggestion": false
   },
-  "aiConfidence": 90,
+  "aiConfidence": 85,
   "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
   "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
 }

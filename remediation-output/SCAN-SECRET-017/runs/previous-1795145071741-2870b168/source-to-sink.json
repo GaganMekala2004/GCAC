@@ -1,0 +1,41 @@
+{
+  "vulnerabilityType": "COMMAND_INJECTION",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "receiptId",
+    "file": "src/PaymentsAPI/Controllers/ReceiptController.cs",
+    "line": 7,
+    "snippet": "public void Generate(string receiptId)"
+  },
+  "dataPropagationEvidence": [
+    {
+      "line": 7,
+      "snippet": "public void Generate(string receiptId)",
+      "note": "References candidate untrusted input 'receiptId'."
+    },
+    {
+      "line": 9,
+      "snippet": "Process.Start(\"cmd.exe\", $\"/c generate-receipt.bat {receiptId}\");",
+      "note": "References candidate untrusted input 'receiptId'."
+    }
+  ],
+  "dangerousSink": {
+    "file": "src/PaymentsAPI/Controllers/ReceiptController.cs",
+    "line": 9,
+    "snippet": "Process.Start(\"cmd.exe\", $\"/c generate-receipt.bat {receiptId}\");"
+  },
+  "missingValidationOrEncoding": "User-supplied input reaches shell/process command invocation without strict allowlist validation or ArgumentList separation.",
+  "affectedFile": "src/PaymentsAPI/Controllers/ReceiptController.cs",
+  "affectedFunction": "Generate(string receiptId)",
+  "affectedLines": "9",
+  "proposedRemediation": "Replace the Process.Start invocation with a safer method of executing commands, such as using a library that does not invoke the shell directly, or validate and sanitize 'receiptId' before use.",
+  "baselineTestEvidence": {
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+  }
+}

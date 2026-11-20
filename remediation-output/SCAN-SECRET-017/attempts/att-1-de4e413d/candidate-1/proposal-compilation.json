@@ -1,0 +1,11 @@
+{
+  "executed": true,
+  "passed": false,
+  "exitCode": 1,
+  "command": "dotnet build --no-restore --nologo",
+  "backendType": "local-container",
+  "machineStatus": "FAILED",
+  "timedOut": false,
+  "cancelled": false,
+  "diagnostics": "/sandbox-work/src/PaymentsAPI/Controllers/ReceiptController.cs(9,14): error CS0103: The name 'IsValidReceiptId' does not exist in the current context [/sandbox-work/src/PaymentsAPI/PaymentsAPI.csproj]\n/sandbox-work/src/PaymentsAPI/Controllers/ReceiptController.cs(9,14): error CS0103: The name 'IsValidReceiptId' does not exist in the current context [/sandbox-work/src/PaymentsAPI/PaymentsAPI.csproj]"
+}

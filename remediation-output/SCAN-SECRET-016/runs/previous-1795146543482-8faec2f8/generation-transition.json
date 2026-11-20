@@ -1,0 +1,18 @@
+{
+  "nextRunId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
+  "archivedAt": "2026-11-20T03:49:03.484Z",
+  "priorIntegrity": {
+    "hasManifest": true,
+    "verified": false,
+    "status": "TAMPERING_DETECTED",
+    "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+    "findingId": "SCAN-SECRET-016",
+    "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+    "cryptographicallySigned": false,
+    "mismatches": [
+      "Modified evidence artifact 'run-state.json' (SHA-256 mismatch)."
+    ],
+    "chainErrors": [],
+    "warning": "Evidence Integrity Mismatch Detected: Modified evidence artifact 'run-state.json' (SHA-256 mismatch)."
+  }
+}

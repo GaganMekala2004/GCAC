@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-78 - OS Command Injection via Shell Invocation",
+  "severity": "HIGH",
+  "exploitability": "High due to the direct invocation of a shell command with user-controlled input, which can lead to arbitrary command execution.",
+  "route": "SpecializedAction",
+  "strategy": "Refactor the code to use ProcessStartInfo with strongly-typed arguments and implement strict input validation to mitigate the risk of command injection.",
+  "attackVector": "An attacker can exploit this vulnerability by providing a crafted receiptId that includes malicious commands, requiring only access to the API endpoint.",
+  "confidence": 85,
+  "summary": "The application is vulnerable to OS command injection, allowing potential execution of arbitrary commands through user input.",
+  "vulnerabilityId": "SCAN-SECRET-017",
+  "scannerProvenance": {
+    "scannerId": "secrets-config",
+    "ruleId": "SEC-004",
+    "cwe": "CWE-78",
+    "detectionMethod": "DETERMINISTIC_REGEX"
+  },
+  "advisoryCwe": "CWE-78 OS Command Injection",
+  "classificationMismatch": false,
+  "cveId": "CWE-78",
+  "originalScannerSeverity": "HIGH",
+  "advisoryAiClassification": {
+    "cwe": "CWE-78 OS Command Injection",
+    "advisorySuggestedSeverity": "HIGH",
+    "route": "SpecializedAction",
+    "exploitability": "High due to the direct invocation of a shell command with user-controlled input, which can lead to arbitrary command execution.",
+    "strategy": "Refactor the code to use ProcessStartInfo with strongly-typed arguments and implement strict input validation to mitigate the risk of command injection.",
+    "attackVector": "An attacker can exploit this vulnerability by providing a crafted receiptId that includes malicious commands, requiring only access to the API endpoint.",
+    "summary": "The application is vulnerable to OS command injection, allowing potential execution of arbitrary commands through user input.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 85,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

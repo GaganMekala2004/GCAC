@@ -4,7 +4,26 @@ const { isSeparateRepositoryDirectory } = require('../repositoryContext');
 const path = require('path');
 const { inRange, compareVersions } = require('./nugetAdvisories');
 
-function auditResolvedProjects(target, snapshot, abortSignal) {
+// Only offer stable, published packages already restored from NuGet.org.
+function cachedUpgrade(id, current, advisories, cacheRoot) {
+    if (!/^[a-z0-9][a-z0-9_.-]*$/i.test(id)) return '';
+    const packageDir = path.join(cacheRoot, id.toLowerCase());
+    let entries;
+    try { entries = fs.readdirSync(packageDir, { withFileTypes: true }); } catch { return ''; }
+    const candidates = entries.filter(entry => entry.isDirectory() && /^\d+(?:\.\d+){1,3}$/.test(entry.name))
+        .map(entry => entry.name).filter(v => compareVersions(v, current) > 0 && !advisories.some(a => inRange(v, a.versions)))
+        .sort(compareVersions);
+    return candidates.find(version => {
+        const dir = path.join(packageDir, version);
+        try {
+            const metadata = JSON.parse(fs.readFileSync(path.join(dir, '.nupkg.metadata'), 'utf8'));
+            return metadata.source === 'https://api.nuget.org/v3/index.json' && Boolean(metadata.contentHash) &&
+                fs.existsSync(path.join(dir, id.toLowerCase() + '.' + version + '.nupkg'));
+        } catch { return false; }
+    }) || '';
+}
+
+function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = process.env.NUGET_PACKAGES || path.join(require('os').homedir(), '.nuget', 'packages')) {
     const projects = [];
     const skipped = new Set(['.git', 'node_modules', 'bin', 'obj', 'packages', 'output', 'remediation-output', 'workspaces', 'evidence']);
     const walk = dir => {
@@ -84,7 +103,10 @@ function auditResolvedProjects(target, snapshot, abortSignal) {
                 const key = `${project}|${identity}|${advisory.url}`;
                 if (seen.has(key)) continue;
                 seen.add(key);
-                results.push({ path: project, frameworks: [{ topLevelPackages: [{ id, resolvedVersion: version,
+                const direct = references.filter(ref => ref[1].toLowerCase() === id.toLowerCase());
+                const exact = direct.length === 1 && direct[0][0].match(/\bVersion=["']([^"']+)["']/i)?.[1] === version;
+                const fixedVersion = exact ? cachedUpgrade(id, version, snapshot.packages[id.toLowerCase()], cacheRoot) : '';
+                results.push({ path: project, frameworks: [{ [direct.length ? 'topLevelPackages' : 'transitivePackages']: [{ id, resolvedVersion: version, fixedVersion,
                     vulnerabilities: [{ advisoryUrl: advisory.url, severity: ['Low', 'Moderate', 'High', 'Critical'][advisory.severity] }] }] }] });
             }
         }

@@ -6,7 +6,7 @@ const { ReScanVerifier } = require('../../extension/scanning/reScanVerifier');
 const { ScanController } = require('../../extension/scanning/scanController');
 const { FindingsStore } = require('../../extension/scanning/findingsStore');
 const { SecretsConfigScanner } = require('../../extension/scanning/adapters/secretsConfigScanner');
-const { NormalizedFinding, VERIFICATION_STATUS } = require('../../extension/scanning/findingModel');
+const { NormalizedFinding, SCANNER_STATUS, VERIFICATION_STATUS } = require('../../extension/scanning/findingModel');
 const { RemediationEngine } = require('../../extension/remediationEngine');
 
 const workspaceRoot = path.resolve(__dirname, '../..');
@@ -111,6 +111,13 @@ async function run() {
     assert.strictEqual(notVerifiedResult.status, VERIFICATION_STATUS.NOT_VERIFIED, 'Must report NOT VERIFIED when scanner adapter is unavailable');
     assert.strictEqual(notVerifiedResult.isResolved, false);
     console.log('  ✓ Missing scanner produces NOT VERIFIED without fabricated success');
+
+    secretsScanner.scan = async () => ({ status: SCANNER_STATUS.PARTIAL, findings: [], coverage: 'Build incomplete' });
+    const partial = await verifier.verifyRemediation({
+        originalFinding: targetFinding, testResult: { passed: true, total: 1, failed: 0 }, targetPath: testSubDir
+    });
+    assert.strictEqual(partial.machineStatus, 'INCONCLUSIVE');
+    assert.strictEqual(partial.isResolved, false);
 
     // 6. RemediationEngine Stage 6 & Markdown Evidence Generation
     const engine = new RemediationEngine(workspaceRoot, null, { findingsStore: store, reScanVerifier: verifier });

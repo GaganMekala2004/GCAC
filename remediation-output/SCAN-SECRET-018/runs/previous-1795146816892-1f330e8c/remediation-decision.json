@@ -1,0 +1,47 @@
+{
+  "vulnerabilityId": "SCAN-SECRET-018",
+  "vulnerabilityType": "WEAK_CRYPTO_MIGRATION",
+  "affectedComponent": "src/PaymentsAPI/LegacyCrypto.cs",
+  "ownershipTier": "APPLICATION_AUTHORED",
+  "sourceIsApplicationAuthored": true,
+  "blastRadius": "HIGH",
+  "selectedTier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+  "recommendedStrategy": "Implement the reviewed AES-256-GCM contract: keep Encrypt(byte[] data, byte[] key, byte[] iv); key must be 32 bytes, iv is a caller-supplied unique 12-byte nonce. Return [version byte 1][12-byte nonce][16-byte tag][ciphertext]. Reject invalid key/nonce lengths. Never use a static nonce or generate a replacement nonce silently. Legacy ciphertext compatibility is explicitly not required. Cryptographic contract tests are mandatory.",
+  "alternativesEvaluated": [
+    {
+      "tier": "1_SECURE_CONFIG_CHANGE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "Root cause lies in application source code logic or architectural/vendor layer rather than declarative config."
+    },
+    {
+      "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+    },
+    {
+      "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "Finding originates in custom/application code or infrastructure, not an outdated dependency manifest."
+    },
+    {
+      "tier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+      "feasible": true,
+      "suitable": true,
+      "reason": "Config/runtime/dependency options cannot fix custom application dataflow; minimal targeted code change in application-authored file is smallest safe fix."
+    },
+    {
+      "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+      "feasible": true,
+      "suitable": false,
+      "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+    }
+  ],
+  "requiresManualReview": false,
+  "automatedExecutionAllowed": true,
+  "disposition": "AUTOMATED_CANDIDATE",
+  "blockingReason": null,
+  "manualReviewPlan": []
+}

@@ -1,12 +1,12 @@
 {
   "cwe": "CWE-327 - Use of Broken Cryptographic Algorithm (DES/MD5)",
   "severity": "HIGH",
-  "exploitability": "High due to the widespread knowledge of vulnerabilities in DES and MD5, making it easy for attackers to exploit.",
+  "exploitability": "Medium: The vulnerability can be exploited if an attacker has access to the encrypted data and the necessary tools to break the weak algorithms.",
   "route": "ArchitecturalMigration",
-  "strategy": "Migrate cryptographic functions to use AES-256 for encryption and SHA-256/SHA-512 for hashing to ensure stronger security.",
-  "attackVector": "Cryptographic attacks exploiting weak algorithms, requiring access to encrypted data and the ability to perform decryption attempts.",
-  "confidence": 90,
-  "summary": "The use of DES for encryption poses a significant security risk, necessitating immediate migration to stronger cryptographic standards.",
+  "strategy": "Migrate cryptographic implementations from DES/MD5 to AES-256 (AES-GCM) for encryption and SHA-256/SHA-512 for hashing to enhance security.",
+  "attackVector": "An attacker can exploit weak cryptographic algorithms to decrypt sensitive data if they can intercept it during transmission or access stored data.",
+  "confidence": 85,
+  "summary": "The use of broken cryptographic algorithms poses a significant security risk, necessitating immediate migration to stronger alternatives.",
   "vulnerabilityId": "SCAN-SECRET-018",
   "scannerProvenance": {
     "scannerId": "secrets-config",
@@ -14,21 +14,21 @@
     "cwe": "CWE-327",
     "detectionMethod": "DETERMINISTIC_REGEX"
   },
-  "advisoryCwe": "CWE-327 Use of Broken Cryptographic Algorithm",
+  "advisoryCwe": "CWE-327: Use of a Broken or Risky Cryptographic Algorithm",
   "classificationMismatch": false,
   "cveId": "CWE-327",
   "originalScannerSeverity": "HIGH",
   "advisoryAiClassification": {
-    "cwe": "CWE-327 Use of Broken Cryptographic Algorithm",
+    "cwe": "CWE-327: Use of a Broken or Risky Cryptographic Algorithm",
     "advisorySuggestedSeverity": "HIGH",
     "route": "ArchitecturalMigration",
-    "exploitability": "High due to the widespread knowledge of vulnerabilities in DES and MD5, making it easy for attackers to exploit.",
-    "strategy": "Migrate cryptographic functions to use AES-256 for encryption and SHA-256/SHA-512 for hashing to ensure stronger security.",
-    "attackVector": "Cryptographic attacks exploiting weak algorithms, requiring access to encrypted data and the ability to perform decryption attempts.",
-    "summary": "The use of DES for encryption poses a significant security risk, necessitating immediate migration to stronger cryptographic standards.",
+    "exploitability": "Medium: The vulnerability can be exploited if an attacker has access to the encrypted data and the necessary tools to break the weak algorithms.",
+    "strategy": "Migrate cryptographic implementations from DES/MD5 to AES-256 (AES-GCM) for encryption and SHA-256/SHA-512 for hashing to enhance security.",
+    "attackVector": "An attacker can exploit weak cryptographic algorithms to decrypt sensitive data if they can intercept it during transmission or access stored data.",
+    "summary": "The use of broken cryptographic algorithms poses a significant security risk, necessitating immediate migration to stronger alternatives.",
     "isNoActionSuggestion": false
   },
-  "aiConfidence": 90,
+  "aiConfidence": 85,
   "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
   "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
 }

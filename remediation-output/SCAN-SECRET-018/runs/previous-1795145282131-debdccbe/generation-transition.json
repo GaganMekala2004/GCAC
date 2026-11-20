@@ -1,0 +1,16 @@
+{
+  "nextRunId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+  "archivedAt": "2026-11-20T03:28:02.134Z",
+  "priorIntegrity": {
+    "hasManifest": true,
+    "verified": true,
+    "status": "VERIFIED_LOCAL_DIGESTS",
+    "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
+    "findingId": "SCAN-SECRET-018",
+    "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+    "cryptographicallySigned": false,
+    "mismatches": [],
+    "chainErrors": [],
+    "warning": "Local SHA-256 manifest and hash chain verified (tamper detection only; not immutable WORM storage)."
+  }
+}

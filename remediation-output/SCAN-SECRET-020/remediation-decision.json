@@ -42,5 +42,6 @@
   "requiresManualReview": false,
   "automatedExecutionAllowed": true,
   "disposition": "AUTOMATED_CANDIDATE",
-  "blockingReason": null
+  "blockingReason": null,
+  "manualReviewPlan": []
 }

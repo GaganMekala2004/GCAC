@@ -246,7 +246,7 @@ class ReScanVerifier {
         } else if (testOutcome === OUTCOME_STATUS.FAILED) {
             machineStatus = OUTCOME_STATUS.REGRESSION_DETECTED;
             explanation = 'The security finding was not detected on re-scan, but post-fix validation tests failed.';
-        } else if (reScanResult.coverage && /(^|\s)0%/.test(reScanResult.coverage)) {
+        } else if (reScanResult.status === SCANNER_STATUS.PARTIAL || (reScanResult.coverage && /(^|\s)0%/.test(reScanResult.coverage))) {
             machineStatus = OUTCOME_STATUS.INCONCLUSIVE;
             explanation = `Re-scan coverage was incomplete (${reScanResult.coverage}). Outcome is inconclusive.`;
         } else if (params.requiresTests !== false && testOutcome !== OUTCOME_STATUS.PASSED) {

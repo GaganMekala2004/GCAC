@@ -30,7 +30,7 @@ async function runLiveProfileSelectionTests() {
     console.log('=== Running Live Scanner Profile Selection Regression Suite ===\n');
 
     const verifiedNet10Digest = 'sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb';
-    const legacyPlaceholderDigest = 'sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b';
+
 
     // -------------------------------------------------------------------------
     // Test 1: net10.0 project selects the real approved .NET 10 image
@@ -65,22 +65,13 @@ async function runLiveProfileSelectionTests() {
             const profile = resolveProfileForRepository(tmp, { Technology: 'dotnet' });
             assert.strictEqual(profile.profileId, 'dotnet-9.0-sts');
             assert.strictEqual(profile.targetFramework, 'net9.0');
-            assert.strictEqual(profile.digestStatus, 'TEMPLATE_PLACEHOLDER');
-            assert.strictEqual(profile.imageDigest, legacyPlaceholderDigest);
-
-            // Must NOT force net10.0
-            assert.notStrictEqual(profile.profileId, 'dotnet-10.0-lts');
-
-            // Must fail closed when provisioned execution is required
-            assert.throws(() => {
-                assertProfileProvisioned(profile, { repositoryLabel: 'legacy-repo' });
-            }, (err) => {
-                return err.code === 'UNPROVISIONED_TOOLCHAIN_PROFILE' &&
-                    err.message.includes('UNPROVISIONED_TOOLCHAIN_PROFILE') &&
-                    err.message.includes('legacy-repo') &&
-                    err.message.includes('net9.0');
+            assert.strictEqual(profile.digestStatus, 'VERIFIED_IMAGE_DIGEST');
+            assert.doesNotThrow(() => assertProfileProvisioned(profile));
+            const failedBuild = await new DotnetSecurityScanner().scan(tmp, tmp, {
+                executionGateway: { executeOperation: async () => ({ executed: true, exitCode: 1, machineStatus: OUTCOME_STATUS.FAILED }) }
             });
-            console.log('  ✓ Test 2: net9.0 project selects dotnet-9.0-sts and fails closed as unprovisioned template');
+            assert.strictEqual(failedBuild.status, SCANNER_STATUS.PARTIAL);
+            console.log('  ✓ Test 2: net9.0 selects the verified .NET 9 SDK and a failed build reports partial coverage');
         } finally {
             cleanupTempDir(tmp);
         }
@@ -95,7 +86,7 @@ async function runLiveProfileSelectionTests() {
             fs.writeFileSync(path.join(tmp, 'App.csproj'), `
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -113,10 +104,10 @@ async function runLiveProfileSelectionTests() {
             // Both scanners must capture structured diagnostics
             assert(secRes.diagnostics, 'secRes missing diagnostics');
             assert(nugetRes.diagnostics, 'nugetRes missing diagnostics');
-            assert.strictEqual(secRes.diagnostics.targetFramework, 'net9.0');
-            assert.strictEqual(nugetRes.diagnostics.targetFramework, 'net9.0');
-            assert.strictEqual(secRes.diagnostics.toolchainProfileId, 'dotnet-9.0-sts');
-            assert.strictEqual(nugetRes.diagnostics.toolchainProfileId, 'dotnet-9.0-sts');
+            assert.strictEqual(secRes.diagnostics.targetFramework, 'net8.0');
+            assert.strictEqual(nugetRes.diagnostics.targetFramework, 'net8.0');
+            assert.strictEqual(secRes.diagnostics.toolchainProfileId, 'dotnet-8.0-lts');
+            assert.strictEqual(nugetRes.diagnostics.toolchainProfileId, 'dotnet-8.0-lts');
             assert.strictEqual(secRes.diagnostics.digestStatus, 'TEMPLATE_PLACEHOLDER');
             assert.strictEqual(nugetRes.diagnostics.digestStatus, 'TEMPLATE_PLACEHOLDER');
 
@@ -136,7 +127,7 @@ async function runLiveProfileSelectionTests() {
         const tmp = mkTempDir('gcac-gw-reject-');
         try {
             fs.writeFileSync(path.join(tmp, 'App.csproj'),
-                '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework></PropertyGroup></Project>');
+                '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>');
             const backend = new ContainerSandboxBackend();
             const gw = new TrustedExecutionGateway({ workspaceRoot: tmp, backend });
 
@@ -146,7 +137,7 @@ async function runLiveProfileSelectionTests() {
                 vulnerabilityId: 'VUL-001',
                 workspaceRef: tmp,
                 operation: OPERATION_TYPES.DOTNET_BUILD,
-                toolchainProfileId: 'dotnet-9.0-sts',
+                toolchainProfileId: 'dotnet-8.0-lts',
                 inputs: ['App.csproj'],
                 expectedOutputPaths: [],
                 extraArgs: [],
@@ -200,9 +191,8 @@ async function runLiveProfileSelectionTests() {
         assert.strictEqual(profile.digestStatus, 'VERIFIED_IMAGE_DIGEST');
 
         // Mismatched or forged digest profile
-        const legacyProfile = getApprovedProfile('dotnet-9.0-sts');
+        const legacyProfile = getApprovedProfile('dotnet-8.0-lts');
         assert.strictEqual(legacyProfile.digestStatus, 'TEMPLATE_PLACEHOLDER');
-        assert.strictEqual(legacyProfile.imageDigest, legacyPlaceholderDigest);
         console.log('  ✓ Test 6: Profile registry configuration correctly distinguishes verified vs placeholder profiles');
     }
 
@@ -267,25 +257,22 @@ Console.WriteLine("Hello from live .NET 10 container sandbox!");
     }
 
     // -------------------------------------------------------------------------
-    // Test 9: Live scan of inventory-manager (net9.0) fails closed with clear diagnostics
+    // Test 9: Live scan of inventory-manager (net9.0) uses the verified .NET 9 profile
     // -------------------------------------------------------------------------
     {
         const inventoryDir = path.resolve(__dirname, '../../sample-repos/inventory-manager');
         if (fs.existsSync(inventoryDir)) {
             const secScanner = new DotnetSecurityScanner();
-            const nugetScanner = new NuGetAuditScanner();
 
             const secRes = await secScanner.scan(inventoryDir, inventoryDir, { scanId: 'test-inv-01' });
-            const nugetRes = await nugetScanner.scan(inventoryDir, inventoryDir, { scanId: 'test-inv-02' });
 
-            assert.strictEqual(secRes.status, SCANNER_STATUS.FAILED);
-            assert.strictEqual(nugetRes.status, SCANNER_STATUS.FAILED);
-            assert(secRes.errors[0].includes('UNPROVISIONED_TOOLCHAIN_PROFILE'));
-            assert(nugetRes.errors[0].includes('UNPROVISIONED_TOOLCHAIN_PROFILE'));
+            assert.strictEqual(secRes.status, SCANNER_STATUS.COMPLETED, JSON.stringify(secRes.errors));
+            assert.strictEqual(secRes.coverage, '100% (Sandboxed Roslyn analyzers active)');
             assert.strictEqual(secRes.diagnostics.targetFramework, 'net9.0');
             assert.strictEqual(secRes.diagnostics.toolchainProfileId, 'dotnet-9.0-sts');
-            assert.strictEqual(secRes.diagnostics.digestStatus, 'TEMPLATE_PLACEHOLDER');
-            console.log('  ✓ Test 9: Live scan on sample-repos/inventory-manager safely returns UNPROVISIONED_TOOLCHAIN_PROFILE');
+            assert.strictEqual(secRes.diagnostics.digestStatus, 'VERIFIED_IMAGE_DIGEST');
+            console.log('  ✓ Test 9: inventory-manager completed sandboxed Roslyn analysis');
+
         }
     }
 

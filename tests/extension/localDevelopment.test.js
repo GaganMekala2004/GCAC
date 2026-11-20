@@ -52,7 +52,21 @@ async function run() {
         const pending = { status: 'AWAITING_HUMAN_APPROVAL', approvalDecision: 'PENDING_STAGE4', patchDiff: diff,
             proposedDiffSha256: require('crypto').createHash('sha256').update(diff).digest('hex'),
             baselineValidation: { executed: true, countsKnown: true, testsTotal: 1, testsPassed: 1, testsFailed: 0, machineStatus: 'PASSED', exitCode: 0 } };
+        Object.assign(pending, { stage: 4, runId: 'current', vulnerabilityId: 'finding', applicationNumber: 'app',
+            baseCommitHash: 'base', approvedFilePaths: ['source.cs'] });
+        pending.pendingApprovalRequest = { runId: 'current', vulnerabilityId: 'finding', applicationId: 'app',
+            baseCommitHash: 'base', proposedDiffSha256: pending.proposedDiffSha256, approvedFilePaths: ['source.cs'],
+            decision: 'PENDING', consumedAtStage5: false, expiresAt: new Date(Date.now() + 60000).toISOString() };
+        const foreign = { ...pending, approvalRecord: { runId: 'old', vulnerabilityId: 'finding', consumedAtStage5: true } };
         assert.strictEqual(isStage4ConsentEligible(pending), true);
+        assert.strictEqual(isStage4ConsentEligible(foreign), true);
+        for (const invalid of [
+            { status: 'REJECTED' }, { patchAppliedAtStage5: true }, { stage4Approved: true },
+            { approvalRecord: { ...foreign.approvalRecord, runId: 'current' } },
+            { approvalRecord: { consumedAtStage5: true } },
+            ...[{ expiresAt: '2000-01-01' }, { runId: 'old' }, { approvedFilePaths: ['wrong.cs'] },
+                { baseCommitHash: 'previous' }].map(change => ({ pendingApprovalRequest: { ...pending.pendingApprovalRequest, ...change } }))
+        ]) assert.strictEqual(isStage4ConsentEligible({ ...foreign, ...invalid }), false);
         assert.strictEqual(isStage4ConsentEligible({ ...pending, patchDiff: diff + 'changed' }), false);
         assert.strictEqual(isStage4ConsentEligible({ ...pending, baselineValidation: { machineStatus: 'UNTESTED' } }), false);
         assert.strictEqual(isStage4ConsentEligible({ Requires_Human_Review: 'true' }), false);

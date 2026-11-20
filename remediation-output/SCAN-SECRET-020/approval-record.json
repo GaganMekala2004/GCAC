@@ -1,22 +1,21 @@
 {
   "schemaVersion": "GCAC-PH2-APPROVAL-1.0",
   "policyVersion": "GCAC-PH2-GOV-1.0",
-  "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+  "runId": "57682bba-b566-4c2d-b1e9-215d6482374d",
   "vulnerabilityId": "SCAN-SECRET-020",
   "applicationId": "APP-1001",
   "baseCommitHash": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f",
-  "proposedDiffSha256": "7cbaefe669963e0db0c9d5ed58f99c5fbf32a6695abbf7d692367d94c9fcef14",
+  "proposedDiffSha256": "2a0e290c2b3c9f91bcfc99b8b03994c5c16e3dd44cafb03711f751a56e7f1b25",
   "approvedFilePaths": [
     "src/PaymentsAPI/appsettings.json"
   ],
-  "decision": "APPROVED",
-  "timestamp": "2026-11-16T15:25:18.972Z",
-  "expiresAt": "2026-11-17T15:25:15.675Z",
+  "decision": "PENDING",
+  "timestamp": "2026-11-20T03:29:15.487Z",
+  "expiresAt": "2026-11-21T03:29:15.487Z",
   "authorId": null,
   "approvalMode": "LOCAL_POC_APPROVAL",
   "reviewerIdentityClaim": null,
   "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
-  "consumedAtStage5": true,
-  "copilotLimitationDisclosure": "VS Code Extension Host cannot intercept or pre-authorize native GitHub Copilot Chat agent file-edit tool calls. Diff-bound approval is strictly enforced on the extension-controlled edit path; native Copilot Chat edits should be restricted to proposal/review mode or an isolated runner before production mutation.",
-  "signatureNotice": "LOCAL_UNAUTHENTICATED_DIGEST_ONLY"
+  "consumedAtStage5": false,
+  "copilotLimitationDisclosure": "VS Code Extension Host cannot intercept or pre-authorize native GitHub Copilot Chat agent file-edit tool calls. Diff-bound approval is strictly enforced on the extension-controlled edit path; native Copilot Chat edits should be restricted to proposal/review mode or an isolated runner before production mutation."
 }

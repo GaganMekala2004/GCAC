@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "366de944-78b7-4997-8a89-0c7f189816c6",
+  "findingId": "SCAN-NUGETA-017",
+  "findingFingerprint": "6e1500727836c557",
+  "applicationId": "APP-1003",
+  "stage": 4,
+  "timestamp": "2026-11-20T04:04:19.080Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "db7663fe2105bfc4ad55a0556db57675855815a24f6f60f5c39cc4e0e20d8e7c",
+    "baseSourceSha256": "d256a57674ce3f4e07b52ec1ad637094d139e27cd35730f39cd062865e0fb972",
+    "baseCommitSha": "78c44b0aa247e7c4f47a4ed9b765994fc5073df7"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "366de944-78b7-4997-8a89-0c7f189816c6",
+      "contentSource": "finding:SCAN-NUGETA-017",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T04:04:18.943Z",
+      "redactedLocation": "InventoryManager/InventoryManager.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "366de944-78b7-4997-8a89-0c7f189816c6",
+      "contentSource": "source:src/InventoryManager/InventoryManager.csproj",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T04:04:19.078Z",
+      "redactedLocation": "InventoryManager/InventoryManager.csproj",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [],
+  "testCommand": "N/A",
+  "actualExitCode": null,
+  "testResultCounts": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": null,
+  "approvalReference": null,
+  "proposedDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "appliedDiffSha256": null,
+  "filesChanged": [],
+  "scopeVerificationOutcome": "NOT_APPLIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-NUGETA-017",
+    "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+    "affectedComponent": "src/InventoryManager/InventoryManager.csproj",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "MEDIUM",
+    "selectedTier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+    "recommendedStrategy": "Manual dependency advisory review required.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Vulnerable third-party package cannot be patched safely via runtime configuration alone."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Dependency vulnerability lacks a verified Fixed_Version or manifest ownership permission; routing to manual review."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": false,
+        "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+      }
+    ],
+    "requiresManualReview": true,
+    "automatedExecutionAllowed": false,
+    "disposition": "MANUAL_REVIEW",
+    "blockingReason": "Dependency upgrade missing verified target version or approved manifest ownership.",
+    "manualReviewPlan": []
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+    "executionEvidence": null,
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "Unresolved (inspect method parameters)",
+      "file": "src/InventoryManager/InventoryManager.csproj",
+      "line": 1,
+      "snippet": "<Project Sdk=\"Microsoft.NET.Sdk\">"
+    },
+    "dataPropagationEvidence": [],
+    "dangerousSink": {
+      "file": "src/InventoryManager/InventoryManager.csproj",
+      "line": 1,
+      "snippet": "<Project Sdk=\"Microsoft.NET.Sdk\">"
+    },
+    "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+    "affectedFile": "src/InventoryManager/InventoryManager.csproj",
+    "affectedFunction": "UnknownMethod",
+    "affectedLines": "Line 1",
+    "proposedRemediation": "Upgrade package 'System.Text.Encodings.Web' to a secure version verified against https://github.com/advisories/GHSA-ghhp-997w-qr28.",
+    "baselineTestEvidence": {
+      "status": "NOT_EXECUTED",
+      "command": null,
+      "exitCode": null,
+      "summary": "No reproducible baseline test runner executed yet; documented static inspection evidence."
+    }
+  },
+  "sandboxExecution": null,
+  "publication": null,
+  "sbomEvidence": null,
+  "finalOutcome": {
+    "scannerOutcome": "NOT_VERIFIED",
+    "testOutcome": "UNTESTED",
+    "workflowOutcome": "BLOCKED",
+    "finalValidationOutcome": "BLOCKED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE",
+    "legacyRemediationStatus": "Manual Review Required",
+    "legacyFinalValidationStatus": "BLOCKED",
+    "isResolved": false,
+    "blockingReasons": [
+      "Dependency upgrade missing verified target version or approved manifest ownership."
+    ]
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

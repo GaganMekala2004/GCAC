@@ -194,6 +194,21 @@ public class CredentialTests {
     assert.equal(result.formalClosure, 'DEFERRED_IN_DEV_MODE');
     assert.equal(result.approvalRecord.approvalMode, 'AUTOMATED_TEST_CONSENT_NOT_HUMAN');
     assert.equal(result.reScanVerification.machineStatus, defective ? 'REGRESSION_DETECTED' : 'RESOLVED');
+    if (process.argv.includes('--repeat-approval')) {
+        const next = await start();
+        assert(next.isAwaitingApproval);
+        const pending = engine.loadRunState(id);
+        assert.notEqual(pending.runId, state.runId);
+        assert.equal(pending.approvalRecord, null);
+        // Recreate the mixed-generation state written by older extension versions.
+        engine.saveRunState(id, { ...pending, approvalRecord: result.approvalRecord });
+        await assert.rejects(engine.executePipeline(id, input), /LOCAL_APPROVAL_DIFF_MISMATCH/);
+        const consent = { ...input, approvedRunId: pending.runId, approvedDiffSha256: pending.proposedDiffSha256 };
+        const reapplied = await engine.executePipeline(id, consent);
+        assert.equal(reapplied.approvalRecord.runId, pending.runId);
+        assert.equal(reapplied.localOutcome, result.localOutcome);
+        assert.equal((await engine.executePipeline(id, consent)).duplicateSubmission, true);
+    }
     if (defective) assert(result.validation.testsFailed > 0);
     assert(result.validation.testsPassed > 0);
     assert.equal(fs.readFileSync(path.join(repo, file), 'utf8'), original);

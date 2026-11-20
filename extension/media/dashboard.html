@@ -676,7 +676,6 @@
                                             <span>Run with Copilot</span>
                                         </button>
                                         <button class="btn btn-secondary u-hidden" id="runProvider">Run remediation</button>
-                                        <span id="runProviderIdentity"></span>
                                         <button class="btn btn-secondary btn-sm" id="btnOpenLocation"
                                             title="Jump to source file in VS Code">
                                             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
@@ -700,6 +699,7 @@
                                 <div class="pipeline-section">
                                     <div class="pipeline-header">
                                         <div class="pipeline-title">Canonical 9-Stage Execution Timeline</div>
+                                        <span id="runProviderIdentity"></span>
                                         <div class="u-flex-row u-gap-8 u-items-center">
                                             <button class="btn btn-secondary btn-sm" id="btnSyncRunState"
                                                 title="Refresh and synchronize authoritative run state from extension host">↻ Sync Status</button>
@@ -1305,7 +1305,7 @@
 
                             <!-- Local Security Audit Card -->
                             <div class="settings-card">
-                                <div class="card-heading">Phase 1 Security Containment &amp; Governance</div>
+                                <div class="card-heading">Data access and publishing</div>
                                 <div class="compliance-status-badge">
                                     <span class="secure-dot"></span>
                                     <span>Autonomous Publishing Disabled • Fail-Closed AI Context Screening</span>
@@ -1320,9 +1320,18 @@
                                 </ul>
                             </div>
 
+                            <div class="settings-card">
+                                <div class="card-heading">Patch approval and evidence</div>
+                                <ul class="compliance-list">
+                                    <li>Review the exact patch in the finding’s Patch Diff tab before authorizing changes.</li>
+                                    <li>Approval applies once to the reviewed run, files and SHA-256 digest.</li>
+                                    <li>Open the finding’s Audit Report to inspect test results, re-scan evidence and local integrity checks.</li>
+                                </ul>
+                            </div>
+
                             <!-- Execution Isolation & Approved Toolchain Policy Card -->
                             <div class="settings-card">
-                                <div class="card-heading">Phase 3 Execution Isolation &amp; Supply Chain Governance</div>
+                                <div class="card-heading">Sandbox and toolchains</div>
                                 <div class="compliance-status-badge" id="sandboxStatusBadge">
                                     <span class="sandbox-dot" id="sandboxStatusDot"></span>
                                     <span id="sandboxStatusHeadline">Checking execution backend...</span>

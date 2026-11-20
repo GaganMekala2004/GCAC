@@ -1,17 +1,17 @@
 {
   "schemaVersion": "GCAC-PH2-APPROVAL-1.0",
   "policyVersion": "GCAC-PH2-GOV-1.0",
-  "runId": "04bbf3d4-0df5-4460-9493-5282148073b5",
+  "runId": "de4e413d-dfc9-4d07-a92f-0f50de5afd75",
   "vulnerabilityId": "SCAN-SECRET-017",
   "applicationId": "APP-1001",
   "baseCommitHash": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f",
-  "proposedDiffSha256": "ac9a202140c15ccd243542199365677250b64fe78a8e3eda220accdb7da3f26f",
+  "proposedDiffSha256": "584080b637a56152b4ff9768283d45388ef48acc972c52ae7931e5cfc67ad04a",
   "approvedFilePaths": [
     "src/PaymentsAPI/Controllers/ReceiptController.cs"
   ],
   "decision": "APPROVED",
-  "timestamp": "2026-11-16T16:22:30.915Z",
-  "expiresAt": "2026-11-17T16:22:24.696Z",
+  "timestamp": "2026-11-20T03:52:25.133Z",
+  "expiresAt": "2026-11-21T03:52:21.307Z",
   "authorId": null,
   "approvalMode": "LOCAL_POC_APPROVAL",
   "reviewerIdentityClaim": null,

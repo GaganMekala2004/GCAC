@@ -20,7 +20,7 @@
   "affectedFile": "src/PaymentsAPI/LegacyCrypto.cs",
   "affectedFunction": "Encrypt(byte[] data, byte[] key, byte[] iv)",
   "affectedLines": "9-11",
-  "proposedRemediation": "Replace the DES encryption with a more secure algorithm, such as AES, which is currently considered secure and widely accepted.",
+  "proposedRemediation": "Replace the DES algorithm with a more secure algorithm such as AES (Advanced Encryption Standard) to ensure stronger encryption and better security practices.",
   "baselineTestEvidence": {
     "status": "PASS",
     "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",

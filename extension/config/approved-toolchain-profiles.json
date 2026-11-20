@@ -127,15 +127,15 @@
     {
       "profileId": "dotnet-9.0-sts",
       "supportedStack": "dotnet",
-      "toolchainVersion": "9.0.317-sts",
+      "toolchainVersion": "9.0.321",
       "targetFrameworks": [
         "net9.0",
         "net8.0"
       ],
       "ltsAssessmentNote": "Existing GCAC .NET projects target net9.0 (STS). Plan deliberate LTS migration to net8.0/net10.0 LTS separately.",
-      "imageDigest": "sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b",
-      "imageRef": "mcr.microsoft.com/dotnet/sdk@sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b",
-      "digestPolicyNote": "Template digest; pin enterprise-verified MCR/Artifactory Linux SDK digest before container execution.",
+      "imageDigest": "sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84",
+      "imageRef": "mcr.microsoft.com/dotnet/sdk@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84",
+      "digestPolicyNote": "Pinned to the Microsoft Container Registry Linux SDK 9.0.321 manifest list.",
       "approvedCommands": {
         "DOTNET_BUILD": {
           "executable": "dotnet",
@@ -228,8 +228,8 @@
         "/sandbox-out/roslyn.sarif"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "ec4f4733197a1bbc26d278ba84f0fe52be44a6815d222272e4baede27fee8374",
-      "digestStatus": "TEMPLATE_PLACEHOLDER"
+      "profileSha256": "bc2cae92c04ffd43cf4a9b9050194857d2a1abfb89117ea59e24f5132671531e",
+      "digestStatus": "VERIFIED_IMAGE_DIGEST"
     },
     {
       "profileId": "java-17-maven",

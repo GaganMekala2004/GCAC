@@ -1,0 +1,20 @@
+diff --git a/src/PaymentsAPI/Controllers/ReceiptController.cs b/src/PaymentsAPI/Controllers/ReceiptController.cs
+index 15df30c..a1b16bc 100644
+--- a/src/PaymentsAPI/Controllers/ReceiptController.cs
++++ b/src/PaymentsAPI/Controllers/ReceiptController.cs
+@@ -6,6 +6,13 @@ public class ReceiptController
+ {
+     public void Generate(string receiptId)
+     {
+-        Process.Start("cmd.exe", $"/c generate-receipt.bat {receiptId}");
++        if (receiptId == null || !System.Text.RegularExpressions.Regex.IsMatch(receiptId, @"\A[A-Za-z0-9_-]{1,64}\z"))
++            throw new System.ArgumentException("The identifier must contain 1-64 letters, digits, underscores or hyphens.", nameof(receiptId));
++        var receiptProcessStartInfo = new ProcessStartInfo { FileName = "cmd.exe", UseShellExecute = false };
++        receiptProcessStartInfo.ArgumentList.Add("/d");
++        receiptProcessStartInfo.ArgumentList.Add("/c");
++        receiptProcessStartInfo.ArgumentList.Add("generate-receipt.bat");
++        receiptProcessStartInfo.ArgumentList.Add(receiptId);
++        Process.Start(receiptProcessStartInfo);
+     }
+ }
+\ No newline at end of file

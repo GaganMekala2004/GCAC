@@ -1,0 +1,14 @@
+diff --git a/src/PaymentsAPI/appsettings.json b/src/PaymentsAPI/appsettings.json
+index 918395e..1671670 100644
+--- a/src/PaymentsAPI/appsettings.json
++++ b/src/PaymentsAPI/appsettings.json
+@@ -5,7 +5,7 @@
+     }
+   },
+   "PaymentGateway": {
+-    "ApiKey": "sk_live_99887766554433221100aabbccddeeff",
++    "ApiKey": "${PAYMENT_GATEWAY_API_KEY}",
+     "Endpoint": "https://api.paymentgateway.internal/v1"
+   }
+ }
+\ No newline at end of file

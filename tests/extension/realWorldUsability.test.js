@@ -751,7 +751,7 @@ async function run() {
                 envReport: readyEnv,
                 authorizedRoots: [retryWs],
                 runsRoot: path.join(tmpBase, 'retry-runs'),
-                retryPolicy: { maxRetries: 2, backoffMs: [25, 50] }
+                retryPolicy: { maxRetries: 2, backoffMs: [60000, 50] }
             });
 
             // 1. Trigger transient timeout at Stage 3
@@ -785,9 +785,9 @@ async function run() {
                 /Retry Backoff Active/
             );
 
-            // Wait out 30ms backoff & retry Stage 3 cleanly -> preserves Stage 1 & 2, creates attempt #2, archives attempt #1, stops at Stage 4
+            // Age the failure explicitly so scheduler and filesystem latency cannot affect the backoff test.
             testMode = 'PASS_ALL';
-            await new Promise(r => setTimeout(r, 40));
+            engine.saveRunState('VUL-RETRY-001', { ...failedState, lastFailureAt: new Date(Date.now() - 61000).toISOString() });
             const retryPause = await engine.retryStage('VUL-RETRY-001', 3);
             assert.strictEqual(retryPause.isAwaitingApproval, true, 'Retry from Stage 3 must pause at Stage 4 human gate');
             assert.strictEqual(retryPause.attemptNumber, 2);

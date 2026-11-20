@@ -1,20 +1,23 @@
 diff --git a/src/PaymentsAPI/LegacyCrypto.cs b/src/PaymentsAPI/LegacyCrypto.cs
-index e79ebfa..6dc8570 100644
+index e79ebfa..f23bd10 100644
 --- a/src/PaymentsAPI/LegacyCrypto.cs
 +++ b/src/PaymentsAPI/LegacyCrypto.cs
-@@ -6,8 +6,12 @@ public class LegacyCrypto
+@@ -6,8 +6,14 @@ public class LegacyCrypto
  {
      public byte[] Encrypt(byte[] data, byte[] key, byte[] iv)
      {
 -        using var des = DES.Create();
 -        using var encryptor = des.CreateEncryptor(key, iv);
-+        using var aes = Aes.Create();
-+        aes.Key = key;
-+        aes.IV = iv;
-+        aes.Mode = CipherMode.GCM;
-+        aes.Padding = PaddingMode.None;
-+        using var encryptor = aes.CreateEncryptor();
-         return encryptor.TransformFinalBlock(data, 0, data.Length);
+-        return encryptor.TransformFinalBlock(data, 0, data.Length);
++        System.ArgumentNullException.ThrowIfNull(data);
++        if (key == null || key.Length != 32) throw new System.ArgumentException("A 32-byte AES key is required.", nameof(key));
++        if (iv == null || iv.Length != 12) throw new System.ArgumentException("A unique 12-byte nonce is required.", nameof(iv));
++        var payload = new byte[29 + data.Length];
++        payload[0] = 1;
++        iv.CopyTo(payload, 1);
++        using var aes = new System.Security.Cryptography.AesGcm(key, 16);
++        aes.Encrypt(iv, data, System.MemoryExtensions.AsSpan(payload, 29), System.MemoryExtensions.AsSpan(payload, 13, 16));
++        return payload;
      }
  }
 \ No newline at end of file

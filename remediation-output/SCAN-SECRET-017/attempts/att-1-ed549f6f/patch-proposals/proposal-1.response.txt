@@ -1,0 +1,1 @@
+{"edits":[{"oldText":"        Process.Start(\"cmd.exe\", $\"/c generate-receipt.bat {receiptId}\");","newText":"        GenerateReceipt(receiptId);"}]}

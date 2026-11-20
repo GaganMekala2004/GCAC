@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "GCAC-PH2-MANIFEST-1.0",
+  "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
+  "findingId": "SCAN-SECRET-016",
+  "applicationId": "APP-1001",
+  "createdAt": "2026-11-16T15:42:27.283Z",
+  "evidenceWriterInterface": "LocalTamperDetectableEvidenceWriter",
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "chainSummary": {
+    "eventCount": 8,
+    "headHash": "bec542d99d30fdc1bdbcba4b6874cc3e8695a5d689b3708cd68d6c3d6499f3d6",
+    "tailHash": "287d74e7c1115fd57e0ecbe9b9c111909839ad326ba2e2e767d5dd033a569207"
+  },
+  "artifacts": {
+    "agent-execution-trace.log": {
+      "sha256": "8943eb1e0bd34f6c8713f50a7a1a23d82fc0aa495382379fa420b918916f6f30",
+      "sizeBytes": 2880
+    },
+    "approval-record.json": {
+      "sha256": "964fb0a70d2addbc8fc406ce5ec7463c2d3ec5ce57dc1d9c86351223ba4cde0a",
+      "sizeBytes": 1152
+    },
+    "baseline-validation.json": {
+      "sha256": "90ac69df2e52be5440fd083ad2d650ab642a488990199da8cd4cfd85faf92d73",
+      "sizeBytes": 250805
+    },
+    "changes.patch": {
+      "sha256": "f9b02be618b425d53fd533f11ecaf612c8c5998a3768b03a572c3ad425ea41e5",
+      "sizeBytes": 810
+    },
+    "classification.json": {
+      "sha256": "ff45299c42a250605986abf3eb9bf4bc01d568670bf4f72922cedb92805f5c72",
+      "sizeBytes": 2071
+    },
+    "events-chain.jsonl": {
+      "sha256": "aaf5b0625e95bf2b8fe74897b97e4f616d15573c36a0921aa9499fcf401742c8",
+      "sizeBytes": 3399
+    },
+    "evidence-record.json": {
+      "sha256": "5ea765c97f44672aac1bcf5de8696cacb6bbb71d39540b80000c1391d2d3ac50",
+      "sizeBytes": 11358
+    },
+    "finding-context.json": {
+      "sha256": "b9395f2c8b8e22e9a5aab7829bd91e6c3ea7b9dd8c549c1010987396fa343aab",
+      "sizeBytes": 750
+    },
+    "finding.json": {
+      "sha256": "69b07ea662d4d13e79e11e16867fab92c514bd58b13627ddc4b83d2120fae38e",
+      "sizeBytes": 1280
+    },
+    "rca.json": {
+      "sha256": "00c8a8918e77868cc01cc3b04aaa29a42a076a6ac0aa0e4595a3e07285af395d",
+      "sizeBytes": 1077
+    },
+    "re-scan-verification.json": {
+      "sha256": "3e76009160c3720b4a287a9bf0e2a080a7b9f062f65e72c0a37b9416478f6e60",
+      "sizeBytes": 2414
+    },
+    "remediation-decision.json": {
+      "sha256": "958741b358b7b2b76e8da276d0353d5458af8bd5f47a197aa405898a9a914d05",
+      "sizeBytes": 1820
+    },
+    "remediation-report.md": {
+      "sha256": "a36339c646f74ebe402184d79af903722833097301c18185ced5da73dd307d61",
+      "sizeBytes": 132881
+    },
+    "run-state.json": {
+      "sha256": "6531f15dfcdb60d2c81c48e8a1cc01346e494b7c86c19e850d8d4db399bb9c18",
+      "sizeBytes": 7510
+    },
+    "sandbox-execution.json": {
+      "sha256": "37d1cf4f59d191855968c4e7487692c7a391f8d8b587ad75373c8a776bc594df",
+      "sizeBytes": 2392
+    },
+    "sbom.cdx.json": {
+      "sha256": "b6ee19dc07f98149c9e440ccd2255371973d1853672ec1e7e01504a3e2be3226",
+      "sizeBytes": 2496
+    },
+    "scope-verification.json": {
+      "sha256": "dd3f18397d5ebc94f12f3ff6813978aef30e7723db2ba6b90600412ec5bcde66",
+      "sizeBytes": 1435
+    },
+    "security-review.json": {
+      "sha256": "841ae5937a4eeef2a42eb62caf3b09d3c381ca0474219895144908af57b604bf",
+      "sizeBytes": 4462
+    },
+    "source-to-sink.json": {
+      "sha256": "a34831a684fd0fbd0b4181e92d19651914013077b94c296e6da693c9ecb9196e",
+      "sizeBytes": 1886
+    },
+    "validation.json": {
+      "sha256": "7e87284dff52dc06602712c0ea2fc297709258d1e31ff079840f772debe20b0d",
+      "sizeBytes": 250566
+    }
+  },
+  "manifestSha256": "221e8abe0c7fe1ea403265b5a75993830285ca8e9e07872535fa592156d9a418",
+  "previousRunStateSha256": "f0c176039873d58f7c72cff1bf37580feaf4d6fc82077ea4b5b79ec9dc26ba2b",
+  "trustedStateRevision": 1,
+  "lastTrustedStateWriteAt": "2026-11-16T16:09:52.961Z"
+}

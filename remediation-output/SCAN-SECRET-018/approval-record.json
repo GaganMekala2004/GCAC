@@ -1,17 +1,17 @@
 {
   "schemaVersion": "GCAC-PH2-APPROVAL-1.0",
   "policyVersion": "GCAC-PH2-GOV-1.0",
-  "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
+  "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
   "vulnerabilityId": "SCAN-SECRET-018",
   "applicationId": "APP-1001",
   "baseCommitHash": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f",
-  "proposedDiffSha256": "96b8508314c7c17a672c507227cd19e9a44f76c97ed3bd7096b2bda5bdbcd75f",
+  "proposedDiffSha256": "65b437c45eb2101c2c342da5eb1630b290108be2db476fc4e7d58189fa11b3ae",
   "approvedFilePaths": [
     "src/PaymentsAPI/LegacyCrypto.cs"
   ],
   "decision": "APPROVED",
-  "timestamp": "2026-11-16T16:25:01.166Z",
-  "expiresAt": "2026-11-17T16:24:31.545Z",
+  "timestamp": "2026-11-20T03:55:07.289Z",
+  "expiresAt": "2026-11-21T03:54:44.888Z",
   "authorId": null,
   "approvalMode": "LOCAL_POC_APPROVAL",
   "reviewerIdentityClaim": null,

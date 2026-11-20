@@ -402,7 +402,7 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
             status: 'LEGACY_NO_MANIFEST',
             mismatches: [],
             chainErrors: [],
-            warning: 'Historical/legacy evidence package has no Phase 2 SHA-256 integrity manifest.'
+            warning: 'Historical/legacy evidence package has no SHA-256 integrity manifest.'
         };
     }
 
@@ -443,6 +443,9 @@ function loadVulnerabilityDetails(workspaceRoot, vulnerabilityId) {
 
     // Infer stages status from evidence and report content
     const canonical = details.runState;
+    details.proposedDiffSha256 = canonical?.vulnerabilityId === vulnerabilityId &&
+        details.integrityVerification?.status !== 'TAMPERING_DETECTED' &&
+        require('./baselineEligibility').isStage4ConsentEligible(canonical) ? canonical.proposedDiffSha256 : null;
     if (canonical?.schemaVersion === RUN_STATE_SCHEMA_VERSION && canonical.stages?.length === 9) {
         // Explicit current-run nulls must not be filled from an older report.
         for (const [stateKey, detailKey] of [['patchDiff', 'patchDiff'], ['postFixValidation', 'validation'],

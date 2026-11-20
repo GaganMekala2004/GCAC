@@ -424,7 +424,7 @@ class CodeQLScanner extends ScannerAdapter {
         }
 
         const codeqlBin  = avail.binaryPath || this._resolvedBinary;
-        const timeoutMs  = Number.isFinite(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : 300000;
+        const timeoutMs  = Number.isFinite(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : 900000;
         const { language, suite, buildMode } = langInfo;
 
         const stamp       = randomUUID();
@@ -437,6 +437,14 @@ class CodeQLScanner extends ScannerAdapter {
         let parsingNs = 0n;
 
         try {
+            try {
+                await this._execCodeqlAsync(codeqlBin, ['resolve', 'queries', suite], { timeout: timeoutMs, abortSignal });
+            } catch (error) {
+                if (/cannot be found|no packs? found|could not resolve/i.test(error.message)) {
+                    throw new Error(`Install the ${language} query pack with “codeql pack download codeql/${language}-queries”, then scan again. ${error.message}`);
+                }
+                throw error;
+            }
             // Buildless extraction may restore packages and write obj files.
             // A disposable copy prevents interference with concurrent adapters.
             fs.mkdirSync(stagedSourceRoot);
@@ -481,6 +489,7 @@ class CodeQLScanner extends ScannerAdapter {
                 suite,
                 '--format=sarif-latest',
                 `--output=${sarifOutput}`,
+                '--threads=2',
                 '--no-print-metrics-summary'
             ];
 

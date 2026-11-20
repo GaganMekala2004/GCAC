@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-89 - Potential SQL Injection via Unparameterized Query",
+  "severity": "CRITICAL",
+  "exploitability": "High due to the use of unparameterized queries that directly incorporate user input, making it susceptible to SQL injection attacks.",
+  "route": "SpecializedAction",
+  "strategy": "Implement parameterized SQL queries or use ORM abstractions like Entity Framework Core to prevent SQL injection vulnerabilities.",
+  "attackVector": "An attacker can manipulate the AccountId or Amount parameters to execute arbitrary SQL commands if the application is exposed to user input.",
+  "confidence": 90,
+  "summary": "The code contains a critical SQL injection vulnerability due to unparameterized query construction, allowing potential exploitation through user input.",
+  "vulnerabilityId": "SCAN-SECRET-016",
+  "scannerProvenance": {
+    "scannerId": "secrets-config",
+    "ruleId": "SEC-005",
+    "cwe": "CWE-89",
+    "detectionMethod": "DETERMINISTIC_REGEX"
+  },
+  "advisoryCwe": "CWE-89 SQL Injection",
+  "classificationMismatch": false,
+  "cveId": "CWE-89",
+  "originalScannerSeverity": "CRITICAL",
+  "advisoryAiClassification": {
+    "cwe": "CWE-89 SQL Injection",
+    "advisorySuggestedSeverity": "CRITICAL",
+    "route": "SpecializedAction",
+    "exploitability": "High due to the use of unparameterized queries that directly incorporate user input, making it susceptible to SQL injection attacks.",
+    "strategy": "Implement parameterized SQL queries or use ORM abstractions like Entity Framework Core to prevent SQL injection vulnerabilities.",
+    "attackVector": "An attacker can manipulate the AccountId or Amount parameters to execute arbitrary SQL commands if the application is exposed to user input.",
+    "summary": "The code contains a critical SQL injection vulnerability due to unparameterized query construction, allowing potential exploitation through user input.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 90,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

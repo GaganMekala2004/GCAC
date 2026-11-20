@@ -58,7 +58,18 @@ async function run() {
         fs.mkdirSync(path.join(root, 'obj'));
         const assetsPath = path.join(root, 'obj', 'project.assets.json');
         fs.writeFileSync(assetsPath, JSON.stringify({ targets: { net10: { 'Example/1.0.0': { type: 'package' } } }, libraries: { 'Example/1.0.0': { type: 'package' } }, project: { frameworks: { net10: { dependencies: { Example: { version: '[1.0.0, )' } } } } } }));
-        const audited = auditResolvedProjects(root, snapshot);
+        const cacheRoot = path.join(root, 'cache');
+        const candidate = path.join(cacheRoot, 'example', '2.0.0');
+        fs.mkdirSync(candidate, { recursive: true });
+        fs.writeFileSync(path.join(candidate, '.nupkg.metadata'), JSON.stringify({
+            source: 'https://api.nuget.org/v3/index.json', contentHash: 'fixture'
+        }));
+        fs.writeFileSync(path.join(candidate, 'example.2.0.0.nupkg'), 'fixture');
+        const audited = auditResolvedProjects(root, snapshot, null, cacheRoot);
+        assert.strictEqual(audited.projects[0].frameworks[0].topLevelPackages[0].fixedVersion, '2.0.0');
+        const unsafe = auditResolvedProjects(root, { ...snapshot, packages: { example: [advisory,
+            { ...advisory, versions: '[2.0.0]' }] } }, null, cacheRoot);
+        assert.strictEqual(unsafe.projects[0].frameworks[0].topLevelPackages[0].fixedVersion, '');
         assert.strictEqual(audited.projects.length, 1);
         assert.strictEqual(audited.packagesChecked, 1);
         const scanner = new NuGetAuditScanner();
@@ -84,8 +95,8 @@ async function run() {
         };
         const result = await codeql.scan(root, root, { scanId: 'TEST' });
         assert.strictEqual(result.errors.length, 0);
-        assert.strictEqual(calls.length, 2);
-        assert(calls.every(call => call.options.timeout === 300000));
+        assert.strictEqual(calls.length, 3);
+        assert(calls.every(call => call.options.timeout === 900000));
         assert.strictEqual(fs.readFileSync(path.join(root, 'source.cs'), 'utf8'), 'first\n\nvulnerable\nlast\n');
         const mapped = codeql.parseSarif({ runs: [{ results: [{ ruleId: 'cs/test', message: { text: 'test' }, locations: [{ physicalLocation: {
             artifactLocation: { uri: '/temporary/staged/Source.cs' }, region: { startLine: 1 }

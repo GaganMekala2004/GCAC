@@ -1,104 +1,123 @@
 {
   "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
-  "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+  "runId": "57682bba-b566-4c2d-b1e9-215d6482374d",
   "findingId": "SCAN-SECRET-020",
   "findingFingerprint": "fe9edab5047b016c",
   "applicationId": "APP-1001",
-  "stage": 9,
-  "timestamp": "2026-11-16T15:43:33.751Z",
+  "stage": 4,
+  "timestamp": "2026-11-20T03:29:15.493Z",
   "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
   "bundleVersion": "2.0.0",
   "inputReferenceHashes": {
-    "minimizedFindingSha256": "bec66dc052d846aee7dc22122890934cd29af3833036a8262b273ca7bb55bee5",
-    "baseSourceSha256": "679a18cc2a8596fc84ae7afbba3c8b6e25dd87b8d73436763a0c866467264aa9",
+    "minimizedFindingSha256": "35d6359ff20ec21e833012627cc6e402fdbc6c514403ddd99333cca531d131bd",
+    "baseSourceSha256": "261c44705b6127522f6c7092a9f1bf6be6863d28e4c3d50c4df258df2f60e028",
     "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f"
   },
   "contentScreeningDecisions": [
     {
-      "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+      "runId": "57682bba-b566-4c2d-b1e9-215d6482374d",
       "contentSource": "finding:SCAN-SECRET-020",
       "trustClass": "UNTRUSTED_SCANNER_FINDING",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T15:43:25.374Z",
+      "timestamp": "2026-11-20T03:29:01.909Z",
       "redactedLocation": "PaymentsAPI/appsettings.json",
       "matchCount": 0
     },
     {
-      "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+      "runId": "57682bba-b566-4c2d-b1e9-215d6482374d",
       "contentSource": "source:src/PaymentsAPI/appsettings.json",
       "trustClass": "UNTRUSTED_SOURCE_CODE",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T15:43:25.380Z",
+      "timestamp": "2026-11-20T03:29:02.062Z",
       "redactedLocation": "PaymentsAPI/appsettings.json",
       "matchCount": 0
     },
     {
-      "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
+      "runId": "57682bba-b566-4c2d-b1e9-215d6482374d",
+      "contentSource": "llm:classification",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:29:03.854Z",
+      "redactedLocation": "PaymentsAPI/appsettings.json",
+      "matchCount": 0
+    },
+    {
+      "runId": "57682bba-b566-4c2d-b1e9-215d6482374d",
+      "contentSource": "llm:rca",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:29:07.128Z",
+      "redactedLocation": "PaymentsAPI/appsettings.json",
+      "matchCount": 0
+    },
+    {
+      "runId": "57682bba-b566-4c2d-b1e9-215d6482374d",
       "contentSource": "sandbox:DOTNET_TEST",
       "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T15:43:31.978Z",
-      "redactedLocation": "SCAN-SECRET-020_b5c858ca-0c5d-412d-9569-d1aa54e7b89c/worktree",
+      "timestamp": "2026-11-20T03:29:14.386Z",
+      "redactedLocation": "SCAN-SECRET-020_57682bba-b566-4c2d-b1e9-215d6482374d/worktree",
       "matchCount": 0
     },
     {
-      "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
-      "contentSource": "llm:securityReview",
+      "runId": "57682bba-b566-4c2d-b1e9-215d6482374d",
+      "contentSource": "llm:remediationProposal",
       "trustClass": "UNTRUSTED_MODEL_RESPONSE",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T15:43:33.711Z",
+      "timestamp": "2026-11-20T03:29:15.404Z",
       "redactedLocation": "PaymentsAPI/appsettings.json",
       "matchCount": 0
     }
   ],
   "commandPolicyDecisions": [
     {
-      "stage": "POST_FIX_TEST",
+      "stage": "BASELINE_TEST",
       "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
       "executable": "dotnet",
       "allowlisted": true,
       "exitCode": 0,
-      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-020_b5c858ca-0c5d-412d-9569-d1aa54e7b89c/worktree"
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-020_57682bba-b566-4c2d-b1e9-215d6482374d/worktree"
     }
   ],
-  "testCommand": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
-  "actualExitCode": 0,
+  "testCommand": "N/A",
+  "actualExitCode": null,
   "testResultCounts": {
-    "total": 1,
-    "passed": 1,
+    "total": 0,
+    "passed": 0,
     "failed": 0,
     "skipped": 0
   },
-  "scannerResult": {
-    "scannerId": "secrets-config",
-    "scannerOutcome": "RESOLVED",
-    "stillPresent": false,
-    "newFindingsCount": 0
-  },
+  "scannerResult": null,
   "approvalReference": {
-    "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
-    "decision": "APPROVED",
+    "runId": "57682bba-b566-4c2d-b1e9-215d6482374d",
+    "decision": "PENDING",
     "approvalMode": "LOCAL_POC_APPROVAL",
     "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
-    "proposedDiffSha256": "7cbaefe669963e0db0c9d5ed58f99c5fbf32a6695abbf7d692367d94c9fcef14",
+    "proposedDiffSha256": "2a0e290c2b3c9f91bcfc99b8b03994c5c16e3dd44cafb03711f751a56e7f1b25",
     "approvedFilePaths": [
       "src/PaymentsAPI/appsettings.json"
     ],
-    "expiresAt": "2026-11-17T15:25:15.675Z",
-    "timestamp": "2026-11-16T15:25:18.972Z"
+    "expiresAt": "2026-11-21T03:29:15.487Z",
+    "timestamp": "2026-11-20T03:29:15.487Z"
   },
-  "proposedDiffSha256": "7cbaefe669963e0db0c9d5ed58f99c5fbf32a6695abbf7d692367d94c9fcef14",
-  "appliedDiffSha256": "7cbaefe669963e0db0c9d5ed58f99c5fbf32a6695abbf7d692367d94c9fcef14",
-  "filesChanged": [],
-  "scopeVerificationOutcome": "SCOPE_VERIFIED",
+  "proposedDiffSha256": "2a0e290c2b3c9f91bcfc99b8b03994c5c16e3dd44cafb03711f751a56e7f1b25",
+  "appliedDiffSha256": null,
+  "filesChanged": [
+    "src/PaymentsAPI/appsettings.json"
+  ],
+  "scopeVerificationOutcome": "NOT_APPLIED",
   "remediationPreferenceDecision": {
     "vulnerabilityId": "SCAN-SECRET-020",
     "vulnerabilityType": "XSS",
@@ -143,7 +162,8 @@
     "requiresManualReview": false,
     "automatedExecutionAllowed": true,
     "disposition": "AUTOMATED_CANDIDATE",
-    "blockingReason": null
+    "blockingReason": null,
+    "manualReviewPlan": []
   },
   "sourceToSinkEvidence": {
     "vulnerabilityType": "XSS",
@@ -175,54 +195,15 @@
       "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
     }
   },
-  "sandboxExecution": {
-    "sandboxStatus": "SANDBOX_READY",
-    "backendType": "local-container",
-    "toolchainProfileId": "dotnet-10.0-lts",
-    "toolchainProfileHash": "ae3bb9ba317890519a59736e5ea19f8d244166cb5258227c9722d7011f8b822b",
-    "imageDigest": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
-    "networkPolicy": "NO_NETWORK",
-    "dependencyStatus": "PREPROVISIONED_CACHE",
-    "dependencyWarnings": [
-      "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
-    ],
-    "instanceId": "gcac-387be5d2fd5a",
-    "timedOut": false,
-    "cancelled": false,
-    "gatewayAuditDecisions": [
-      {
-        "timestamp": "2026-11-16T15:43:27.268Z",
-        "runId": "b5c858ca-0c5d-412d-9569-d1aa54e7b89c",
-        "instanceId": "gcac-387be5d2fd5a",
-        "vulnerabilityId": "SCAN-SECRET-020",
-        "operation": "DOTNET_TEST",
-        "toolchainProfileId": "dotnet-10.0-lts",
-        "decision": "ALLOWED",
-        "reasonCode": "POLICY_SATISFIED",
-        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
-        "backendType": "local-container",
-        "policyVersion": "GCAC-PH3-GW-1.0"
-      }
-    ],
-    "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
-  },
-  "sbomEvidence": {
-    "sbomStatus": "MANIFEST_INVENTORY_ONLY_EXTERNAL_CLI_NOT_AVAILABLE",
-    "externalSbomCliStatus": "NOT_AVAILABLE",
-    "format": "CycloneDX/1.5",
-    "componentCount": 4,
-    "artifactHash": "6034de8b13dbd603bf3e07e6668d4cab797213c5bd5e7af106d768d289713c4d"
-  },
+  "sandboxExecution": null,
+  "publication": null,
+  "sbomEvidence": null,
   "finalOutcome": {
-    "scannerOutcome": "RESOLVED",
-    "testOutcome": "PASSED",
-    "workflowOutcome": "VerifiedLocally_PendingPR",
-    "finalValidationOutcome": "PASSED",
-    "closureOutcome": "PENDING_FORMAL_CLOSURE",
-    "legacyRemediationStatus": "Remediated",
-    "legacyFinalValidationStatus": "PASS",
-    "isResolved": true,
-    "blockingReasons": []
+    "scannerOutcome": "NOT_VERIFIED",
+    "testOutcome": "UNTESTED",
+    "workflowOutcome": "NOT_VERIFIED",
+    "finalValidationOutcome": "NOT_VERIFIED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE"
   },
   "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
   "cryptographicallySigned": false,

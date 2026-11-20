@@ -1,5 +1,5 @@
 diff --git a/src/PaymentsAPI/Controllers/ReceiptController.cs b/src/PaymentsAPI/Controllers/ReceiptController.cs
-index 15df30c..27b7790 100644
+index 15df30c..aa3ee7f 100644
 --- a/src/PaymentsAPI/Controllers/ReceiptController.cs
 +++ b/src/PaymentsAPI/Controllers/ReceiptController.cs
 @@ -6,6 +6,18 @@ public class ReceiptController
@@ -7,11 +7,11 @@ index 15df30c..27b7790 100644
      public void Generate(string receiptId)
      {
 -        Process.Start("cmd.exe", $"/c generate-receipt.bat {receiptId}");
-+        var sanitizedReceiptId = SanitizeReceiptId(receiptId);
-+        ProcessStartInfo startInfo = new ProcessStartInfo
++        if (string.IsNullOrWhiteSpace(receiptId) || receiptId.Contains(" ")) throw new ArgumentException("Invalid receipt ID.");
++        var startInfo = new ProcessStartInfo
 +        {
 +            FileName = "generate-receipt.bat",
-+            Arguments = sanitizedReceiptId,
++            Arguments = receiptId,
 +            RedirectStandardOutput = true,
 +            UseShellExecute = false,
 +            CreateNoWindow = true

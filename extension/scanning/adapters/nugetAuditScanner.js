@@ -205,7 +205,7 @@ class NuGetAuditScanner extends ScannerAdapter {
                                 remediationGuidance: `Upgrade package '${pkg.id}' to a secure version verified against ${advUrl}.`,
                                 packageName: pkg.id,
                                 currentVersion: pkg.resolvedVersion,
-                                fixedVersion: '',
+                                fixedVersion: meta.offlineAudit === true ? pkg.fixedVersion || '' : '',
                                 advisoryUrl: advUrl,
                                 repository: meta.repository || '',
                                 repositoryRoot: meta.repositoryRoot || '',
@@ -290,7 +290,7 @@ class NuGetAuditScanner extends ScannerAdapter {
             }
             const audited = auditResolvedProjects(projectDir, snapshot, options.abortSignal);
             const effectiveRoot = repoContext.repositoryRoot || boundaryRoot;
-            const findings = this.parseJsonAuditOutput(audited, projectFile, effectiveRoot, scanId, repoContext);
+            const findings = this.parseJsonAuditOutput(audited, projectFile, effectiveRoot, scanId, { ...repoContext, offlineAudit: true });
             return {
                 scannerId: this.id, status: SCANNER_STATUS.COMPLETED,
                 executionPolicy: 'READ_ONLY_ADVISORY_DATA', networkPolicy: 'NO_NETWORK',
@@ -327,7 +327,7 @@ class NuGetAuditScanner extends ScannerAdapter {
             const profileId = err.profileId || profile?.profileId || 'unresolved';
             const imageDigest = err.imageDigest || profile?.imageDigest || 'none';
             const digestStatus = err.digestStatus || profile?.digestStatus || 'UNRESOLVED';
-            const diagMsg = `[${this.name}] Target repository '${repoLabel}' (${targetFramework} -> ${profileId}): ${err.message}`;
+            const diagMsg = `Target repository '${repoLabel}' (${targetFramework} -> ${profileId}): ${err.message}`;
             return {
                 scannerId: this.id,
                 status: SCANNER_STATUS.FAILED,
@@ -340,7 +340,7 @@ class NuGetAuditScanner extends ScannerAdapter {
                 warnings: [
                     `Toolchain resolution failed for '${repoLabel}'.`,
                     err.code === 'UNPROVISIONED_TOOLCHAIN_PROFILE'
-                        ? `Profile '${profileId}' uses template placeholder digest '${imageDigest}'. Only verified profiles (dotnet-10.0-lts) are available locally.`
+                        ? `Profile '${profileId}' uses template placeholder digest '${imageDigest}'. Configure a verified SDK digest for this profile.`
                         : err.message
                 ],
                 coverage: err.code === 'UNPROVISIONED_TOOLCHAIN_PROFILE'
@@ -386,7 +386,7 @@ class NuGetAuditScanner extends ScannerAdapter {
         if (!gwRes.executed || gwRes.timedOut || gwRes.cancelled ||
             gwRes.machineStatus === OUTCOME_STATUS.BLOCKED ||
             gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
-            const diagMsg = `[${this.name}] Target repository '${repoLabel}' (${profile.targetFramework || 'dotnet'} -> ${profile.profileId}): ${gwRes.reason || gwRes.summary || 'AUDIT UNAVAILABLE — Sandbox required for NuGet dependency audit.'}`;
+            const diagMsg = `Target repository '${repoLabel}' (${profile.targetFramework || 'dotnet'} -> ${profile.profileId}): ${gwRes.reason || gwRes.summary || 'AUDIT UNAVAILABLE — Sandbox required for NuGet dependency audit.'}`;
             return {
                 scannerId: this.id,
                 status: gwRes.cancelled ? SCANNER_STATUS.CANCELLED : SCANNER_STATUS.FAILED,

@@ -1,0 +1,233 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+  "findingId": "SCAN-SECRET-018",
+  "findingFingerprint": "384a2bb5788d649a",
+  "applicationId": "APP-1001",
+  "stage": 4,
+  "timestamp": "2026-11-20T03:28:35.585Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "0675a0e4c2d3a0dbcd8adf31edea592c6d204e81a048161d0700cb1335f7c528",
+    "baseSourceSha256": "2f3f37dfe28d2d0209a43c2fa9a125d93b2015d98f445575421823a57f5681eb",
+    "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+      "contentSource": "finding:SCAN-SECRET-018",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:28:02.136Z",
+      "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+      "contentSource": "source:src/PaymentsAPI/LegacyCrypto.cs",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:28:02.296Z",
+      "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+      "contentSource": "llm:classification",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:28:06.192Z",
+      "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+      "contentSource": "llm:rca",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:28:08.043Z",
+      "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+      "contentSource": "sandbox:DOTNET_TEST",
+      "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:28:14.202Z",
+      "redactedLocation": "SCAN-SECRET-018_24058d9f-5855-4271-bafa-129ea1b1a10b/worktree",
+      "matchCount": 0
+    },
+    {
+      "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+      "contentSource": "llm:remediationProposal",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:28:15.350Z",
+      "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+      "contentSource": "llm:remediationProposal",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:28:21.727Z",
+      "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+      "contentSource": "llm:remediationProposal",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:28:26.885Z",
+      "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [
+    {
+      "stage": "BASELINE_TEST",
+      "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+      "executable": "dotnet",
+      "allowlisted": true,
+      "exitCode": 0,
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-018_24058d9f-5855-4271-bafa-129ea1b1a10b/worktree"
+    }
+  ],
+  "testCommand": "N/A",
+  "actualExitCode": null,
+  "testResultCounts": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": null,
+  "approvalReference": {
+    "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+    "decision": "PENDING",
+    "approvalMode": "LOCAL_POC_APPROVAL",
+    "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
+    "proposedDiffSha256": "eba3bf925b077bb02ebd7bb306917397b2ff861d5ead253988b93b92bfee1764",
+    "approvedFilePaths": [
+      "src/PaymentsAPI/LegacyCrypto.cs"
+    ],
+    "expiresAt": "2026-11-21T03:28:35.579Z",
+    "timestamp": "2026-11-20T03:28:35.579Z"
+  },
+  "proposedDiffSha256": "eba3bf925b077bb02ebd7bb306917397b2ff861d5ead253988b93b92bfee1764",
+  "appliedDiffSha256": null,
+  "filesChanged": [
+    "src/PaymentsAPI/LegacyCrypto.cs"
+  ],
+  "scopeVerificationOutcome": "NOT_APPLIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-SECRET-018",
+    "vulnerabilityType": "WEAK_CRYPTO_MIGRATION",
+    "affectedComponent": "src/PaymentsAPI/LegacyCrypto.cs",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "HIGH",
+    "selectedTier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+    "recommendedStrategy": "Implement the reviewed AES-256-GCM contract: keep Encrypt(byte[] data, byte[] key, byte[] iv); key must be 32 bytes, iv is a caller-supplied unique 12-byte nonce. Return [version byte 1][12-byte nonce][16-byte tag][ciphertext]. Reject invalid key/nonce lengths. Never use a static nonce or generate a replacement nonce silently. Legacy ciphertext compatibility is explicitly not required. Cryptographic contract tests are mandatory.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Root cause lies in application source code logic or architectural/vendor layer rather than declarative config."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Finding originates in custom/application code or infrastructure, not an outdated dependency manifest."
+      },
+      {
+        "tier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+        "feasible": true,
+        "suitable": true,
+        "reason": "Config/runtime/dependency options cannot fix custom application dataflow; minimal targeted code change in application-authored file is smallest safe fix."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": false,
+        "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+      }
+    ],
+    "requiresManualReview": false,
+    "automatedExecutionAllowed": true,
+    "disposition": "AUTOMATED_CANDIDATE",
+    "blockingReason": null,
+    "manualReviewPlan": []
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "WEAK_CRYPTO_MIGRATION",
+    "executionEvidence": null,
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "Unresolved (inspect method parameters)",
+      "file": "src/PaymentsAPI/LegacyCrypto.cs",
+      "line": 9,
+      "snippet": "using var des = DES.Create();"
+    },
+    "dataPropagationEvidence": [],
+    "dangerousSink": {
+      "file": "src/PaymentsAPI/LegacyCrypto.cs",
+      "line": 9,
+      "snippet": "using var des = DES.Create();"
+    },
+    "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+    "affectedFile": "src/PaymentsAPI/LegacyCrypto.cs",
+    "affectedFunction": "Encrypt(byte[] data, byte[] key, byte[] iv)",
+    "affectedLines": "Lines 9-11",
+    "proposedRemediation": "Replace the DES algorithm with a more secure algorithm, such as AES, by using Aes.Create() instead of DES.Create() on line 9.",
+    "baselineTestEvidence": {
+      "status": "PASS",
+      "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+      "exitCode": 0,
+      "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+    }
+  },
+  "sandboxExecution": null,
+  "publication": null,
+  "sbomEvidence": null,
+  "finalOutcome": {
+    "scannerOutcome": "NOT_VERIFIED",
+    "testOutcome": "UNTESTED",
+    "workflowOutcome": "NOT_VERIFIED",
+    "finalValidationOutcome": "NOT_VERIFIED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE"
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

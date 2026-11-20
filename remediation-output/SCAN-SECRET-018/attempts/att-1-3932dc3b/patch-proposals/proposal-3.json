@@ -1,0 +1,8 @@
+{
+  "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f",
+  "sourceSha256": "2f3f37dfe28d2d0209a43c2fa9a125d93b2015d98f445575421823a57f5681eb",
+  "diagnostic": {
+    "reasonCode": "PROPOSAL_CRYPTO_CONTRACT_FAILED"
+  },
+  "failureCategory": "PATCH_INVALID"
+}

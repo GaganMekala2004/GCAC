@@ -1,98 +1,106 @@
 {
   "schemaVersion": "GCAC-PH2-MANIFEST-1.0",
-  "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
+  "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
   "findingId": "SCAN-SECRET-018",
   "applicationId": "APP-1001",
-  "createdAt": "2026-11-16T16:25:07.917Z",
+  "createdAt": "2026-11-20T03:56:27.770Z",
   "evidenceWriterInterface": "LocalTamperDetectableEvidenceWriter",
   "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
   "cryptographicallySigned": false,
   "chainSummary": {
     "eventCount": 8,
-    "headHash": "f33501a178276975dcd0d3912017e1b00b579430a19661a3cab1b71445c951dc",
-    "tailHash": "3176e0e6c1644e7018dd9e4b1b5723e67f4062ca1c7a40d9b6be3774cbcaf343"
+    "headHash": "a373ecebdeac0b016de9c4f2990d7d158ef40107a95ff9db19fa03704b7192e9",
+    "tailHash": "d869be0a06556605d9d9ab84a4d6759f7e2d4c1958360d37ec8ff0ce849e83b8"
   },
   "artifacts": {
     "agent-execution-trace.log": {
-      "sha256": "d3b8e0581e5d1ce91ff9a2b8c92f62b58c3c03b2e5610108fea54e9ea21fd906",
-      "sizeBytes": 2793
+      "sha256": "ed83964f980e7530194f68b84970757c5ce2b6159e2febe7314dd952a8cc8752",
+      "sizeBytes": 3002
     },
     "approval-record.json": {
-      "sha256": "51ece3492cd05479150bc514a08af69005cdcb3e42938a91caa21662e33f6a77",
+      "sha256": "3eaa1d7af60ce537a42aac350d05ffb0a7478378dfcf5803f88d4a5790e06e54",
       "sizeBytes": 1135
     },
     "baseline-validation.json": {
-      "sha256": "03ce08e8485c0ce8442d9ab621680f88ad7e673e7f16eee069cbad0bb33f5ed1",
-      "sizeBytes": 251025
+      "sha256": "cf3cb31f7e1c8d2378fb1604fa15aea24f0a0a1a793750d13eee46385614552e",
+      "sizeBytes": 250921
     },
     "changes.patch": {
-      "sha256": "96b8508314c7c17a672c507227cd19e9a44f76c97ed3bd7096b2bda5bdbcd75f",
-      "sizeBytes": 724
+      "sha256": "65b437c45eb2101c2c342da5eb1630b290108be2db476fc4e7d58189fa11b3ae",
+      "sizeBytes": 1159
     },
     "classification.json": {
-      "sha256": "4ad2636b174f4f634f04836333cf2f29d582cdeb52a0bb8c96c169f30696ae5e",
-      "sizeBytes": 2024
+      "sha256": "7fd088ac078ad5a7a7094530c75850ab9dda31576eae074218085c5cf593df93",
+      "sizeBytes": 2180
+    },
+    "crypto-contract-tests.cs": {
+      "sha256": "abada9ae40181276da4a4795072909685f85e470a1c7f945eec6c900b8ff6b01",
+      "sizeBytes": 1940
+    },
+    "crypto-contract-validation.json": {
+      "sha256": "b83dc2ed2a4afc1e47e01f6ce0ee13f80aa752cea529024bed1f686fcfa6fc92",
+      "sizeBytes": 255517
     },
     "events-chain.jsonl": {
-      "sha256": "b5cf7c818521dc84defd0f7bcd531e454e835b7f7013723774b4dd9a1ad364a9",
-      "sizeBytes": 3392
+      "sha256": "acf15c77cbfe41fb2a6424a8779318cc2bef2d85f078b376e6cba07123988f82",
+      "sizeBytes": 3399
     },
     "evidence-record.json": {
-      "sha256": "a525b9c8e9370c512e66058d3e2e31b7efb989928d35d8178876a6a02c09adbd",
-      "sizeBytes": 10794
+      "sha256": "3173d8a3250982a3b4a6634a05dd75493ec4e5d5f0a7376771fcf9b03549f5d1",
+      "sizeBytes": 16659
     },
     "finding-context.json": {
-      "sha256": "9a8ca6dcc26a4fb9542c0a0224466ae46ec9aa41607b6b100f2fcca70fbad015",
+      "sha256": "c2c9bda9b4513bd9d06860a2d2a5fcde6d8e87fe23fc9bcf49433bfaf8240a1c",
       "sizeBytes": 728
     },
     "finding.json": {
-      "sha256": "6f9fb56741e1a9eee8c6b03ddb3699e9c5bdcc4bc807eb62027850845f54e2f3",
+      "sha256": "7924e8bf419ba48bdc8d1e0b2a3eafeec0dd0be153c050802a8322a154cde63e",
       "sizeBytes": 1237
     },
     "rca.json": {
-      "sha256": "2ca8dd1805a220d064493f4f70e7a4e5a54937a417dcc91b480d49c9d1f80df6",
-      "sizeBytes": 1039
+      "sha256": "941d817bf843950288af8504d857f21116f43d8ee647570fb0e5d941c6471740",
+      "sizeBytes": 1235
     },
     "re-scan-verification.json": {
-      "sha256": "836aa4520e7f79ecca9448651a905c16d245629cfde81435f0119491c418d7a4",
-      "sizeBytes": 2081
+      "sha256": "aa03434340b1b321128b3c7351fffec7877fea692ee34a8109b23faefed88f34",
+      "sizeBytes": 2386
     },
     "remediation-decision.json": {
       "sha256": "b82e6b1e9f35f13e5972b6b9f62a3b23f6931e895ac694348c3e42f509ff69bc",
       "sizeBytes": 2154
     },
     "remediation-report.md": {
-      "sha256": "1a299ef193fb0e745ed1a6c9aa7625d29a5fd3babb58d5107c7f4bbdfebe72aa",
-      "sizeBytes": 58800
+      "sha256": "a48f756b1bab09e0dd479bf3ddc6946cc340bf5a592289a7c35dcbf920c98cc4",
+      "sizeBytes": 134349
     },
     "run-state.json": {
-      "sha256": "452e51894815dbfcb493b2a41d5b8f1522e6456c6b76cb4562bd729a97d6b5e6",
-      "sizeBytes": 494198
+      "sha256": "3fc8537adc7a47482dbbac4346445bea47f7c62b091ce5521c36b555697c32b1",
+      "sizeBytes": 818165
     },
     "sandbox-execution.json": {
-      "sha256": "13322f1a3d2c90ebc3c4b0c26b2dc6b505f54eaa9f0eddaa0a3b7913e8775e79",
-      "sizeBytes": 1880
+      "sha256": "a7a07ee623d7e6ff3ccf69494b36b9f104e3eab81b654777e9254313c5ddcd00",
+      "sizeBytes": 7520
     },
     "sbom.cdx.json": {
-      "sha256": "e52566ae8d69cc00474d85905f76ee25b087698ffb15b25242d0b5503493a952",
+      "sha256": "5d33fe724d2869a0f1cb79f26fd740b059e6feef8bc425057272ca61cfb3fa2a",
       "sizeBytes": 2496
     },
     "scope-verification.json": {
-      "sha256": "8cb2dcdd82106da0338c7bd37a4fb6e6b2aba62a674a86ff047bc5f4dcb3ecb3",
-      "sizeBytes": 1343
+      "sha256": "4a616c4fad79b060a355b3635e77360bcbc4eccc6541a10255ac14e17a7189ec",
+      "sizeBytes": 1785
     },
     "security-review.json": {
-      "sha256": "d91e99615ababcf3ab34b9633151f6091d8e18e52f7ae00ad91318d2753d5808",
-      "sizeBytes": 4360
+      "sha256": "74096a412e6fd9ce1b782dedda04b4bd4a133c72e840c53a22a04b74058bb820",
+      "sizeBytes": 4714
     },
     "source-to-sink.json": {
-      "sha256": "b9a8db669d55580fef7e4700870457f620482e73eb0da8ce6f5f8d23944f2e55",
-      "sizeBytes": 1359
+      "sha256": "e081ebe42687881ab6903429b0de5daa0b03748837becc681cb71ba17bcc741d",
+      "sizeBytes": 1390
     },
     "validation.json": {
-      "sha256": "1b7013be49db6b5f43f61481c50116deb695ec08a1efc07a79aedf030fe68aed",
-      "sizeBytes": 97567
+      "sha256": "b83dc2ed2a4afc1e47e01f6ce0ee13f80aa752cea529024bed1f686fcfa6fc92",
+      "sizeBytes": 255517
     }
   },
-  "manifestSha256": "d9ab300c1c57a5b3f209bd645f0d775918b658ed6522d47ed020deea90a0dcb8"
+  "manifestSha256": "f485b528e3c100613da02f571c63d166a2e60e7cfa89669bd35552a152f89f83"
 }

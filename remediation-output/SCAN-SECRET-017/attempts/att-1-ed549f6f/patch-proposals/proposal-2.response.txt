@@ -1,0 +1,1 @@
+{"edits":[{"oldText":"        Process.Start(\"cmd.exe\", $\"/c generate-receipt.bat {receiptId}\");","newText":"        GenerateReceipt(receiptId); // Secure method to generate the receipt without shell invocation\n\n        private void GenerateReceipt(string receiptId) {\n            // Implementation of receipt generation logic here\n        }"}]}

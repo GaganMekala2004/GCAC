@@ -30,8 +30,8 @@
   "missingValidationOrEncoding": "User-supplied input reaches shell/process command invocation without strict allowlist validation or ArgumentList separation.",
   "affectedFile": "src/PaymentsAPI/Controllers/ReceiptController.cs",
   "affectedFunction": "Generate(string receiptId)",
-  "affectedLines": "9",
-  "proposedRemediation": "Replace the Process.Start invocation with a safer method of executing commands, such as using a library that does not invoke the shell directly, or validate and sanitize 'receiptId' before use.",
+  "affectedLines": "Lines 7-10",
+  "proposedRemediation": "Replace the Process.Start invocation with a safer method of executing commands, such as using a library that does not involve shell invocation or properly validate and sanitize 'receiptId' before use.",
   "baselineTestEvidence": {
     "status": "PASS",
     "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",

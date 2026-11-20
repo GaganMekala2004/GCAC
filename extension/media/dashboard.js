@@ -1099,7 +1099,8 @@
         if (btnApprove) {
             btnApprove.addEventListener('click', () => {
                 if (!selectedVulnerability) return;
-                postToHost({ command: 'approveRemediation', vulnerabilityId: selectedVulnerability.Vulnerability_ID });
+                if (currentDetails?.vulnerabilityId !== selectedVulnerability.Vulnerability_ID || !currentDetails.proposedDiffSha256) return;
+                postToHost({ command: 'approveRemediation', vulnerabilityId: currentDetails.vulnerabilityId, runId: currentDetails.runId, diff: currentDetails.proposedDiffSha256 });
             });
         }
 
@@ -1340,7 +1341,7 @@
                         document.getElementById('providerStatus').textContent = '';
                         const button = document.getElementById('runProvider');
                         button.classList.toggle('u-hidden', provider.id === 'copilot');
-                        button.textContent = 'Run with ' + provider.id;
+                        button.textContent = 'Run with ' + (provider.id === 'ollama' ? 'Ollama' : provider.id);
                     }
                     currentConfig = {
                         provider: message.provider,
@@ -1400,6 +1401,7 @@
                     break;
 
                 case 'DETAILS_LOADED':
+                    if (selectedVulnerability && message.details?.vulnerabilityId !== selectedVulnerability.Vulnerability_ID) break;
                     currentDetails = message.details;
                     if (currentDetails && currentDetails.vulnerabilityId) {
                         detailsCache.set(currentDetails.vulnerabilityId, currentDetails);
@@ -2671,7 +2673,7 @@
         const identity = details?.provider || details?.runState?.provider;
         const proposal = details?.runState?.proposalSource;
         document.getElementById('runProviderIdentity').textContent = identity
-            ? [identity.id, identity.model, proposal?.kind === 'DOTNET_REPAIR_RECIPE' ? '.NET repair recipe' : ''].filter(Boolean).join(' · ') : '';
+            ? 'Run provider: ' + [identity.id === 'copilot' ? 'Copilot' : identity.id, identity.model, proposal?.kind === 'DOTNET_REPAIR_RECIPE' ? '.NET repair recipe' : ''].filter(Boolean).join(' · ') : '';
         if (!details) return;
 
         // 1. Render Stepper
@@ -2730,7 +2732,7 @@
                 details.runState?.stages?.[2]?.status === 'blocked' ||
                 details.runState?.stages?.[2]?.status === 'failed' ||
                 details.runState?.status === 'BLOCKED';
-            if (isStage3Blocked) {
+            if (isStage3Blocked || details.runState?.status === 'REJECTED') {
                 showGate4 = false;
             }
 
@@ -2787,14 +2789,14 @@
                 humanGateCard.style.display = showGate4 ? 'flex' : 'none';
                 if (showGate4 && gate4PatchSummary) {
                     const hasVerifiedDiff = Boolean(details.proposedDiffSha256 && /^[0-9a-f]{64}$/i.test(details.proposedDiffSha256));
-                    const diffHash = hasVerifiedDiff ? details.proposedDiffSha256 : (details.approvalRecord?.proposedDiffSha256 || null);
+                    const diffHash = hasVerifiedDiff ? details.proposedDiffSha256 : null;
                     const authState = details.approvalRecord?.reviewerAuthorizationStatus || 'AUTHENTICATION_NOT_VERIFIED';
 
                     gate4PatchSummary.innerHTML = `
                         <div class="gate4-patch-box">
                             ${!hasVerifiedDiff ? '<div class="badge badge-status-blocked u-mb-4">[NON-APPROVABLE DRAFT RECOMMENDATION]</div>' : ''}
-                            <div><strong>Root Cause:</strong> ${escapeHtml(selectedVulnerability?.Agent_Code_Analysis_Output || 'Untrusted input parameter concatenated directly into raw query.')}</div>
-                            <div class="u-mt-4"><strong>${hasVerifiedDiff ? 'Proposed Fix' : 'Draft Recommendation (Non-Approvable)'}:</strong> ${escapeHtml(selectedVulnerability?.Remediation_Guidance || 'Use parameterized query placeholder.')}</div>
+                            <div><strong>Root Cause:</strong> ${escapeHtml(details.runState?.rca?.rootCause || selectedVulnerability?.Agent_Code_Analysis_Output || 'Analysis unavailable')}</div>
+                            <div class="u-mt-4"><strong>${hasVerifiedDiff ? 'Proposed Fix' : 'Draft Recommendation (Non-Approvable)'}:</strong> ${escapeHtml(details.runState?.rca?.proposedFix || selectedVulnerability?.Remediation_Guidance || 'Recommendation unavailable')}</div>
                             <div class="u-mt-4"><strong>Target File:</strong> <code>${escapeHtml(selectedVulnerability?.Location_Path || 'Source.cs')}</code> (Line ${escapeHtml(selectedVulnerability?.Line_Number || '1')})</div>
                         </div>
                     `;
@@ -2808,6 +2810,7 @@
                     }
                     if (btnApprove) {
                         btnApprove.disabled = !hasVerifiedDiff;
+                        btnApprove.title = '';
                         if (!hasVerifiedDiff) {
                             btnApprove.title = 'NON-APPROVABLE: Mandatory patch diff not generated or verified';
                         }
@@ -3146,7 +3149,7 @@
                 </div>
 
                 <div class="review-card-actions">
-                    <button class="btn btn-success btn-sm btn-queue-approve" data-id="${escapeHtml(item.Vulnerability_ID)}">
+                    <button class="btn btn-success btn-sm btn-queue-approve" data-run="${escapeHtml(item.GCAC_Run_ID)}" data-diff="${escapeHtml(item.GCAC_Diff_SHA256)}" data-id="${escapeHtml(item.Vulnerability_ID)}">
                         ✓ Authorize &amp; Proceed to Testing
                     </button>
                     <button class="btn btn-secondary btn-sm btn-queue-reject" data-id="${escapeHtml(item.Vulnerability_ID)}">
@@ -3162,7 +3165,7 @@
         reviewQueueCardsList.querySelectorAll('.btn-queue-approve').forEach(btn => {
             btn.addEventListener('click', () => {
                 const id = btn.getAttribute('data-id');
-                postToHost({ command: 'approveRemediation', vulnerabilityId: id });
+                postToHost({ command: 'approveRemediation', vulnerabilityId: id, runId: btn.dataset.run, diff: btn.dataset.diff });
             });
         });
 

@@ -1,0 +1,255 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+  "findingId": "SCAN-SECRET-017",
+  "findingFingerprint": "1868f150541f663f",
+  "applicationId": "APP-1001",
+  "stage": 4,
+  "timestamp": "2026-11-20T03:24:59.960Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "fb26e5e68b295bfb010c06c114c8f4da8e7c4b7879eb8da52b2f562e354f42fb",
+    "baseSourceSha256": "d1912e011c7cdbdf031c4c2e82fc4d81b809e941e7b20475926dbce49346021d",
+    "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+      "contentSource": "finding:SCAN-SECRET-017",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:24:31.746Z",
+      "redactedLocation": "Controllers/ReceiptController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+      "contentSource": "source:src/PaymentsAPI/Controllers/ReceiptController.cs",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:24:31.897Z",
+      "redactedLocation": "Controllers/ReceiptController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+      "contentSource": "llm:classification",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:24:34.808Z",
+      "redactedLocation": "Controllers/ReceiptController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+      "contentSource": "llm:rca",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:24:36.790Z",
+      "redactedLocation": "Controllers/ReceiptController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+      "contentSource": "sandbox:DOTNET_TEST",
+      "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:24:43.286Z",
+      "redactedLocation": "SCAN-SECRET-017_ed549f6f-6b15-41a5-b785-ac35d4d40a30/worktree",
+      "matchCount": 0
+    },
+    {
+      "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+      "contentSource": "llm:remediationProposal",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:24:44.173Z",
+      "redactedLocation": "Controllers/ReceiptController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+      "contentSource": "llm:remediationProposal",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:24:49.892Z",
+      "redactedLocation": "Controllers/ReceiptController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+      "contentSource": "llm:remediationProposal",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:24:53.923Z",
+      "redactedLocation": "Controllers/ReceiptController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+      "contentSource": "recipe:dotnetSourcePattern",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:24:56.296Z",
+      "redactedLocation": "Controllers/ReceiptController.cs",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [
+    {
+      "stage": "BASELINE_TEST",
+      "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+      "executable": "dotnet",
+      "allowlisted": true,
+      "exitCode": 0,
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-017_ed549f6f-6b15-41a5-b785-ac35d4d40a30/worktree"
+    }
+  ],
+  "testCommand": "N/A",
+  "actualExitCode": null,
+  "testResultCounts": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": null,
+  "approvalReference": {
+    "runId": "ed549f6f-6b15-41a5-b785-ac35d4d40a30",
+    "decision": "PENDING",
+    "approvalMode": "LOCAL_POC_APPROVAL",
+    "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
+    "proposedDiffSha256": "3c8ea5d54ebdccad10c86c24b0d484a93b517256e68518b05fb3107ae813809e",
+    "approvedFilePaths": [
+      "src/PaymentsAPI/Controllers/ReceiptController.cs"
+    ],
+    "expiresAt": "2026-11-21T03:24:59.955Z",
+    "timestamp": "2026-11-20T03:24:59.955Z"
+  },
+  "proposedDiffSha256": "3c8ea5d54ebdccad10c86c24b0d484a93b517256e68518b05fb3107ae813809e",
+  "appliedDiffSha256": null,
+  "filesChanged": [
+    "src/PaymentsAPI/Controllers/ReceiptController.cs"
+  ],
+  "scopeVerificationOutcome": "NOT_APPLIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-SECRET-017",
+    "vulnerabilityType": "COMMAND_INJECTION",
+    "affectedComponent": "src/PaymentsAPI/Controllers/ReceiptController.cs",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "LOW",
+    "selectedTier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+    "recommendedStrategy": "Apply minimal targeted secure coding fix in application-authored 'src/PaymentsAPI/Controllers/ReceiptController.cs'.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Root cause lies in application source code logic or architectural/vendor layer rather than declarative config."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Finding originates in custom/application code or infrastructure, not an outdated dependency manifest."
+      },
+      {
+        "tier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+        "feasible": true,
+        "suitable": true,
+        "reason": "Config/runtime/dependency options cannot fix custom application dataflow; minimal targeted code change in application-authored file is smallest safe fix."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": false,
+        "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+      }
+    ],
+    "requiresManualReview": false,
+    "automatedExecutionAllowed": true,
+    "disposition": "AUTOMATED_CANDIDATE",
+    "blockingReason": null,
+    "manualReviewPlan": []
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "COMMAND_INJECTION",
+    "executionEvidence": null,
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "receiptId",
+      "file": "src/PaymentsAPI/Controllers/ReceiptController.cs",
+      "line": 7,
+      "snippet": "public void Generate(string receiptId)"
+    },
+    "dataPropagationEvidence": [
+      {
+        "line": 7,
+        "snippet": "public void Generate(string receiptId)",
+        "note": "References candidate untrusted input 'receiptId'."
+      },
+      {
+        "line": 9,
+        "snippet": "Process.Start(\"cmd.exe\", $\"/c generate-receipt.bat {receiptId}\");",
+        "note": "References candidate untrusted input 'receiptId'."
+      }
+    ],
+    "dangerousSink": {
+      "file": "src/PaymentsAPI/Controllers/ReceiptController.cs",
+      "line": 9,
+      "snippet": "Process.Start(\"cmd.exe\", $\"/c generate-receipt.bat {receiptId}\");"
+    },
+    "missingValidationOrEncoding": "User-supplied input reaches shell/process command invocation without strict allowlist validation or ArgumentList separation.",
+    "affectedFile": "src/PaymentsAPI/Controllers/ReceiptController.cs",
+    "affectedFunction": "Generate(string receiptId)",
+    "affectedLines": "Lines 7-10",
+    "proposedRemediation": "Use a secure method to generate the receipt without invoking a shell command, such as directly calling a method that handles receipt generation.",
+    "baselineTestEvidence": {
+      "status": "PASS",
+      "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+      "exitCode": 0,
+      "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+    }
+  },
+  "sandboxExecution": null,
+  "publication": null,
+  "sbomEvidence": null,
+  "finalOutcome": {
+    "scannerOutcome": "NOT_VERIFIED",
+    "testOutcome": "UNTESTED",
+    "workflowOutcome": "NOT_VERIFIED",
+    "finalValidationOutcome": "NOT_VERIFIED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE"
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

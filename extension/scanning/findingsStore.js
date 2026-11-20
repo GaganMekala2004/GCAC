@@ -160,6 +160,10 @@ class FindingsStore {
             if (existingMap.has(key)) {
                 // Deduplication match within same repository: update provenance/location, retain active remediation status
                 const match = existingMap.get(key);
+                if (finding.scannerId === 'nuget-audit') {
+                    match.fixedVersion = finding.fixedVersion;
+                    match.currentVersion = finding.currentVersion;
+                }
                 match.line = finding.line || match.line;
                 match.column = finding.column || match.column;
                 match.timestamp = finding.timestamp;

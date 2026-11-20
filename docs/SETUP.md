@@ -36,23 +36,23 @@ Use **Local Scans → Comprehensive Scan**, select the applicable checkboxes, an
 | .NET source | Select **.NET Security Analysis**. GCAC runs the SDK’s Roslyn analyzers in a container. Follow the .NET steps below. |
 | NuGet packages | Select **NuGet Dependency Audit**. From the GCAC checkout, run `node scripts/refresh-nuget-advisories.js "/absolute/path/to/workspace"` once. Supply the first open VS Code workspace folder, where GCAC writes `output/scans/`. The offline audit needs current advisories and restored project dependency graphs. |
 | npm packages | Select **OSV public npm dependency intelligence** on a folder with a root `package-lock.json` version 2 or 3. Review the public package names and versions, then choose **Query OSV**. The adapter calls OSV directly. |
-| CodeQL source analysis | Install the official CodeQL **bundle** with its queries. Put the executable on the extension host’s PATH or set `CODEQL_PATH` to its absolute executable path before starting VS Code. Verify with `codeql version`, then use **Local Scans → GitHub CodeQL CLI Status → Refresh**. [CodeQL installation](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/scan-from-the-command-line/set-up-codeql-cli) |
+| CodeQL source analysis | Install the official CodeQL **bundle** with its queries. Put the executable on the extension host’s PATH or set `CODEQL_PATH` to its absolute executable path before starting VS Code. For a CLI-only installation, provision each language you use with `codeql pack download codeql/java-queries` or `codeql pack download codeql/csharp-queries`. Verify with `codeql version`, then use **Local Scans → GitHub CodeQL CLI Status → Refresh**. [CodeQL installation](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/scan-from-the-command-line/set-up-codeql-cli) |
 | Optional AI triage | Select up to 60 lines in a saved source file. Keep the editor visible and use the **Remediation Hub sidebar** to enable **AI candidate review of selected lines** with Ollama or your external API. Confirm a candidate independently before remediation. |
 
-### Prepare a .NET 10 project
+### Prepare a .NET 9 or .NET 10 project
 
-1. Check the project’s `global.json` SDK pin and `TargetFramework` in its project file. For a trusted .NET 10 project, install the matching host SDK, verify it with `dotnet --list-sdks`, and run `dotnet restore` on the target solution or project to populate its dependency graph and package cache. [Microsoft .NET 10 SDK installers](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
+1. Check the project’s `global.json` SDK pin and `TargetFramework` in its project file. For a trusted project, install the matching host SDK, verify it with `dotnet --list-sdks`, and run `dotnet restore` on the target solution or project to populate its dependency graph and package cache. [Microsoft .NET SDK installers](https://dotnet.microsoft.com/en-us/download/dotnet)
 2. Start Docker with Linux containers or a Linux Podman runtime. For Docker, verify `docker info` shows a running server. [Docker installation](https://docs.docker.com/get-started/get-docker/)
-3. Preload the approved SDK image. From the GCAC checkout, run the commands below in a terminal with Node.js. Copy the **entire printed reference** into the pull command. Use `podman pull` if using Podman.
+3. Preload the approved SDK image. From the GCAC checkout, run the commands below in a terminal with Node.js. Replace the example path with the actual project file. Copy the **entire printed reference** into the pull command. Use `podman pull` if using Podman.
 
    ```sh
-   node -p "require('./extension/sandbox/toolchainProfiles').getApprovedProfile('dotnet-10.0-lts').imageRef"
+   node -p "require('./extension/sandbox/toolchainProfiles').resolveProfileForRepository('/absolute/path/to/project.csproj', { Technology: 'dotnet' }).imageRef"
    docker pull <printed-image-reference>
    ```
 
 4. Open **Settings → Re-check Sandbox Backend**, then rerun the .NET scanner. GCAC disables automatic image pulls during scans. The pinned image supports Linux x64, ARM64, and ARMv7. Docker selects the Linux image for the runtime.
 
-GCAC selects the build profile from project metadata. The supplied **.NET 8, .NET 9, Java 17/Maven, and Node 22** profiles contain template image digests. If you see `UNPROVISIONED_TOOLCHAIN_PROFILE`, give the project’s framework and reported profile ID to the GCAC maintainer. Build-backed checks require a verified, digest-pinned image for that profile. Gradle, Ant, and Python build validation have no approved adapter in this version. Applicable source and dependency scanners can still run independently.
+GCAC selects the build profile from project metadata. The supplied **.NET 8, Java 17/Maven, and Node 22** profiles contain template image digests. If you see `UNPROVISIONED_TOOLCHAIN_PROFILE`, give the project’s framework and reported profile ID to the GCAC maintainer. Build-backed checks require a verified, digest-pinned image for that profile. Gradle, Ant, and Python build validation have no approved adapter in this version. Applicable source and dependency scanners can still run independently.
 
 ## 4. Remediate one finding and verify the fix
 
@@ -65,3 +65,13 @@ GCAC selects the build profile from project metadata. The supplied **.NET 8, .NE
 **If results look stale**, select **Force Fresh Scan** and rerun on the same target. **If only some checks ran**, inspect the per-scanner reason in the scan results. Quick Scan covers secrets and configuration only.
 
 **After updating from 2.0.0**, open the owning Git repository, select **Force Fresh Scan**, and start a new run from its results. Isolated worktrees use committed source. Commit reviewed framework or source changes in the target repository before rescanning. GCAC regression fixtures remain visible for manual review. A `SCAN-SECRET` ID identifies the scanner; its rule and CWE identify the finding type.
+
+
+### When Stage 4 approval stops
+
+Open the finding in the Remediation Hub, refresh it, and review **Patch Diff**. Confirm the file and SHA-256 before selecting **Authorize Fix**. Every new run needs its own review, even for the same finding.
+
+If you rejected the proposal or its approval expired, start a new remediation and review the new patch. If GCAC reports that the current approval was consumed during an interrupted patch application, inspect the isolated worktree and run evidence before starting a new run. Keep the original evidence for review.
+
+
+For a NuGet finding, run a fresh scan after restoring the project. GCAC can propose a version for a directly declared dependency when a newer stable package is present in the local NuGet.org cache and falls outside every affected range in the current advisory snapshot. Transitive dependencies and packages without a verified target require dependency review.

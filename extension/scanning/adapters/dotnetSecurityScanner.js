@@ -68,7 +68,7 @@ class DotnetSecurityScanner extends ScannerAdapter {
         super({
             id: 'dotnet-security',
             name: '.NET Security Analyzer',
-            version: '8.0.0',
+            version: '8.0.1',
             supportedLanguages: ['csharp', 'dotnet'],
             supportedCategories: [
                 'CWE-327 (Broken Crypto)',
@@ -312,7 +312,7 @@ class DotnetSecurityScanner extends ScannerAdapter {
             const profileId = err.profileId || profile?.profileId || 'unresolved';
             const imageDigest = err.imageDigest || profile?.imageDigest || 'none';
             const digestStatus = err.digestStatus || profile?.digestStatus || 'UNRESOLVED';
-            const diagMsg = `[${this.name}] Target repository '${repoLabel}' (${targetFramework} -> ${profileId}): ${err.message}`;
+            const diagMsg = `Target repository '${repoLabel}' (${targetFramework} -> ${profileId}): ${err.message}`;
             return {
                 scannerId: this.id,
                 status: SCANNER_STATUS.FAILED,
@@ -325,7 +325,7 @@ class DotnetSecurityScanner extends ScannerAdapter {
                 warnings: [
                     `Toolchain resolution failed for '${repoLabel}'.`,
                     err.code === 'UNPROVISIONED_TOOLCHAIN_PROFILE'
-                        ? `Profile '${profileId}' uses template placeholder digest '${imageDigest}'. Only verified profiles (dotnet-10.0-lts) are available locally.`
+                        ? `Profile '${profileId}' uses template placeholder digest '${imageDigest}'. Configure a verified SDK digest for this profile.`
                         : err.message
                 ],
                 coverage: err.code === 'UNPROVISIONED_TOOLCHAIN_PROFILE'
@@ -370,7 +370,7 @@ class DotnetSecurityScanner extends ScannerAdapter {
         if (!gwRes.executed || gwRes.timedOut || gwRes.cancelled ||
             gwRes.machineStatus === OUTCOME_STATUS.BLOCKED ||
             gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
-            const diagMsg = `[${this.name}] Target repository '${repoLabel}' (${profile.targetFramework || 'dotnet'} -> ${profile.profileId}): ${gwRes.reason || gwRes.summary || 'SANDBOX_UNAVAILABLE'}`;
+            const diagMsg = `Target repository '${repoLabel}' (${profile.targetFramework || 'dotnet'} -> ${profile.profileId}): ${gwRes.reason || gwRes.summary || 'SANDBOX_UNAVAILABLE'}`;
             return {
                 scannerId: this.id,
                 status: gwRes.cancelled ? SCANNER_STATUS.CANCELLED : SCANNER_STATUS.FAILED,
@@ -407,7 +407,7 @@ class DotnetSecurityScanner extends ScannerAdapter {
         const findings = this.parseRoslynDiagnostics((gwRes.stdout || '') + '\n' + (gwRes.stderr || ''), effectiveRepoRoot, scanId, meta);
         return {
             scannerId: this.id,
-            status: SCANNER_STATUS.COMPLETED,
+            status: gwRes.exitCode === 0 ? SCANNER_STATUS.COMPLETED : SCANNER_STATUS.PARTIAL,
             sandboxStatus: gwRes.sandboxStatus,
             executionPolicy: 'SANDBOX_GATEWAY',
             backendType: gwRes.backendType,
@@ -416,8 +416,8 @@ class DotnetSecurityScanner extends ScannerAdapter {
             findings,
             durationMs: Date.now() - startTime,
             errors: [],
-            warnings: gwRes.exitCode !== 0 ? [`Build completed with compilation diagnostics (exit code ${gwRes.exitCode})`] : [],
-            coverage: gwRes.exitCode === 0 ? '100% (Sandboxed Roslyn analyzers active)' : 'Coverage active (Sandboxed diagnostics encountered)',
+            warnings: gwRes.exitCode !== 0 ? [`Build did not finish successfully (exit code ${gwRes.exitCode})`] : [],
+            coverage: gwRes.exitCode === 0 ? '100% (Sandboxed Roslyn analyzers active)' : 'Partial (sandboxed build failed before full analysis could be confirmed)',
             diagnostics: {
                 repository: repoLabel,
                 targetFramework: profile.targetFramework || 'net10.0',

@@ -436,7 +436,7 @@ class ContainerSandboxBackend extends ExecutionBackend {
                     status: 'COULD NOT RUN',
                     failureCategory: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
                     reasonCode: 'TOOLCHAIN_IMAGE_UNAVAILABLE',
-                    reason: `Approved digest-pinned image '${preparedEnv.policy.imageRef}' is not present in local runtime cache; auto-pull disabled.`,
+                    reason: `Approved digest-pinned image '${preparedEnv.policy.imageRef}' is absent from the local cache. Provision it with '${preparedEnv.runtime} pull ${preparedEnv.policy.imageRef}', then run again.`,
                     imageDigest: preparedEnv.policy.imageRef,
                     executable: request.executable,
                     args: request.args || [],
@@ -448,9 +448,9 @@ class ContainerSandboxBackend extends ExecutionBackend {
                     timedOut: false,
                     cancelled: false,
                     stdout: '',
-                    stderr: `Approved digest-pinned image '${preparedEnv.policy.imageRef}' is not present in local runtime cache; auto-pull disabled.`,
+                    stderr: `Approved digest-pinned image '${preparedEnv.policy.imageRef}' is absent from the local cache. Provision it with '${preparedEnv.runtime} pull ${preparedEnv.policy.imageRef}', then run again.`,
                     outputArtifactHashes: {},
-                    summary: `COULD NOT RUN (TOOLCHAIN_IMAGE_UNAVAILABLE) — Approved digest-pinned image '${preparedEnv.policy.imageRef}' is not present in local runtime cache; auto-pull disabled.`
+                    summary: `COULD NOT RUN (TOOLCHAIN_IMAGE_UNAVAILABLE) — Approved digest-pinned image '${preparedEnv.policy.imageRef}' is absent from the local cache. Provision it with '${preparedEnv.runtime} pull ${preparedEnv.policy.imageRef}', then run again.`
                 };
                 this.collectedEvidence.set(preparedEnv.instanceId, evidence);
                 return evidence;

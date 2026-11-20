@@ -1,60 +1,60 @@
 {
   "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
-  "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
+  "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
   "findingId": "SCAN-SECRET-018",
   "findingFingerprint": "384a2bb5788d649a",
   "applicationId": "APP-1001",
   "stage": 9,
-  "timestamp": "2026-11-16T16:25:07.915Z",
+  "timestamp": "2026-11-20T03:56:27.767Z",
   "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
   "bundleVersion": "2.0.0",
   "inputReferenceHashes": {
-    "minimizedFindingSha256": "bffc266a7d8812deb6e1d19220484ed9fa98b617d0fbeeaf23dc759c0596742f",
-    "baseSourceSha256": "2f3f37dfe28d2d0209a43c2fa9a125d93b2015d98f445575421823a57f5681eb",
+    "minimizedFindingSha256": "3e77ca196b8bdc84e4be9f5f7865b2ec3af3a545614c106c1e24304fdb5f2898",
+    "baseSourceSha256": "f689253a661a77123c566e06c052d67297dcb583185eebbfb169e18c512f5cbf",
     "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f"
   },
   "contentScreeningDecisions": [
     {
-      "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
+      "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
       "contentSource": "finding:SCAN-SECRET-018",
       "trustClass": "UNTRUSTED_SCANNER_FINDING",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T16:25:01.136Z",
+      "timestamp": "2026-11-20T03:56:08.506Z",
       "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
       "matchCount": 0
     },
     {
-      "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
+      "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
       "contentSource": "source:src/PaymentsAPI/LegacyCrypto.cs",
       "trustClass": "UNTRUSTED_SOURCE_CODE",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T16:25:01.141Z",
+      "timestamp": "2026-11-20T03:56:08.512Z",
       "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
       "matchCount": 0
     },
     {
-      "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
+      "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
       "contentSource": "sandbox:DOTNET_TEST",
       "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T16:25:06.276Z",
-      "redactedLocation": "SCAN-SECRET-018_a9f8bd92-9a96-4ca9-aee1-7b70ef354f17/worktree",
+      "timestamp": "2026-11-20T03:56:22.943Z",
+      "redactedLocation": "T/gcac-crypto-contract-4sGyOt",
       "matchCount": 0
     },
     {
-      "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
+      "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
       "contentSource": "llm:securityReview",
       "trustClass": "UNTRUSTED_MODEL_RESPONSE",
       "ruleId": "INJ-PASS",
       "outcome": "ALLOW_UNTRUSTED_DATA",
       "policyVersion": "GCAC-PH2-INJ-1.0",
-      "timestamp": "2026-11-16T16:25:07.887Z",
+      "timestamp": "2026-11-20T03:56:27.736Z",
       "redactedLocation": "PaymentsAPI/LegacyCrypto.cs",
       "matchCount": 0
     }
@@ -65,38 +65,38 @@
       "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
       "executable": "dotnet",
       "allowlisted": true,
-      "exitCode": 1,
-      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-018_a9f8bd92-9a96-4ca9-aee1-7b70ef354f17/worktree"
+      "exitCode": 0,
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-018_3932dc3b-bfd2-4821-b60a-2db904e5a3a9/worktree"
     }
   ],
   "testCommand": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
-  "actualExitCode": 1,
+  "actualExitCode": 0,
   "testResultCounts": {
-    "total": 0,
-    "passed": 0,
+    "total": 4,
+    "passed": 4,
     "failed": 0,
     "skipped": 0
   },
   "scannerResult": {
     "scannerId": "secrets-config",
-    "scannerOutcome": "REGRESSION_DETECTED",
+    "scannerOutcome": "RESOLVED",
     "stillPresent": false,
     "newFindingsCount": 0
   },
   "approvalReference": {
-    "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
+    "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
     "decision": "APPROVED",
     "approvalMode": "LOCAL_POC_APPROVAL",
     "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
-    "proposedDiffSha256": "96b8508314c7c17a672c507227cd19e9a44f76c97ed3bd7096b2bda5bdbcd75f",
+    "proposedDiffSha256": "65b437c45eb2101c2c342da5eb1630b290108be2db476fc4e7d58189fa11b3ae",
     "approvedFilePaths": [
       "src/PaymentsAPI/LegacyCrypto.cs"
     ],
-    "expiresAt": "2026-11-17T16:24:31.545Z",
-    "timestamp": "2026-11-16T16:25:01.166Z"
+    "expiresAt": "2026-11-21T03:54:44.888Z",
+    "timestamp": "2026-11-20T03:55:07.289Z"
   },
-  "proposedDiffSha256": "96b8508314c7c17a672c507227cd19e9a44f76c97ed3bd7096b2bda5bdbcd75f",
-  "appliedDiffSha256": "96b8508314c7c17a672c507227cd19e9a44f76c97ed3bd7096b2bda5bdbcd75f",
+  "proposedDiffSha256": "65b437c45eb2101c2c342da5eb1630b290108be2db476fc4e7d58189fa11b3ae",
+  "appliedDiffSha256": "65b437c45eb2101c2c342da5eb1630b290108be2db476fc4e7d58189fa11b3ae",
   "filesChanged": [],
   "scopeVerificationOutcome": "SCOPE_VERIFIED",
   "remediationPreferenceDecision": {
@@ -168,7 +168,7 @@
     "affectedFile": "src/PaymentsAPI/LegacyCrypto.cs",
     "affectedFunction": "Encrypt(byte[] data, byte[] key, byte[] iv)",
     "affectedLines": "9-11",
-    "proposedRemediation": "Replace the DES encryption with a more secure algorithm, such as AES, which is currently considered secure and widely accepted.",
+    "proposedRemediation": "Replace the DES algorithm with a more secure algorithm such as AES (Advanced Encryption Standard) to ensure stronger encryption and better security practices.",
     "baselineTestEvidence": {
       "status": "PASS",
       "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
@@ -187,14 +187,14 @@
     "dependencyWarnings": [
       "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
     ],
-    "instanceId": "gcac-85e27c30ba19",
+    "instanceId": "gcac-5e98d18462fd",
     "timedOut": false,
     "cancelled": false,
     "gatewayAuditDecisions": [
       {
-        "timestamp": "2026-11-16T16:24:25.362Z",
-        "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
-        "instanceId": "gcac-0dd80e177ef7",
+        "timestamp": "2026-11-20T03:53:51.899Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-47f6e0bdbd30",
         "vulnerabilityId": "SCAN-SECRET-018",
         "operation": "DOTNET_TEST",
         "toolchainProfileId": "dotnet-10.0-lts",
@@ -205,9 +205,152 @@
         "policyVersion": "GCAC-PH3-GW-1.0"
       },
       {
-        "timestamp": "2026-11-16T16:25:03.317Z",
-        "runId": "a9f8bd92-9a96-4ca9-aee1-7b70ef354f17",
-        "instanceId": "gcac-85e27c30ba19",
+        "timestamp": "2026-11-20T03:54:00.380Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-f017c4912b0a",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_BUILD",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:54:03.862Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-85bd69e6a2be",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:54:14.485Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-30cdd8fa5469",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_BUILD",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:54:18.275Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-7116bcf25f74",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:54:27.297Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-20543a69bd42",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_BUILD",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:54:31.123Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-812a01f924df",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:54:36.897Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-6aed59da2021",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_BUILD",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:54:40.529Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-e7016510cf60",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:55:09.282Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-d66eee5acaa6",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:55:16.238Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-d61436c830d4",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:56:10.577Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-d87166a8a2be",
+        "vulnerabilityId": "SCAN-SECRET-018",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:56:17.732Z",
+        "runId": "3932dc3b-bfd2-4821-b60a-2db904e5a3a9",
+        "instanceId": "gcac-5e98d18462fd",
         "vulnerabilityId": "SCAN-SECRET-018",
         "operation": "DOTNET_TEST",
         "toolchainProfileId": "dotnet-10.0-lts",
@@ -220,28 +363,27 @@
     ],
     "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
   },
-  "publication": null,
+  "publication": {
+    "status": "NOT_CONFIGURED",
+    "reason": "No origin remote. Final approval closes local evidence only; no GitHub PR can be created."
+  },
   "sbomEvidence": {
     "sbomStatus": "MANIFEST_INVENTORY_ONLY_EXTERNAL_CLI_NOT_AVAILABLE",
     "externalSbomCliStatus": "NOT_AVAILABLE",
     "format": "CycloneDX/1.5",
     "componentCount": 4,
-    "artifactHash": "e52566ae8d69cc00474d85905f76ee25b087698ffb15b25242d0b5503493a952"
+    "artifactHash": "5d33fe724d2869a0f1cb79f26fd740b059e6feef8bc425057272ca61cfb3fa2a"
   },
   "finalOutcome": {
-    "scannerOutcome": "REGRESSION_DETECTED",
-    "testOutcome": "FAILED",
-    "workflowOutcome": "FAILED",
-    "finalValidationOutcome": "FAILED",
+    "scannerOutcome": "RESOLVED",
+    "testOutcome": "PASSED",
+    "workflowOutcome": "VerifiedLocally_PendingPR",
+    "finalValidationOutcome": "PASSED",
     "closureOutcome": "PENDING_FORMAL_CLOSURE",
-    "legacyRemediationStatus": "Validation Failed",
-    "legacyFinalValidationStatus": "FAIL",
-    "isResolved": false,
-    "blockingReasons": [
-      "Post-fix validation test outcome is FAILED, not PASSED.",
-      "Scanner re-scan verification outcome is REGRESSION_DETECTED.",
-      "Independent security review rated FAIL."
-    ]
+    "legacyRemediationStatus": "Remediated",
+    "legacyFinalValidationStatus": "PASS",
+    "isResolved": true,
+    "blockingReasons": []
   },
   "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
   "cryptographicallySigned": false,

@@ -1,0 +1,21 @@
+diff --git a/src/PaymentsAPI/LegacyCrypto.cs b/src/PaymentsAPI/LegacyCrypto.cs
+index e79ebfa..edadf67 100644
+--- a/src/PaymentsAPI/LegacyCrypto.cs
++++ b/src/PaymentsAPI/LegacyCrypto.cs
+@@ -6,8 +6,12 @@ public class LegacyCrypto
+ {
+     public byte[] Encrypt(byte[] data, byte[] key, byte[] iv)
+     {
+-        using var des = DES.Create();
+-        using var encryptor = des.CreateEncryptor(key, iv);
+-        return encryptor.TransformFinalBlock(data, 0, data.Length);
++        using var aes = new AesGcm(key);
++        byte[] nonce = new byte[12];
++        RandomNumberGenerator.Fill(nonce);
++        byte[] tag = new byte[16];
++        byte[] ciphertext = new byte[data.Length];
++        aes.Encrypt(nonce, data, ciphertext, tag);
++        return new byte[] { 1 }.Concat(nonce).Concat(tag).Concat(ciphertext).ToArray();
+     }
+ }
+\ No newline at end of file

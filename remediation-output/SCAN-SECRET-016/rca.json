@@ -1,8 +1,8 @@
 {
-  "dataFlow": "The untrusted input comes from the 'request.AccountId' and 'request.Amount' properties of the PaymentRequest object, which are directly concatenated into the SQL query string on line 15, leading to potential SQL injection when the query is executed via SqlCommand on line 16.",
-  "rootCause": "The vulnerable code line is line 15, where unparameterized user input is concatenated into an SQL query string, allowing for SQL injection attacks.",
-  "securityImpact": "An attacker could manipulate the input to execute arbitrary SQL commands, potentially leading to unauthorized data access, data modification, or deletion, impacting confidentiality, integrity, and availability of the database.",
-  "proposedFix": "Use parameterized queries by replacing the concatenation with SqlParameter objects to safely pass user input into the SQL command.",
+  "dataFlow": "The untrusted input comes from the 'request.AccountId' and 'request.Amount' properties of the PaymentRequest object, which are directly concatenated into the SQL query string on line 15. This query is then executed using SqlCommand on line 16.",
+  "rootCause": "The vulnerable code line is line 15, where user input is concatenated into an SQL query string without proper parameterization, leading to potential SQL injection.",
+  "securityImpact": "An attacker could manipulate the input to execute arbitrary SQL commands, potentially leading to unauthorized data access, data modification, or deletion, impacting confidentiality, integrity, and availability.",
+  "proposedFix": "Use parameterized queries by replacing the concatenation with parameters in the SqlCommand to safely handle user input.",
   "affectedLines": "Lines 15-16",
-  "summary": "The root cause of the vulnerability is the use of unparameterized SQL queries that directly incorporate user input, exposing the application to SQL injection risks."
+  "summary": "The root cause of the vulnerability is the use of unparameterized SQL queries that directly incorporate user input, allowing for potential SQL injection attacks."
 }

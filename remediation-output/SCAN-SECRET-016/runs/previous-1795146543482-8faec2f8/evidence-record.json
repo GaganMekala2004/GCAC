@@ -1,0 +1,278 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+  "findingId": "SCAN-SECRET-016",
+  "findingFingerprint": "58fd28730867fb5b",
+  "applicationId": "APP-1001",
+  "stage": 9,
+  "timestamp": "2026-11-20T03:22:13.892Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "f736bf97d7ce06073ba8819e5c13654bbbc072997eb45c2c929e11f99bb7f2be",
+    "baseSourceSha256": "deb6b611fb3009c578c4af6a3ecdac85b4ff82914ecf6854d05ce963d6fdd316",
+    "baseCommitSha": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+      "contentSource": "finding:SCAN-SECRET-016",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:22:05.467Z",
+      "redactedLocation": "Controllers/PaymentController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+      "contentSource": "source:src/PaymentsAPI/Controllers/PaymentController.cs",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:22:05.472Z",
+      "redactedLocation": "Controllers/PaymentController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+      "contentSource": "sandbox:DOTNET_TEST",
+      "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:22:12.173Z",
+      "redactedLocation": "SCAN-SECRET-016_b8885de2-9ed2-4c58-b869-01f341829ee0/worktree",
+      "matchCount": 0
+    },
+    {
+      "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+      "contentSource": "llm:securityReview",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-20T03:22:13.862Z",
+      "redactedLocation": "Controllers/PaymentController.cs",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [
+    {
+      "stage": "POST_FIX_TEST",
+      "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+      "executable": "dotnet",
+      "allowlisted": true,
+      "exitCode": 0,
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-016_b8885de2-9ed2-4c58-b869-01f341829ee0/worktree"
+    }
+  ],
+  "testCommand": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+  "actualExitCode": 0,
+  "testResultCounts": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": {
+    "scannerId": "secrets-config",
+    "scannerOutcome": "RESOLVED",
+    "stillPresent": false,
+    "newFindingsCount": 0
+  },
+  "approvalReference": {
+    "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+    "decision": "APPROVED",
+    "approvalMode": "LOCAL_POC_APPROVAL",
+    "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
+    "proposedDiffSha256": "f9b02be618b425d53fd533f11ecaf612c8c5998a3768b03a572c3ad425ea41e5",
+    "approvedFilePaths": [
+      "src/PaymentsAPI/Controllers/PaymentController.cs"
+    ],
+    "expiresAt": "2026-11-21T03:21:31.110Z",
+    "timestamp": "2026-11-20T03:21:34.724Z"
+  },
+  "proposedDiffSha256": "f9b02be618b425d53fd533f11ecaf612c8c5998a3768b03a572c3ad425ea41e5",
+  "appliedDiffSha256": "f9b02be618b425d53fd533f11ecaf612c8c5998a3768b03a572c3ad425ea41e5",
+  "filesChanged": [],
+  "scopeVerificationOutcome": "SCOPE_VERIFIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-SECRET-016",
+    "vulnerabilityType": "SQL_INJECTION",
+    "affectedComponent": "src/PaymentsAPI/Controllers/PaymentController.cs",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "LOW",
+    "selectedTier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+    "recommendedStrategy": "Apply minimal targeted secure coding fix in application-authored 'src/PaymentsAPI/Controllers/PaymentController.cs'.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Root cause lies in application source code logic or architectural/vendor layer rather than declarative config."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Finding originates in custom/application code or infrastructure, not an outdated dependency manifest."
+      },
+      {
+        "tier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+        "feasible": true,
+        "suitable": true,
+        "reason": "Config/runtime/dependency options cannot fix custom application dataflow; minimal targeted code change in application-authored file is smallest safe fix."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": false,
+        "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+      }
+    ],
+    "requiresManualReview": false,
+    "automatedExecutionAllowed": true,
+    "disposition": "AUTOMATED_CANDIDATE",
+    "blockingReason": null,
+    "manualReviewPlan": []
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "SQL_INJECTION",
+    "executionEvidence": {
+      "executionObserved": false,
+      "parameterizedExecutingCommandObserved": false,
+      "limitation": "Single-file syntactic evidence only. Query construction is not proof of database execution; parameter binding must belong to the executing command."
+    },
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "Unresolved (inspect method parameters)",
+      "file": "src/PaymentsAPI/Controllers/PaymentController.cs",
+      "line": 15,
+      "snippet": "string query = \"SELECT * FROM Payments WHERE AccountId = '\" + request.AccountId + \"' AND Amount = \" + request.Amount;"
+    },
+    "dataPropagationEvidence": [],
+    "dangerousSink": {
+      "file": "src/PaymentsAPI/Controllers/PaymentController.cs",
+      "line": 15,
+      "snippet": "string query = \"SELECT * FROM Payments WHERE AccountId = '\" + request.AccountId + \"' AND Amount = \" + request.Amount;"
+    },
+    "missingValidationOrEncoding": "SQL query uses string concatenation/interpolation without parameterized query placeholders (e.g. SqlParameter / PreparedStatement).",
+    "affectedFile": "src/PaymentsAPI/Controllers/PaymentController.cs",
+    "affectedFunction": "Process(PaymentRequest request)",
+    "affectedLines": "15-16",
+    "proposedRemediation": "Use parameterized queries by replacing the concatenation with parameters in the SqlCommand to safely handle user input.",
+    "baselineTestEvidence": {
+      "status": "PASS",
+      "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+      "exitCode": 0,
+      "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+    }
+  },
+  "sandboxExecution": {
+    "sandboxStatus": "SANDBOX_READY",
+    "backendType": "local-container",
+    "toolchainProfileId": "dotnet-10.0-lts",
+    "toolchainProfileHash": "ae3bb9ba317890519a59736e5ea19f8d244166cb5258227c9722d7011f8b822b",
+    "imageDigest": "sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb",
+    "networkPolicy": "NO_NETWORK",
+    "dependencyStatus": "PREPROVISIONED_CACHE",
+    "dependencyWarnings": [
+      "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+    ],
+    "instanceId": "gcac-6601c4f26be6",
+    "timedOut": false,
+    "cancelled": false,
+    "gatewayAuditDecisions": [
+      {
+        "timestamp": "2026-11-20T03:21:21.288Z",
+        "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+        "instanceId": "gcac-1b24b0856d5b",
+        "vulnerabilityId": "SCAN-SECRET-016",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:21:28.412Z",
+        "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+        "instanceId": "gcac-49078a435f80",
+        "vulnerabilityId": "SCAN-SECRET-016",
+        "operation": "DOTNET_BUILD",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:21:35.891Z",
+        "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+        "instanceId": "gcac-35a9549338f9",
+        "vulnerabilityId": "SCAN-SECRET-016",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-20T03:22:07.314Z",
+        "runId": "b8885de2-9ed2-4c58-b869-01f341829ee0",
+        "instanceId": "gcac-6601c4f26be6",
+        "vulnerabilityId": "SCAN-SECRET-016",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-10.0-lts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      }
+    ],
+    "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
+  },
+  "publication": {
+    "status": "NOT_CONFIGURED",
+    "reason": "No origin remote. Final approval closes local evidence only; no GitHub PR can be created."
+  },
+  "sbomEvidence": {
+    "sbomStatus": "MANIFEST_INVENTORY_ONLY_EXTERNAL_CLI_NOT_AVAILABLE",
+    "externalSbomCliStatus": "NOT_AVAILABLE",
+    "format": "CycloneDX/1.5",
+    "componentCount": 4,
+    "artifactHash": "291b7ff7405a925e6a1dfc987f650bb7d931f465fac30159cdec83f9e04a629a"
+  },
+  "finalOutcome": {
+    "scannerOutcome": "RESOLVED",
+    "testOutcome": "PASSED",
+    "workflowOutcome": "VerifiedLocally_PendingPR",
+    "finalValidationOutcome": "PASSED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE",
+    "legacyRemediationStatus": "Remediated",
+    "legacyFinalValidationStatus": "PASS",
+    "isResolved": true,
+    "blockingReasons": []
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

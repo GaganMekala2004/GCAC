@@ -111,7 +111,7 @@ function assertProfileProvisioned(profile, context = {}) {
         const repoLabel = context.repositoryLabel || profile.resolvedFrom || 'Target repository';
         const tf = profile.targetFramework || context.targetFramework || 'detected framework';
         const err = new ToolchainProfileError(
-            `UNPROVISIONED_TOOLCHAIN_PROFILE: ${repoLabel} targets '${tf}' which resolves to profile '${profile.profileId}'. However, profile '${profile.profileId}' uses template placeholder digest '${profile.imageDigest}' (status: TEMPLATE_PLACEHOLDER). Only verified, provisioned toolchains (such as 'dotnet-10.0-lts' @ sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb) are available in the local sandbox cache. Auto-pull is disabled by container security policy. Provision the required container image or migrate the repository to supported .NET 10 LTS.`,
+            `${repoLabel} targets '${tf}'. Profile '${profile.profileId}' uses template placeholder digest '${profile.imageDigest}'. Configure a verified digest for this framework and provision its image before scanning.`,
             'UNPROVISIONED_TOOLCHAIN_PROFILE'
         );
         err.profileId = profile.profileId;

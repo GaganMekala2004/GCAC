@@ -4,7 +4,7 @@ const vscode = require('vscode');
 exports.run = async function () {
     const extension = vscode.extensions.getExtension('gcac.gcac-vulnerability-remediation');
     assert(extension);
-    assert.equal(extension.packageJSON.version, '2.0.2');
+    assert.equal(extension.packageJSON.version, '2.0.5');
     assert.equal(typeof vscode.chat.createChatParticipant, 'function');
     await extension.activate();
     const commands = await vscode.commands.getCommands(true);

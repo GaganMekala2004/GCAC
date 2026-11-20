@@ -443,7 +443,7 @@ async function runStage6TestVerificationSuite() {
     {
         const tmpDir = makeTempDir('toolchain-unavail-');
         try {
-            fs.writeFileSync(path.join(tmpDir, 'Legacy.csproj'), '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework></PropertyGroup></Project>');
+            fs.writeFileSync(path.join(tmpDir, 'Legacy.csproj'), '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>');
             const runRes = await executeRealTestRunner('dotnet', ['test'], tmpDir, {
                 workspaceRoot: WORKSPACE_ROOT,
                 repositoryPath: tmpDir,

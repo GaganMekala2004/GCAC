@@ -1,0 +1,11 @@
+{
+  "executed": true,
+  "passed": true,
+  "exitCode": 0,
+  "command": "dotnet build --no-restore --nologo",
+  "backendType": "local-container",
+  "machineStatus": "PASSED",
+  "timedOut": false,
+  "cancelled": false,
+  "diagnostics": "Build succeeded."
+}

@@ -1,0 +1,19 @@
+{
+  "contextSchemaVersion": "GCAC-FINDING-CTX-1.0",
+  "findingId": "SCAN-SECRET-016",
+  "applicationId": "APP-1001",
+  "applicationName": "Payments API",
+  "applicationIdentitySource": "ENTERPRISE_REGISTRY",
+  "canonicalRepositoryId": "ab25f2acb29a",
+  "repositoryReference": "sample-repos/payments-api",
+  "repositoryPath": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/payments-api",
+  "projectPath": "",
+  "scannerId": "secrets-config",
+  "scanExecutionId": "SCAN-1795144763189",
+  "sourceOrigin": "LocalScanner",
+  "detectionMethod": "DETERMINISTIC_REGEX",
+  "findingFingerprint": "58fd28730867fb5b",
+  "originalSeverity": "CRITICAL",
+  "technology": "dotnet",
+  "evidenceLocation": "src/PaymentsAPI/Controllers/PaymentController.cs:15"
+}

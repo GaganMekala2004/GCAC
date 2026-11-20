@@ -1,0 +1,1 @@
+{"edits":[{"oldText":"        using var des = DES.Create();\n        using var encryptor = des.CreateEncryptor(key, iv);","newText":"        using var aes = Aes.Create();\n        aes.Key = key;\n        aes.IV = iv;\n        aes.Mode = CipherMode.GCM;\n        using var encryptor = aes.CreateEncryptor();"}]}

@@ -2,7 +2,7 @@ const { createRunCancellation } = require('./runCancellation');
 const { EXECUTION_MODE, resolveExecutionMode, assertDevelopmentRepository, canAcknowledgeMissingBaseline, developmentConclusion } = require('./executionMode');
 const { applyExactPatch, extractProposedPatch, canonicalizeProposedPatch, patchFromExactEdits } = require('./patchApplication');
 const { assertCurrentFinding, fixtureReviewReason } = require('./findingSourceEvidence');
-const { isBaselineEligible } = require('./baselineEligibility');
+const { isBaselineEligible, reconcileStage4Approval } = require('./baselineEligibility');
 const { createCredentialRedactor } = require('./credentialRedaction');
 const fs = require('fs');
 const path = require('path');
@@ -302,7 +302,7 @@ class RemediationEngine {
         const statePath = this.getRunStatePath(vulnerabilityId);
         if (fs.existsSync(statePath)) {
             try {
-                return JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+                return reconcileStage4Approval(JSON.parse(fs.readFileSync(statePath, 'utf-8')));
             } catch (e) {}
         }
         return null;
@@ -1125,6 +1125,13 @@ class RemediationEngine {
         // A repeated consent click is a read of the existing execution result,
         // never another execution and never a failure that rewrites its evidence.
         const prior = this.loadRunState(cleanId);
+        if (options.isHumanApproved && !options.retryFromStage) {
+            if (prior?.status === 'REJECTED') throw new Error('This proposal was rejected. Start a fresh remediation to review a new patch.');
+            if ((options.approvedRunId && options.approvedRunId !== prior?.runId) ||
+                (options.approvedDiffSha256 && options.approvedDiffSha256 !== prior?.proposedDiffSha256)) {
+                throw new Error('LOCAL_APPROVAL_DIFF_MISMATCH: Review the current run and patch before approving.');
+            }
+        }
         if (options.isFinalApproved && prior?.formalClosure === FORMAL_CLOSURE.RESOLVED_CLOSED) {
             return { ...prior, isCompleted: true, isResolved: true, isAwaitingFinalApproval: false,
                 isAwaitingApproval: false, duplicateSubmission: true, validation: prior.postFixValidation };
@@ -1329,6 +1336,13 @@ class RemediationEngine {
         const minimizedFinding = buildMinimizedSingleFinding(finding);
 
         let existingState = this.loadRunState(vulnerabilityId);
+        const isRetryExecution = Boolean(options.retryFromStage || options.attemptId || options.revisionFeedback);
+        if (!isApproved && !isRetryExecution) {
+            // A migration acknowledgement has its own source-hash check below.
+            // All execution evidence and approval tokens belong to their issuing run.
+            existingState = existingState?.vulnerabilityId === vulnerabilityId && existingState.cryptoMigrationContract
+                ? { cryptoMigrationContract: existingState.cryptoMigrationContract } : null;
+        }
         if (existingState?.executionMode && existingState.executionMode !== this.executionMode && (isApproved || options.retryFromStage)) {
             throw new Error('EXECUTION_MODE_CHANGED: Start a new run and obtain fresh approval.');
         }
@@ -1392,7 +1406,6 @@ class RemediationEngine {
             }
         }
 
-        const isRetryExecution = Boolean(options.retryFromStage || options.attemptId || options.revisionFeedback);
         const provider = ((isApproved || isRetryExecution) ? existingState?.provider : options.provider) || { id: 'copilot' };
         const modelClient = provider.id === 'copilot' ? this.llmClient : this.providerHost.client(provider, resolvedRepositoryPath);
         const runId = ((isApproved || isRetryExecution) && existingState && existingState.runId)
@@ -2369,6 +2382,7 @@ Return exactly this JSON shape:
             if (approvalRecord) {
                 approvalRecord.consumedAtStage5 = true;
                 currentState.approvalRecord = approvalRecord;
+                this.saveRunState(finding.Vulnerability_ID, currentState);
             }
 
             if (sourceFilePath && fs.existsSync(sourceFilePath)) {
@@ -3331,7 +3345,7 @@ Return a JSON object with EXACTLY these keys:
                 sourceToSinkEvidence: sourceToSinkEvidence || prev.sourceToSinkEvidence || null,
                 proposedDiffSha256: prev.patchAppliedAtStage5 ? prev.proposedDiffSha256 : null,
                 patchDiff: prev.patchAppliedAtStage5 ? prev.patchDiff : null,
-                approvalRecord: prev.patchAppliedAtStage5 ? prev.approvalRecord : null,
+                approvalRecord: prev.approvalRecord?.consumedAtStage5 ? prev.approvalRecord : null,
                 pendingApprovalRequest: null,
                 stage4Approved: prev.patchAppliedAtStage5 ? prev.stage4Approved : false,
                 updatedAt: now()

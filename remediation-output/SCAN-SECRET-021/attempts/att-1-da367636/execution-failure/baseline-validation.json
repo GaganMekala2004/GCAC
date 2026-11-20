@@ -1,0 +1,106 @@
+{
+  "executed": false,
+  "passed": false,
+  "status": "COULD NOT RUN",
+  "sandboxStatus": "SANDBOX_READY",
+  "lifecycleState": "BLOCKED",
+  "machineStatus": "COULD_NOT_RUN",
+  "reasonCode": "TOOLCHAIN_IMAGE_UNAVAILABLE",
+  "reason": "Approved digest-pinned image 'mcr.microsoft.com/dotnet/sdk@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84' is not present in local runtime cache; auto-pull disabled.",
+  "instanceId": "gcac-48238c12a0d7",
+  "runId": "da367636-1897-4267-8907-ce93dd1b8f49",
+  "operationId": "DOTNET_TEST",
+  "backendType": "local-container",
+  "runtime": "docker",
+  "toolchainProfileId": "dotnet-9.0-sts",
+  "toolchainProfileHash": "bc2cae92c04ffd43cf4a9b9050194857d2a1abfb89117ea59e24f5132671531e",
+  "imageDigest": "sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84",
+  "digestStatus": "VERIFIED_IMAGE_DIGEST",
+  "executable": "dotnet",
+  "approvedArgs": [
+    "test",
+    "--no-restore",
+    "--nologo",
+    "-v",
+    "normal",
+    "-v",
+    "normal",
+    "--logger",
+    "trx",
+    "--results-directory",
+    "/sandbox-out"
+  ],
+  "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+  "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-021_da367636-1897-4267-8907-ce93dd1b8f49/worktree",
+  "startTime": "2026-11-20T04:17:35.533Z",
+  "endTime": "2026-11-20T04:17:35.561Z",
+  "durationMs": 28,
+  "exitCode": null,
+  "timedOut": false,
+  "cancelled": false,
+  "networkPolicy": "NO_NETWORK",
+  "networkEnforcementSummary": "Container network namespace isolated (--network=none); zero outbound or loopback/host-service egress.",
+  "dependencyStatus": "PREPROVISIONED_CACHE",
+  "dependencyWarnings": [
+    "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+  ],
+  "resourceLimits": {
+    "timeoutMs": 120000,
+    "memoryMb": 2048,
+    "cpus": 2,
+    "pidsLimit": 128
+  },
+  "stdout": "",
+  "stderr": "Approved digest-pinned image 'mcr.microsoft.com/dotnet/sdk@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84' is not present in local runtime cache; auto-pull disabled.",
+  "consoleOutput": "Approved digest-pinned image 'mcr.microsoft.com/dotnet/sdk@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84' is not present in local runtime cache; auto-pull disabled.",
+  "outputArtifactHashes": {},
+  "outputArtifacts": {},
+  "injectionScreening": {
+    "runId": "da367636-1897-4267-8907-ce93dd1b8f49",
+    "contentSource": "sandbox:DOTNET_TEST",
+    "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+    "ruleId": "INJ-PASS",
+    "outcome": "ALLOW_UNTRUSTED_DATA",
+    "policyVersion": "GCAC-PH2-INJ-1.0",
+    "timestamp": "2026-11-20T04:17:35.608Z",
+    "redactedLocation": "SCAN-SECRET-021_da367636-1897-4267-8907-ce93dd1b8f49/worktree",
+    "matchCount": 0
+  },
+  "lifecycleHistory": [
+    {
+      "state": "PENDING",
+      "timestamp": "2026-11-20T04:17:35.520Z",
+      "detail": "Instance registered."
+    },
+    {
+      "state": "PREPARING",
+      "timestamp": "2026-11-20T04:17:35.520Z",
+      "detail": "Staging credential-free source snapshot."
+    },
+    {
+      "state": "RUNNING",
+      "timestamp": "2026-11-20T04:17:35.533Z",
+      "detail": "Executing DOTNET_TEST via local-container."
+    },
+    {
+      "state": "BLOCKED",
+      "timestamp": "2026-11-20T04:17:35.608Z",
+      "detail": "Approved digest-pinned image 'mcr.microsoft.com/dotnet/sdk@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84' is not present in local runtime cache; auto-pull disabled."
+    }
+  ],
+  "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception.",
+  "failureCategory": "TOOLCHAIN_IMAGE_UNAVAILABLE",
+  "stage": "Stage 3: Baseline Security Test",
+  "testPhase": "BASELINE_SECURITY_TEST",
+  "repositoryTested": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-SECRET-021_da367636-1897-4267-8907-ce93dd1b8f49/worktree",
+  "rootError": "Approved digest-pinned image 'mcr.microsoft.com/dotnet/sdk@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84' is not present in local runtime cache; auto-pull disabled.",
+  "countsKnown": false,
+  "testsTotal": 0,
+  "testsPassed": 0,
+  "testsFailed": 0,
+  "testsSkipped": 0,
+  "testReportLocation": null,
+  "retryEligible": false,
+  "suggestedNextAction": "Install or configure the required runtime/toolchain in the sandbox image, then retry.",
+  "summary": "COULD NOT RUN — Approved digest-pinned image 'mcr.microsoft.com/dotnet/sdk@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84' is not present in local runtime cache; auto-pull disabled."
+}

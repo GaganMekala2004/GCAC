@@ -6,7 +6,7 @@
   "Scanner_ID": "secrets-config",
   "Rule_ID": "SEC-003",
   "Scanner_Version": "1.3.0",
-  "Scan_ID": "SCAN-1794846100613",
+  "Scan_ID": "SCAN-1795146448687",
   "Detection_Method": "DETERMINISTIC_REGEX",
   "Finding_Fingerprint": "384a2bb5788d649a",
   "Application_Number": "APP-1001",

@@ -11,7 +11,7 @@ cat > "$profile/probe/package.json" <<'JSON'
 JSON
 echo 'exports.activate = () => {};' > "$profile/probe/extension.js"
 flags=(--user-data-dir "$profile/user" --extensions-dir "$profile/extensions")
-"$VSCODE_CLI" "${flags[@]}" --install-extension "${1:-$root/out/gcac-2.0.2.vsix}"
+"$VSCODE_CLI" "${flags[@]}" --install-extension "${1:-$root/out/gcac-2.0.5.vsix}"
 "$VSCODE_CLI" "${flags[@]}" --disable-workspace-trust --disable-updates --skip-welcome \
     --extensionDevelopmentPath="$profile/probe" --extensionTestsPath="$profile/probe/acceptance.js" "$profile/workspace"
 # The macOS launcher may return before the renderer flushes the extension test log.

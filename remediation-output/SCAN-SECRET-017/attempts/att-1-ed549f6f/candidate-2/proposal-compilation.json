@@ -1,0 +1,11 @@
+{
+  "executed": true,
+  "passed": false,
+  "exitCode": 1,
+  "command": "dotnet build --no-restore --nologo",
+  "backendType": "local-container",
+  "machineStatus": "FAILED",
+  "timedOut": false,
+  "cancelled": false,
+  "diagnostics": "/sandbox-work/src/PaymentsAPI/Controllers/ReceiptController.cs(9,36): error CS1513: } expected [/sandbox-work/src/PaymentsAPI/PaymentsAPI.csproj]\n/sandbox-work/src/PaymentsAPI/Controllers/ReceiptController.cs(15,1): error CS1022: Type or namespace definition, or end-of-file expected [/sandbox-work/src/PaymentsAPI/PaymentsAPI.csproj]\n/sandbox-work/src/PaymentsAPI/Controllers/ReceiptController.cs(9,36): error CS1513: } expected [/sandbox-work/src/PaymentsAPI/PaymentsAPI.csproj]\n/sandbox-work/src/PaymentsAPI/Controllers/ReceiptController.cs(15,1): error CS1022: Type or namespace definition, or end-of-file expected [/sandbox-work/src/PaymentsAPI/PaymentsAPI.csproj]"
+}

@@ -9,14 +9,14 @@
   "dependencyWarnings": [
     "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
   ],
-  "instanceId": "gcac-df04357a2cfc",
+  "instanceId": "gcac-5ce5bcc17a80",
   "timedOut": false,
   "cancelled": false,
   "gatewayAuditDecisions": [
     {
-      "timestamp": "2026-11-16T16:22:18.239Z",
-      "runId": "04bbf3d4-0df5-4460-9493-5282148073b5",
-      "instanceId": "gcac-4755a98e5520",
+      "timestamp": "2026-11-20T03:51:53.905Z",
+      "runId": "de4e413d-dfc9-4d07-a92f-0f50de5afd75",
+      "instanceId": "gcac-7560f8883c82",
       "vulnerabilityId": "SCAN-SECRET-017",
       "operation": "DOTNET_TEST",
       "toolchainProfileId": "dotnet-10.0-lts",
@@ -27,9 +27,48 @@
       "policyVersion": "GCAC-PH3-GW-1.0"
     },
     {
-      "timestamp": "2026-11-16T16:22:32.663Z",
-      "runId": "04bbf3d4-0df5-4460-9493-5282148073b5",
-      "instanceId": "gcac-df04357a2cfc",
+      "timestamp": "2026-11-20T03:52:03.809Z",
+      "runId": "de4e413d-dfc9-4d07-a92f-0f50de5afd75",
+      "instanceId": "gcac-8676d07e0015",
+      "vulnerabilityId": "SCAN-SECRET-017",
+      "operation": "DOTNET_BUILD",
+      "toolchainProfileId": "dotnet-10.0-lts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-20T03:52:18.526Z",
+      "runId": "de4e413d-dfc9-4d07-a92f-0f50de5afd75",
+      "instanceId": "gcac-cca8d8f602ea",
+      "vulnerabilityId": "SCAN-SECRET-017",
+      "operation": "DOTNET_BUILD",
+      "toolchainProfileId": "dotnet-10.0-lts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-20T03:52:26.369Z",
+      "runId": "de4e413d-dfc9-4d07-a92f-0f50de5afd75",
+      "instanceId": "gcac-0a3450d01314",
+      "vulnerabilityId": "SCAN-SECRET-017",
+      "operation": "DOTNET_TEST",
+      "toolchainProfileId": "dotnet-10.0-lts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-20T03:52:52.057Z",
+      "runId": "de4e413d-dfc9-4d07-a92f-0f50de5afd75",
+      "instanceId": "gcac-5ce5bcc17a80",
       "vulnerabilityId": "SCAN-SECRET-017",
       "operation": "DOTNET_TEST",
       "toolchainProfileId": "dotnet-10.0-lts",

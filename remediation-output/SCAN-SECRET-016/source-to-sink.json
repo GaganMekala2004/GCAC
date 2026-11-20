@@ -24,7 +24,7 @@
   "affectedFile": "src/PaymentsAPI/Controllers/PaymentController.cs",
   "affectedFunction": "Process(PaymentRequest request)",
   "affectedLines": "Lines 15-16",
-  "proposedRemediation": "Use parameterized queries by replacing the concatenation with SqlParameter objects to safely pass user input into the SQL command.",
+  "proposedRemediation": "Use parameterized queries by replacing the concatenation with parameters in the SqlCommand to safely handle user input.",
   "baselineTestEvidence": {
     "status": "PASS",
     "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",

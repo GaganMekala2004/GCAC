@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "GCAC-PH2-APPROVAL-1.0",
+  "policyVersion": "GCAC-PH2-GOV-1.0",
+  "runId": "24058d9f-5855-4271-bafa-129ea1b1a10b",
+  "vulnerabilityId": "SCAN-SECRET-018",
+  "applicationId": "APP-1001",
+  "baseCommitHash": "8587590ed6494d5b97b2a0b3f3f597a5d4a7d49f",
+  "proposedDiffSha256": "eba3bf925b077bb02ebd7bb306917397b2ff861d5ead253988b93b92bfee1764",
+  "approvedFilePaths": [
+    "src/PaymentsAPI/LegacyCrypto.cs"
+  ],
+  "decision": "PENDING",
+  "timestamp": "2026-11-20T03:28:35.579Z",
+  "expiresAt": "2026-11-21T03:28:35.579Z",
+  "authorId": null,
+  "approvalMode": "LOCAL_POC_APPROVAL",
+  "reviewerIdentityClaim": null,
+  "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
+  "consumedAtStage5": false,
+  "copilotLimitationDisclosure": "VS Code Extension Host cannot intercept or pre-authorize native GitHub Copilot Chat agent file-edit tool calls. Diff-bound approval is strictly enforced on the extension-controlled edit path; native Copilot Chat edits should be restricted to proposal/review mode or an isolated runner before production mutation."
+}

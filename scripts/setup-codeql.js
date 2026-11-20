@@ -145,7 +145,7 @@ async function main() {
             log('Found on system PATH.', 'ok');
         }
         writeState({ installed: true, version: existingVersion, binaryPath: CODEQL_BIN });
-        console.log('\n✅ No installation needed. CodeQL scanning is ready.\n');
+        console.log('\n✅ CLI available. For CLI-only installations, run codeql pack download codeql/<language>-queries for each scan language.\n');
         return 0;
     }
 

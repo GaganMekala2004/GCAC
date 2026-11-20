@@ -1,0 +1,118 @@
+{
+  "rating": "FAIL",
+  "summary": "The proposed remediation introduces a dependency on a non-existent method 'SanitizeReceiptId', leading to a build failure. Additionally, the re-scan indicates a regression, confirming that the security issue was not adequately addressed despite the code changes.",
+  "auditChecks": [
+    "Test status is FAILED due to missing method, violating mandatory audit criteria.",
+    "Total tests executed is 0, violating mandatory audit criteria.",
+    "Re-scan status indicates REGRESSION_DETECTED, violating mandatory audit criteria."
+  ],
+  "machineOutcome": "FAILED",
+  "evidenceChecklist": {
+    "schemaVersion": "GCAC-EVIDENCE-CHECKLIST-1.0",
+    "isSecretFinding": false,
+    "recommendation": "BLOCKED",
+    "finalReviewStatus": "BLOCKED — Post-fix validation failed",
+    "finalSignOffAllowed": false,
+    "completionSummary": "4 of 7 required checks complete",
+    "passedCount": 4,
+    "failedCount": 3,
+    "missingCount": 0,
+    "notApplicableCount": 4,
+    "totalApplicable": 7,
+    "passedCheckIds": [
+      "ROOT_CAUSE_ANALYSIS",
+      "SOURCE_TO_SINK_EVIDENCE",
+      "BASELINE_EVIDENCE",
+      "CODE_DIFF_INTEGRITY"
+    ],
+    "failedCheckIds": [
+      "POST_FIX_TEST_EXECUTION",
+      "SCANNER_RESCAN",
+      "INDEPENDENT_SECURITY_CHECKS"
+    ],
+    "missingCheckIds": [],
+    "secretRemediationActions": [],
+    "checks": [
+      {
+        "id": "ROOT_CAUSE_ANALYSIS",
+        "label": "Root cause analysis documented",
+        "status": "PASS",
+        "required": true,
+        "detail": "The root cause of the vulnerability is the direct use of untrusted input in a shell command execution, allowing for OS command injection."
+      },
+      {
+        "id": "SOURCE_TO_SINK_EVIDENCE",
+        "label": "Source-to-sink or vulnerability location evidence",
+        "status": "PASS",
+        "required": true,
+        "detail": "Method: DETERMINISTIC_SOURCE_SINK_HEURISTIC | FormalTaintProof: false"
+      },
+      {
+        "id": "BASELINE_EVIDENCE",
+        "label": "Baseline test reproduction or documented constraint",
+        "status": "PASS",
+        "required": true,
+        "detail": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+      },
+      {
+        "id": "CODE_DIFF_INTEGRITY",
+        "label": "Approved code diff & scope integrity verified",
+        "status": "PASS",
+        "required": true,
+        "detail": "Diff SHA-256 ac9a202140c1 authorized & scoped."
+      },
+      {
+        "id": "POST_FIX_TEST_EXECUTION",
+        "label": "Post-fix build & test execution passed (>0 tests)",
+        "status": "FAIL",
+        "required": true,
+        "detail": "2>/sandbox-work/src/PaymentsAPI/Controllers/ReceiptController.cs(9,34): error CS0103: The name 'SanitizeReceiptId' does not exist in the current context [/sandbox-work/src/PaymentsAPI/PaymentsAPI.csproj]"
+      },
+      {
+        "id": "SCANNER_RESCAN",
+        "label": "Originating scanner post-fix re-scan verified",
+        "status": "FAIL",
+        "required": true,
+        "detail": "The security finding was not detected on re-scan, but post-fix validation tests failed."
+      },
+      {
+        "id": "INDEPENDENT_SECURITY_CHECKS",
+        "label": "Security suppression & regression validation passed",
+        "status": "FAIL",
+        "required": true,
+        "detail": "Validation or re-scan check failed; cannot confirm security closure."
+      },
+      {
+        "id": "SECRET_MANAGER_REPLACEMENT",
+        "label": "Secret-manager externalization check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      },
+      {
+        "id": "SECRET_REVOCATION_CONFIRMED",
+        "label": "Credential revocation check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      },
+      {
+        "id": "SECRET_ROTATION_CONFIRMED",
+        "label": "Credential rotation check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      },
+      {
+        "id": "EXPOSED_CREDENTIAL_INVALIDATED",
+        "label": "Exposed credential invalidation check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      }
+    ]
+  },
+  "recommendation": "BLOCKED",
+  "finalReviewStatus": "BLOCKED — Post-fix validation failed",
+  "completionSummary": "4 of 7 required checks complete"
+}

@@ -9,14 +9,14 @@
   "dependencyWarnings": [
     "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
   ],
-  "instanceId": "gcac-12e04ae1aa2b",
+  "instanceId": "gcac-8d925773bf2c",
   "timedOut": false,
   "cancelled": false,
   "gatewayAuditDecisions": [
     {
-      "timestamp": "2026-11-16T15:41:41.901Z",
-      "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
-      "instanceId": "gcac-595781148d83",
+      "timestamp": "2026-11-20T03:49:15.252Z",
+      "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
+      "instanceId": "gcac-c7fde0c811cc",
       "vulnerabilityId": "SCAN-SECRET-016",
       "operation": "DOTNET_TEST",
       "toolchainProfileId": "dotnet-10.0-lts",
@@ -27,9 +27,22 @@
       "policyVersion": "GCAC-PH3-GW-1.0"
     },
     {
-      "timestamp": "2026-11-16T15:41:55.601Z",
-      "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
-      "instanceId": "gcac-2692aa5a1620",
+      "timestamp": "2026-11-20T03:49:28.140Z",
+      "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
+      "instanceId": "gcac-ee29eae38652",
+      "vulnerabilityId": "SCAN-SECRET-016",
+      "operation": "DOTNET_BUILD",
+      "toolchainProfileId": "dotnet-10.0-lts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-20T03:49:56.448Z",
+      "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
+      "instanceId": "gcac-e08618178444",
       "vulnerabilityId": "SCAN-SECRET-016",
       "operation": "DOTNET_TEST",
       "toolchainProfileId": "dotnet-10.0-lts",
@@ -40,9 +53,9 @@
       "policyVersion": "GCAC-PH3-GW-1.0"
     },
     {
-      "timestamp": "2026-11-16T15:42:21.489Z",
-      "runId": "356b8716-d54d-4ae2-8277-f4aeeb18ebed",
-      "instanceId": "gcac-12e04ae1aa2b",
+      "timestamp": "2026-11-20T03:50:16.196Z",
+      "runId": "072611a2-b49d-43a6-953a-4ea7cb9854df",
+      "instanceId": "gcac-8d925773bf2c",
       "vulnerabilityId": "SCAN-SECRET-016",
       "operation": "DOTNET_TEST",
       "toolchainProfileId": "dotnet-10.0-lts",
