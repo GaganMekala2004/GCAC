@@ -4,9 +4,9 @@
   "affectedComponent": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
   "ownershipTier": "APPLICATION_AUTHORED",
   "sourceIsApplicationAuthored": true,
-  "blastRadius": "MEDIUM",
-  "selectedTier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
-  "recommendedStrategy": "Manual dependency advisory review required.",
+  "blastRadius": "LOW",
+  "selectedTier": "3_EXISTING_DEPENDENCY_UPGRADE",
+  "recommendedStrategy": "Upgrade dependency in manifest 'tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj' from '2.1.10' to '2.1.13'.",
   "alternativesEvaluated": [
     {
       "tier": "1_SECURE_CONFIG_CHANGE",
@@ -22,9 +22,9 @@
     },
     {
       "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
-      "feasible": false,
-      "suitable": false,
-      "reason": "Dependency vulnerability lacks a verified Fixed_Version or manifest ownership permission; routing to manual review."
+      "feasible": true,
+      "suitable": true,
+      "reason": "Existing third-party dependency vulnerability has an approved target version (2.1.13); preferred over custom code workarounds."
     },
     {
       "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
@@ -33,9 +33,9 @@
       "reason": "Not required because a lower-risk automated tier is safe and sufficient."
     }
   ],
-  "requiresManualReview": true,
-  "automatedExecutionAllowed": false,
-  "disposition": "MANUAL_REVIEW",
-  "blockingReason": "Dependency upgrade missing verified target version or approved manifest ownership.",
+  "requiresManualReview": false,
+  "automatedExecutionAllowed": true,
+  "disposition": "AUTOMATED_CANDIDATE",
+  "blockingReason": null,
   "manualReviewPlan": []
 }

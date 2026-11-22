@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-1395 - Vulnerable Dependency: SQLitePCLRaw.lib.e_sqlite3 (2.1.10)",
+  "severity": "HIGH",
+  "exploitability": "Medium: The vulnerability can be exploited if the application is using the affected version of the library, but requires specific conditions to be met.",
+  "route": "SpecializedAction",
+  "strategy": "Pin the vulnerable dependency 'SQLitePCLRaw.lib.e_sqlite3' to version 2.1.13 and validate the dependency graph to ensure no other vulnerabilities are present.",
+  "attackVector": "Exploitation through the use of the vulnerable library in the application, requiring access to the application environment.",
+  "confidence": 85,
+  "summary": "The identified vulnerability in the SQLitePCLRaw.lib.e_sqlite3 library poses a high risk and requires immediate remediation to prevent potential exploitation.",
+  "vulnerabilityId": "SCAN-NUGETA-020",
+  "scannerProvenance": {
+    "scannerId": "nuget-audit",
+    "ruleId": "GHSA-2M69-GCR7-JV3Q",
+    "cwe": "CWE-1395",
+    "detectionMethod": "NUGET_ADVISORY_DATA"
+  },
+  "advisoryCwe": "CWE-1395: Insecure Dependency Management",
+  "classificationMismatch": false,
+  "cveId": "CWE-1395",
+  "originalScannerSeverity": "HIGH",
+  "advisoryAiClassification": {
+    "cwe": "CWE-1395: Insecure Dependency Management",
+    "advisorySuggestedSeverity": "HIGH",
+    "route": "SpecializedAction",
+    "exploitability": "Medium: The vulnerability can be exploited if the application is using the affected version of the library, but requires specific conditions to be met.",
+    "strategy": "Pin the vulnerable dependency 'SQLitePCLRaw.lib.e_sqlite3' to version 2.1.13 and validate the dependency graph to ensure no other vulnerabilities are present.",
+    "attackVector": "Exploitation through the use of the vulnerable library in the application, requiring access to the application environment.",
+    "summary": "The identified vulnerability in the SQLitePCLRaw.lib.e_sqlite3 library poses a high risk and requires immediate remediation to prevent potential exploitation.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 85,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

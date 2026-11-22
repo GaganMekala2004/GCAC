@@ -202,7 +202,9 @@ class NuGetAuditScanner extends ScannerAdapter {
                                 line: 1,
                                 evidence: `Package: ${pkg.id}, Resolved: ${pkg.resolvedVersion}, Severity: ${vuln.severity || 'High'}, Advisory: ${advUrl}`,
                                 evidenceRef: `${relPath}:1`,
-                                remediationGuidance: `Upgrade package '${pkg.id}' to a secure version verified against ${advUrl}.`,
+                                remediationGuidance: meta.offlineAudit && transitive.includes(pkg) && pkg.fixedVersion
+                                    ? `Pin the resolved transitive package '${pkg.id}' in the project at verified version ${pkg.fixedVersion} and validate the restored graph.`
+                                    : `Upgrade package '${pkg.id}' to a secure version verified against ${advUrl}.`,
                                 packageName: pkg.id,
                                 currentVersion: pkg.resolvedVersion,
                                 fixedVersion: meta.offlineAudit === true ? pkg.fixedVersion || '' : '',
@@ -277,9 +279,10 @@ class NuGetAuditScanner extends ScannerAdapter {
 
         const projectDirRoot = path.dirname(projectFile);
         let offlineDiagnostic = '';
+        let snapshot;
         try {
             const snapshotFile = options.advisorySnapshotPath || snapshotPath(workspaceRoot);
-            let snapshot;
+
             try { snapshot = readSnapshot(snapshotFile); }
             catch (error) {
                 // Refresh official public data only; this never executes repository
@@ -378,6 +381,26 @@ class NuGetAuditScanner extends ScannerAdapter {
             }
         };
 
+        if (options.isRescan && snapshot && projectDir.endsWith('.csproj')) {
+            try {
+                const restored = await gateway.executeOperation({ ...req, operation: OPERATION_TYPES.NUGET_RESTORE_GRAPH,
+                    workspaceRef: boundaryRoot, inputs: [path.relative(boundaryRoot, projectFile).split(path.sep).join('/')],
+                    networkPolicy: 'NO_NETWORK' }, { ...options, originalWorkspaceRoot: boundaryRoot });
+                if (!restored.executed || restored.exitCode !== 0 || restored.machineStatus !== OUTCOME_STATUS.PASSED)
+                    throw Error(restored.reason || 'Offline package restore failed.');
+                const graph = JSON.parse(restored.outputArtifacts?.['project.assets.json']?.content || 'null');
+                if (!graph || graph.project?.restore?.projectPath !== path.posix.join('/sandbox-work', path.relative(boundaryRoot, projectFile).split(path.sep).join('/')))
+                    throw Error('Offline restore did not produce the target project graph.');
+                const audit = auditResolvedProjects(projectFile, snapshot, options.abortSignal, undefined, graph);
+                return { scannerId: this.id, status: SCANNER_STATUS.COMPLETED, executionPolicy: 'SANDBOX_GATEWAY',
+                    networkPolicy: 'NO_NETWORK', sandboxStatus: restored.sandboxStatus, errors: [], warnings: [],
+                    coverage: `100% (${audit.packagesChecked} restored packages checked)`,
+                    findings: this.parseJsonAuditOutput(audit, projectFile, boundaryRoot, scanId, { ...repoContext, offlineAudit: true }) };
+            } catch (error) {
+                return { scannerId: this.id, status: SCANNER_STATUS.FAILED, findings: [], warnings: [],
+                    errors: ['Post-fix NuGet verification: ' + error.message], coverage: '0% (restore or audit incomplete)' };
+            }
+        }
         const gwRes = await gateway.executeOperation(req, {
             ...options,
             originalWorkspaceRoot: boundaryRoot

@@ -1,0 +1,152 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+  "findingId": "SCAN-NUGETA-021",
+  "findingFingerprint": "92b4c484308d4895",
+  "applicationId": "APP-E2E-001",
+  "stage": 4,
+  "timestamp": "2026-11-22T09:14:05.831Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {},
+  "contentScreeningDecisions": [
+    {
+      "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+      "contentSource": "finding:SCAN-NUGETA-021",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T09:13:39.770Z",
+      "redactedLocation": "GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+      "contentSource": "source:tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T09:13:39.933Z",
+      "redactedLocation": "GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+      "contentSource": "repo:README.md",
+      "trustClass": "UNTRUSTED_README",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T09:13:39.933Z",
+      "redactedLocation": "README.md",
+      "matchCount": 0
+    },
+    {
+      "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+      "contentSource": "llm:classification",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T09:13:43.049Z",
+      "redactedLocation": "GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+      "contentSource": "llm:rca",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T09:13:44.873Z",
+      "redactedLocation": "GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+      "contentSource": "sandbox:DOTNET_TEST",
+      "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T09:13:58.644Z",
+      "redactedLocation": "SCAN-NUGETA-021_9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7/worktree",
+      "matchCount": 0
+    },
+    {
+      "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+      "contentSource": "llm:remediationProposal",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T09:14:01.197Z",
+      "redactedLocation": "GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+      "contentSource": "llm:remediationProposal",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T09:14:03.643Z",
+      "redactedLocation": "GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+      "contentSource": "llm:remediationProposal",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T09:14:05.821Z",
+      "redactedLocation": "GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [
+    {
+      "stage": "BASELINE_TEST",
+      "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+      "executable": "dotnet",
+      "allowlisted": true,
+      "exitCode": 0,
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-NUGETA-021_9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7/worktree"
+    }
+  ],
+  "testCommand": "N/A",
+  "actualExitCode": null,
+  "testResultCounts": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": null,
+  "approvalReference": null,
+  "proposedDiffSha256": null,
+  "appliedDiffSha256": null,
+  "filesChanged": [],
+  "scopeVerificationOutcome": "NOT_APPLIED",
+  "remediationPreferenceDecision": null,
+  "sourceToSinkEvidence": null,
+  "sandboxExecution": null,
+  "publication": null,
+  "sbomEvidence": null,
+  "finalOutcome": {
+    "scannerOutcome": "NOT_VERIFIED",
+    "testOutcome": "UNTESTED",
+    "workflowOutcome": "FAILED",
+    "finalValidationOutcome": "NOT_VERIFIED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE"
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

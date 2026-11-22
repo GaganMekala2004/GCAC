@@ -95,7 +95,7 @@ const STRUCTURED_INJECTION_RULES = Object.freeze([
         category: 'CREDENTIAL_EXFILTRATION_INSTRUCTION',
         outcome: SCREEN_OUTCOME.BLOCK,
         reason: 'Instruction to read, print, or exfiltrate credentials/secrets detected.',
-        regex: /(?:(?:print|dump|output|leak|send|upload|exfiltrate|read|cat)\s+(?:all\s+)?(?:env(?:ironment)?\s+variables?|credentials?|secrets?|api[_ ]?keys?|\.env\b|id_rsa\b|vulnerabilities\.csv\b|vulnerabilities\.db\b)|\bsend\s+.*\bto\s+https?:\/\/)/i
+        regex: /(?:\b(?:print|dump|output|leak|send|upload|exfiltrate|read|cat)\s+(?:all\s+)?(?:env(?:ironment)?\s+variables?|credentials?|secrets?|api[_ ]?keys?|\.env\b|id_rsa\b|vulnerabilities\.csv\b|vulnerabilities\.db\b)|\bsend\s+.*\bto\s+https?:\/\/)/i
     },
     {
         id: 'INJ-009',

@@ -1,0 +1,173 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "2e788826-082e-46f3-b8cc-c44571a3db71",
+  "findingId": "SCAN-CODEQL-023",
+  "findingFingerprint": "0f4fb2ce572dd9e7",
+  "applicationId": "APP-E2E-001",
+  "stage": 4,
+  "timestamp": "2026-11-21T05:36:15.587Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "14cba870cb0b86e807ee560a731444d929caa6ce1f60e9c6076d700813765d28",
+    "baseSourceSha256": "7e6e076400c8b09050b8ac30018c0d6b5a4734d5872f808205996ae02fec5b06",
+    "baseCommitSha": "7075159c77b3ed28fc2ca45b67c754fff799178d"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "2e788826-082e-46f3-b8cc-c44571a3db71",
+      "contentSource": "finding:SCAN-CODEQL-023",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T05:36:15.443Z",
+      "redactedLocation": "GcasE2ETestApi/DiagnosticsController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "2e788826-082e-46f3-b8cc-c44571a3db71",
+      "contentSource": "source:src/GcasE2ETestApi/DiagnosticsController.cs",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T05:36:15.584Z",
+      "redactedLocation": "GcasE2ETestApi/DiagnosticsController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "2e788826-082e-46f3-b8cc-c44571a3db71",
+      "contentSource": "repo:README.md",
+      "trustClass": "UNTRUSTED_README",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T05:36:15.585Z",
+      "redactedLocation": "README.md",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [],
+  "testCommand": "N/A",
+  "actualExitCode": null,
+  "testResultCounts": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": null,
+  "approvalReference": null,
+  "proposedDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "appliedDiffSha256": null,
+  "filesChanged": [],
+  "scopeVerificationOutcome": "NOT_APPLIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-CODEQL-023",
+    "vulnerabilityType": "UNKNOWN",
+    "affectedComponent": "src/GcasE2ETestApi/DiagnosticsController.cs",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "LOW",
+    "selectedTier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+    "recommendedStrategy": "Halt automated editing and escalate to Manual Architectural / Security Review.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Root cause lies in application source code logic or architectural/vendor layer rather than declarative config."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Finding originates in custom/application code or infrastructure, not an outdated dependency manifest."
+      },
+      {
+        "tier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Vulnerability type or source ownership is uncertain; cannot safely automate source code changes."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": true,
+        "reason": "No safe automated low-blast-radius remediation strategy; manual architectural or governance review required."
+      }
+    ],
+    "requiresManualReview": true,
+    "automatedExecutionAllowed": false,
+    "disposition": "MANUAL_REVIEW",
+    "blockingReason": "No safe automated low-blast-radius remediation strategy; manual architectural or governance review required.",
+    "manualReviewPlan": []
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "UNKNOWN",
+    "executionEvidence": null,
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "host",
+      "file": "src/GcasE2ETestApi/DiagnosticsController.cs",
+      "line": 11,
+      "snippet": "public IActionResult Ping([FromQuery] string host)"
+    },
+    "dataPropagationEvidence": [
+      {
+        "line": 11,
+        "snippet": "public IActionResult Ping([FromQuery] string host)",
+        "note": "References candidate untrusted input 'host'."
+      },
+      {
+        "line": 15,
+        "snippet": "process.StartInfo.Arguments = \"-c \\\"ping -c 1 \" + host + \"\\\"\";",
+        "note": "References candidate untrusted input 'host'."
+      }
+    ],
+    "dangerousSink": {
+      "file": "src/GcasE2ETestApi/DiagnosticsController.cs",
+      "line": 14,
+      "snippet": "process.StartInfo.FileName = \"sh\";"
+    },
+    "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+    "affectedFile": "src/GcasE2ETestApi/DiagnosticsController.cs",
+    "affectedFunction": "Ping([FromQuery] string host)",
+    "affectedLines": "Line 14",
+    "proposedRemediation": "Fix cs/command-line-injection: Uncontrolled command line. See https://codeql.github.com/codeql-query-help/ for detailed remediation guidance.",
+    "baselineTestEvidence": {
+      "status": "NOT_EXECUTED",
+      "command": null,
+      "exitCode": null,
+      "summary": "No reproducible baseline test runner executed yet; documented static inspection evidence."
+    }
+  },
+  "sandboxExecution": null,
+  "publication": null,
+  "sbomEvidence": null,
+  "finalOutcome": {
+    "scannerOutcome": "NOT_VERIFIED",
+    "testOutcome": "UNTESTED",
+    "workflowOutcome": "BLOCKED",
+    "finalValidationOutcome": "BLOCKED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE",
+    "legacyRemediationStatus": "Manual Review Required",
+    "legacyFinalValidationStatus": "BLOCKED",
+    "isResolved": false,
+    "blockingReasons": [
+      "No safe automated low-blast-radius remediation strategy; manual architectural or governance review required."
+    ]
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

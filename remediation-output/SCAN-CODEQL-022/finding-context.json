@@ -1,0 +1,19 @@
+{
+  "contextSchemaVersion": "GCAC-FINDING-CTX-1.0",
+  "findingId": "SCAN-CODEQL-022",
+  "applicationId": "APP-E2E-001",
+  "applicationName": "GCAS Agentic E2E Test API",
+  "applicationIdentitySource": "ENTERPRISE_REGISTRY",
+  "canonicalRepositoryId": "73b61c0a6ab0",
+  "repositoryReference": "sample-repos/gcas-agentic-e2e-test-repo",
+  "repositoryPath": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/gcas-agentic-e2e-test-repo",
+  "projectPath": "",
+  "scannerId": "codeql",
+  "scanExecutionId": "SCAN-1795338322985",
+  "sourceOrigin": "LocalScanner",
+  "detectionMethod": "CODEQL_SEMANTIC_SAST",
+  "findingFingerprint": "662ae4711059c763",
+  "originalSeverity": "MEDIUM",
+  "technology": "dotnet",
+  "evidenceLocation": "src/GcasE2ETestApi/FileController.cs:16"
+}

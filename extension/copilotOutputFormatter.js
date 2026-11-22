@@ -138,7 +138,7 @@ function formatTerminalConclusionMarkdown(vulnId, result) {
 - **Baseline / Post-Fix Tests**: \`NOT_EXECUTED\`
 - **Re-Scan**: \`NOT_VERIFIED\`
 - **Stage 4 Approval**: Unavailable — this is an architectural-review referral, not a code proposal awaiting approval.
-- **Next Required Action**: Prepare a reviewed migration plan before proposing code changes. Final remediation sign-off remains blocked.
+- **Next Required Action**: ${stripDecorativeSymbols(result.remediationDecision?.recommendedStrategy || 'Review the reported blocker before proposing code changes.')}
 ${(result.remediationDecision?.manualReviewPlan || []).map((step, i) => `${i + 1}. ${stripDecorativeSymbols(step)}`).join('\n')}
 `;
     }
@@ -200,7 +200,7 @@ ${result.failureReason || ''}
     if (result.finalGateBlocked || (!result.isCompleted && !result.isAwaitingApproval && !result.isAwaitingFinalApproval)) {
         const val = result.validation || {};
         const diagSummary = stripDecorativeSymbols(
-            val.rootError || val.summary || result.failureReason || 'Post-fix validation did not pass.'
+            result.failureReason || val.rootError || val.summary || 'Post-fix validation did not pass.'
         );
         const testCountsStr = val.countsKnown
             ? `Passed: ${val.testsPassed ?? 0}, Failed: ${val.testsFailed ?? 0}, Total: ${val.testsTotal ?? 0}`
@@ -218,7 +218,7 @@ ${result.failureReason || ''}
             `- **Finding ID**: \`${vulnId}\``,
             `- **Workflow Lifecycle**: \`${result.workflowLifecycle || 'COMPLETED'}\``,
             `- **Baseline Outcome**: \`${result.baselineOutcome || result.baselineValidation?.status || 'NOT AVAILABLE'}\``,
-            `- **Post-Fix Test Outcome**: \`${result.securityValidationOutcome || val.status || 'FAILED'}\``,
+            `- **Post-Fix Test Outcome**: \`${val.machineStatus || val.status || 'FAILED'}\``,
             `- **Actual Test Counts**: ${testCountsStr}`,
             `- **Re-Scan Status**: \`${result.reScanVerification?.status || result.reScanVerification?.machineStatus || 'NOT VERIFIED'}\``,
             `- **Final Human-Review Eligibility**: \`${checklist?.finalSignOffAllowed ? 'ELIGIBLE' : 'BLOCKED'}\``,
@@ -249,7 +249,7 @@ ${result.failureReason || ''}
             `- **Finding ID**: \`${vulnId}\``,
             `- **Workflow Lifecycle**: \`${result.workflowLifecycle || 'COMPLETED'}\``,
             `- **Baseline Outcome**: \`${result.baselineOutcome || result.baselineValidation?.status || 'PASS'}\``,
-            `- **Post-Fix Test Outcome**: \`${result.securityValidationOutcome || val.status || 'PASS'}\``,
+            `- **Post-Fix Test Outcome**: \`${val.machineStatus || val.status || 'PASS'}\``,
             `- **Actual Test Counts**: ${testCountsStr}`,
             `- **Re-Scan Status**: \`${result.reScanVerification?.status || result.reScanVerification?.machineStatus || 'RESOLVED'}\``,
             `- **Final Human-Review Eligibility**: \`${checklist?.finalSignOffAllowed ? 'ELIGIBLE' : 'BLOCKED'}\``,

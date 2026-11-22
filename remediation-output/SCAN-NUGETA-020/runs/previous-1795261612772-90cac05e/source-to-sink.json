@@ -1,0 +1,30 @@
+{
+  "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "Unresolved (inspect method parameters)",
+    "file": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+    "line": 1,
+    "snippet": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">"
+  },
+  "dataPropagationEvidence": [],
+  "dangerousSink": {
+    "file": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+    "line": 1,
+    "snippet": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">"
+  },
+  "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+  "affectedFile": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+  "affectedFunction": "UnknownMethod",
+  "affectedLines": "Line 1",
+  "proposedRemediation": "Upgrade package 'SQLitePCLRaw.lib.e_sqlite3' to a secure version verified against https://github.com/advisories/GHSA-2m69-gcr7-jv3q.",
+  "baselineTestEvidence": {
+    "status": "NOT_EXECUTED",
+    "command": null,
+    "exitCode": null,
+    "summary": "No reproducible baseline test runner executed yet; documented static inspection evidence."
+  }
+}

@@ -8,9 +8,8 @@
    -------------------------------------------------------------------------- */
 
 :root,
-[data-theme="light"],
-body.theme-light,
-body.vscode-light {
+[data-theme="light"] {
+    color-scheme: light;
     /* Backgrounds & Atmospheric Gradients (ITSM Dashboard aesthetic) */
     --bg-page: #f8fafc;
     --bg-mesh-gradient: radial-gradient(1000px circle at 10% 10%, rgba(214, 233, 255, 0.7), transparent 50%),
@@ -24,6 +23,8 @@ body.vscode-light {
     --bg-surface-subtle: rgba(248, 250, 252, 0.7);
     --bg-card: rgba(255, 255, 255, 0.75);
     --bg-code: rgba(241, 245, 249, 0.85);
+    --inline-code-bg: #e9eef6;
+    --inline-code-text: #243653;
 
     /* Borders */
     --border-subtle: rgba(226, 232, 240, 0.85);
@@ -110,10 +111,8 @@ body.vscode-light {
 }
 
 /* Dark Theme Tokens */
-[data-theme="dark"],
-body.theme-dark,
-body.vscode-dark,
-body.vscode-high-contrast {
+[data-theme="dark"] {
+    color-scheme: dark;
     /* Backgrounds & Cyber/SaaS Gradients */
     --bg-page: #0b0f19;
     --bg-mesh-gradient: radial-gradient(1100px circle at 15% 15%, rgba(37, 99, 235, 0.16), transparent 50%),
@@ -127,6 +126,8 @@ body.vscode-high-contrast {
     --bg-surface-subtle: rgba(15, 23, 42, 0.65);
     --bg-card: rgba(20, 28, 46, 0.72);
     --bg-code: #0b0f19;
+    --inline-code-bg: #29364b;
+    --inline-code-text: #e5efff;
 
     --border-subtle: rgba(51, 65, 85, 0.7);
     --border-default: rgba(71, 85, 105, 0.8);
@@ -134,8 +135,8 @@ body.vscode-high-contrast {
     --border-focus: #60a5fa;
 
     --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --text-secondary: #bac6d8;
+    --text-muted: #9aaac2;
     --text-inverse: #0f172a;
 
     --accent: #3b82f6;
@@ -900,12 +901,7 @@ body.theme-dark .nav-item.active svg {
 }
 
 .target-context-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    min-width: 0;
-    flex: 1 1 auto;
+    display: contents;
 }
 
 .target-chip {
@@ -975,13 +971,6 @@ body.theme-dark .nav-item.active svg {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.target-divider {
-    width: 1px;
-    height: 16px;
-    background-color: var(--border-subtle);
-    flex-shrink: 0;
 }
 
 .target-context-right {
@@ -1657,6 +1646,8 @@ body.theme-dark .nav-item.active svg {
     border: 1px solid var(--sev-low-border);
 }
 
+.badge-success,
+.badge-status-completed,
 .badge-status-remediated {
     background-color: var(--success-subtle);
     color: var(--success);
@@ -1669,6 +1660,7 @@ body.theme-dark .nav-item.active svg {
     border: 1px solid rgba(37, 99, 235, 0.25);
 }
 
+.badge-status-in_progress,
 .badge-status-inprogress,
 .badge-status-active {
     background-color: var(--info-subtle);
@@ -1676,6 +1668,8 @@ body.theme-dark .nav-item.active svg {
     border: 1px solid var(--info-border);
 }
 
+.badge-warning,
+.badge-status-awaiting_review,
 .badge-status-review {
     background-color: var(--warning-subtle);
     color: var(--warning);
@@ -2189,7 +2183,7 @@ body.theme-dark .nav-item.active svg {
 
 .test-metric-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 105px), 1fr));
     gap: 8px;
 }
 
@@ -2315,11 +2309,15 @@ body.theme-dark .nav-item.active svg {
 
 .markdown-body p { margin-bottom: 8px; }
 
-.markdown-body code {
+body :not(pre) > code {
     font-family: var(--font-mono);
-    font-size: 11px;
-    background-color: var(--bg-code);
-    padding: 2px 5px;
+    font-size: .95em;
+    color: var(--inline-code-text);
+    background-color: var(--inline-code-bg);
+    overflow-wrap: anywhere;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    padding: 1px 4px;
     border-radius: 4px;
     border: 1px solid var(--border-subtle);
 }
@@ -3741,4 +3739,48 @@ body.theme-dark .nav-item.active svg {
 .btn:disabled {
     opacity: 0.55;
     cursor: not-allowed;
+}
+
+/* Keep long repository paths, digests and state names inside their panels. */
+.app-view, .meta-item, .step-content > div, .checklist-text, .target-context-right {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.failure-header, .gate-card-header, .pipeline-header, .evidence-tabs-header {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+}
+.failure-header .badge, .gate-card-header .badge, .step-content .badge {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.step-content .badge { flex: 0 0 auto; }
+.inspector-actions { align-items: center; }
+.detail-panel { container-type: inline-size; }
+.target-context-right { max-width: 100%; }
+.target-security-badge { white-space: normal; }
+.diagnostic-detail-grid, .sandbox-meta-strip {
+    display: grid;
+    grid-template-columns: fit-content(10rem) minmax(0, 1fr);
+    gap: 6px 12px;
+    margin: 0;
+    padding: 12px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+.evidence-dashboard dt { font-weight: 600; }
+.evidence-dashboard dd { margin: 0; min-width: 0; }
+@container (max-width: 440px) {
+    .step-content { flex-direction: column; gap: 4px; }
+    .pipeline-header > div, .failure-header > div { min-width: 0; }
+    .inspector-scroll-area { padding: 14px; }
+    .diagnostic-detail-grid, .sandbox-meta-strip { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .evidence-dashboard dd + dt { margin-top: 6px; }
+}
+@media (max-width: 640px) {
+    .header-main-row { height: auto; min-height: 44px; flex-wrap: wrap; padding-block: 5px; }
+    .header-right { flex-wrap: wrap; flex-shrink: 1; max-width: 100%; gap: 5px; }
+    .target-context-right { margin-left: 0; }
+    .target-chip { flex-wrap: wrap; }
 }

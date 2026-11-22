@@ -20,11 +20,11 @@
   "affectedFile": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
   "affectedFunction": "UnknownMethod",
   "affectedLines": "Line 1",
-  "proposedRemediation": "Upgrade package 'SQLitePCLRaw.lib.e_sqlite3' to a secure version verified against https://github.com/advisories/GHSA-2m69-gcr7-jv3q.",
+  "proposedRemediation": "Update the dependency to a secure version of SQLitePCLRaw.lib.e_sqlite3 that does not contain known vulnerabilities.",
   "baselineTestEvidence": {
-    "status": "NOT_EXECUTED",
-    "command": null,
-    "exitCode": null,
-    "summary": "No reproducible baseline test runner executed yet; documented static inspection evidence."
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
   }
 }

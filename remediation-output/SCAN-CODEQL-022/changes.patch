@@ -1,0 +1,16 @@
+diff --git a/src/GcasE2ETestApi/FileController.cs b/src/GcasE2ETestApi/FileController.cs
+index 47fd21f..f29cd05 100644
+--- a/src/GcasE2ETestApi/FileController.cs
++++ b/src/GcasE2ETestApi/FileController.cs
+@@ -12,6 +12,11 @@ public sealed class FileController : ControllerBase
+     public IActionResult Get([FromQuery] string fileName)
+     {
+         // Intentionally vulnerable: caller controls the path without containment validation.
++        // Validate and sanitize the fileName to prevent path traversal attacks.
++        if (string.IsNullOrWhiteSpace(fileName) || fileName.Contains(".."))
++        {
++            return BadRequest("Invalid file name.");
++        }
+         var path = Path.Combine(BaseDirectory, fileName);
+         if (!System.IO.File.Exists(path))
+         {

@@ -244,3 +244,18 @@ test('provider picker grants only the selected Gemini repository and stores its 
     assert.deepEqual([...saved.keys()], ['gcac.gemini.key']);
     await assert.rejects(host.client(host.selection(), '/other').getAvailableModels(), /policy prohibits/);
 });
+
+test('workspace provider choices migrate independently and scanner review can be disabled', async () => {
+    const legacy = { id: 'ollama', model: 'legacy' };
+    const state = new Map([['gcac.provider', legacy]]);
+    const host = new ProviderHost({ window: { showQuickPick: items => items[0] } }, {
+        workspaceState: { get: k => state.get(k), update: (k,v) => state.set(k,v) }
+    });
+    assert.deepEqual(host.selection('scanner'), legacy);
+    await host.configure('/repo');
+    assert.equal(host.selection().id, 'copilot');
+    assert.deepEqual(host.selection('scanner'), legacy);
+    await host.configure('/repo', 'scanner');
+    assert.equal(host.selection('scanner').id, 'none');
+    assert.equal(host.selection().id, 'copilot');
+});

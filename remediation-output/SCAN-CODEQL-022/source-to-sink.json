@@ -1,0 +1,41 @@
+{
+  "vulnerabilityType": "PATH_TRAVERSAL",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "fileName",
+    "file": "src/GcasE2ETestApi/FileController.cs",
+    "line": 12,
+    "snippet": "public IActionResult Get([FromQuery] string fileName)"
+  },
+  "dataPropagationEvidence": [
+    {
+      "line": 12,
+      "snippet": "public IActionResult Get([FromQuery] string fileName)",
+      "note": "References candidate untrusted input 'fileName'."
+    },
+    {
+      "line": 15,
+      "snippet": "var path = Path.Combine(BaseDirectory, fileName);",
+      "note": "References candidate untrusted input 'fileName'."
+    }
+  ],
+  "dangerousSink": {
+    "file": "src/GcasE2ETestApi/FileController.cs",
+    "line": 9,
+    "snippet": "private static readonly string BaseDirectory = Path.Combine(AppContext.BaseDirectory, \"data\");"
+  },
+  "missingValidationOrEncoding": "File path input lacks canonical Path.GetFullPath() + base-directory prefix containment validation.",
+  "affectedFile": "src/GcasE2ETestApi/FileController.cs",
+  "affectedFunction": "Get([FromQuery] string fileName)",
+  "affectedLines": "Lines 12-21",
+  "proposedRemediation": "Implement validation and sanitization of the 'fileName' input to ensure it does not contain any path traversal characters (e.g., '../') and restrict access to only allowed files.",
+  "baselineTestEvidence": {
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+  }
+}

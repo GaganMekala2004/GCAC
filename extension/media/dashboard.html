@@ -214,8 +214,6 @@
                         <select class="target-csv-select" id="selectWorkspaceFolder" aria-label="Select Workspace Folder"></select>
                     </div>
 
-                    <div class="target-divider"></div>
-
                     <div class="target-chip csv-chip" id="targetCsvChip" title="Active vulnerability scan CSV report">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="target-icon">
                             <path
@@ -667,7 +665,7 @@
 
                                     <!-- Concise Actions: One Primary + Remaining Secondary -->
                                     <div class="inspector-actions">
-                                        <button class="btn btn-primary btn-copilot-trigger" id="btnLaunchCopilot"
+                                        <button class="btn btn-primary btn-sm btn-copilot-trigger" id="btnLaunchCopilot"
                                             title="Run with Copilot in VS Code Chat">
                                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                                 <path
@@ -675,7 +673,7 @@
                                             </svg>
                                             <span>Run with Copilot</span>
                                         </button>
-                                        <button class="btn btn-secondary u-hidden" id="runProvider">Run remediation</button>
+                                        <button class="btn btn-primary btn-sm u-hidden" id="runProvider">Run remediation</button>
                                         <button class="btn btn-secondary btn-sm" id="btnOpenLocation"
                                             title="Jump to source file in VS Code">
                                             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
@@ -1121,13 +1119,6 @@
                             </div>
                         </div>
 
-                        <div class="scan-scope-card">
-                            <div class="card-heading">AI provider</div>
-                            <p id="providerSelection">GitHub Copilot (default)</p>
-                            <button class="btn btn-secondary" id="configureProvider">Configure provider and model</button>
-                            <button class="btn btn-secondary" id="checkProvider">Check availability</button>
-                            <p role="status" id="providerStatus"></p>
-                        </div>
                         <!-- Scan Configuration & Scope -->
                         <div class="scan-scope-card">
                             <div class="card-heading">Scan Mode, Execution Scope &amp; Selectors</div>
@@ -1255,6 +1246,19 @@
                         </div>
 
                         <div class="settings-grid">
+                            <div class="settings-card">
+                                <div class="card-heading">Scanner AI provider</div>
+                                <p id="scannerProviderSelection">AI candidate review disabled</p>
+                                <button class="btn btn-secondary" id="configureScannerProvider">Configure scanner provider and model</button>
+                            </div>
+                            <div class="settings-card">
+                                <div class="card-heading">Remediation AI provider</div>
+                                <p id="providerSelection">GitHub Copilot (default)</p>
+                                <button class="btn btn-secondary" id="configureProvider">Configure remediation provider and model</button>
+                                <button class="btn btn-secondary" id="checkProvider">Check availability</button>
+                                <p role="status" id="providerStatus"></p>
+                            </div>
+
                             <!-- Active Repository & CSV Configuration Card -->
                             <div class="settings-card">
                                 <div class="card-heading">Active Repository &amp; Scan Source Configuration</div>

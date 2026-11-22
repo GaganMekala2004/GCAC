@@ -119,9 +119,11 @@ class ReScanVerifier {
 
         const effectiveRoot = params.workspaceRoot || this.workspaceRoot;
 
+        const advisorySnapshotPath = scanner.id === 'nuget-audit' && this.workspaceRoot
+            ? require('./nugetAdvisories').snapshotPath(this.workspaceRoot) : undefined;
         // Check scanner availability (passing sandbox context for container-backed scanners)
         const avail = await scanner.isAvailable({
-            workspaceRoot: effectiveRoot,
+            workspaceRoot: effectiveRoot, advisorySnapshotPath,
             executionGateway: params.executionGateway || null,
             sandboxBackend: params.sandboxBackend || null,
             envReport: params.envReport || null
@@ -161,7 +163,7 @@ class ReScanVerifier {
         try {
             reScanResult = await scanner.scan(effectiveRoot, scanTarget, {
                 scanId: `rescan-${Date.now()}`,
-                isRescan: true,
+                isRescan: true, advisorySnapshotPath,
                 runId: params.runId || `rescan-${Date.now()}`,
                 applicationId: params.applicationId || originalFinding.applicationId || originalFinding.Application_Number || 'APP-RESCAN',
                 vulnerabilityId: params.vulnerabilityId || originalFinding.vulnerabilityId || originalFinding.Vulnerability_ID || 'VUL-RESCAN',
@@ -201,7 +203,7 @@ class ReScanVerifier {
 
         // 1. Check if the original finding is still present (matching fingerprint OR matching ruleId + target file)
         const targetRelFile = relLocPath.replace(/\\/g, '/').toLowerCase();
-        const ruleId = (originalFinding.ruleId || originalFinding.CVE_ID || '').toUpperCase();
+        const ruleId = (originalFinding.ruleId || originalFinding.Rule_ID || originalFinding.CVE_ID || '').toUpperCase();
         const baselineFp = originalFinding.findingFingerprint || originalFinding.Finding_Fingerprint || '';
 
         const matchingFinding = findings.find(f => {
@@ -214,8 +216,14 @@ class ReScanVerifier {
         });
 
         // 2. Check for regressions (new security findings introduced in same file)
+        const scanId = originalFinding.Scan_ID || originalFinding.scanId;
+        const repoId = originalFinding.Canonical_Repository_ID || originalFinding.canonicalRepositoryId;
+        const baseline = scanner.id === 'nuget-audit' && scanId && repoId
+            ? this.scanController?.findingsStore?.getFindings({ scanId, canonicalRepositoryId: repoId }) || [] : [];
         const regressions = findings.filter(f => {
             if (matchingFinding && f === matchingFinding) return false;
+            if (baseline.some(prior => prior.scannerId === scanner.id && prior.filePath === f.filePath &&
+                prior.packageName === f.packageName && prior.currentVersion === f.currentVersion && prior.ruleId === f.ruleId)) return false;
             if (!targetRelFile) return true;
             const fFile = (f.filePath || '').replace(/\\/g, '/').toLowerCase();
             return fFile.endsWith(path.basename(targetRelFile));

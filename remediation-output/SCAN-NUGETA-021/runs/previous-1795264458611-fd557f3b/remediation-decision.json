@@ -1,0 +1,41 @@
+{
+  "vulnerabilityId": "SCAN-NUGETA-021",
+  "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+  "affectedComponent": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+  "ownershipTier": "APPLICATION_AUTHORED",
+  "sourceIsApplicationAuthored": true,
+  "blastRadius": "MEDIUM",
+  "selectedTier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+  "recommendedStrategy": "Manual dependency advisory review required.",
+  "alternativesEvaluated": [
+    {
+      "tier": "1_SECURE_CONFIG_CHANGE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "Vulnerable third-party package cannot be patched safely via runtime configuration alone."
+    },
+    {
+      "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+    },
+    {
+      "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "Dependency vulnerability lacks a verified Fixed_Version or manifest ownership permission; routing to manual review."
+    },
+    {
+      "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+      "feasible": true,
+      "suitable": false,
+      "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+    }
+  ],
+  "requiresManualReview": true,
+  "automatedExecutionAllowed": false,
+  "disposition": "MANUAL_REVIEW",
+  "blockingReason": "Dependency upgrade missing verified target version or approved manifest ownership.",
+  "manualReviewPlan": []
+}

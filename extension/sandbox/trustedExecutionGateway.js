@@ -27,6 +27,8 @@ const { SandboxLifecycleManager } = require('./sandboxLifecycleManager');
 const EXECUTION_POLICY_VERSION = 'GCAC-PH3-GW-1.0';
 
 const OPERATION_TYPES = Object.freeze({
+    NUGET_RESTORE_GRAPH: 'NUGET_RESTORE_GRAPH',
+    DOTNET_TEST_RESTORED: 'DOTNET_TEST_RESTORED',
     DOTNET_BUILD: 'DOTNET_BUILD',
     DOTNET_TEST: 'DOTNET_TEST',
     MAVEN_COMPILE: 'MAVEN_COMPILE',
@@ -202,6 +204,15 @@ class TrustedExecutionGateway {
         }
 
         const finalArgs = [...cmdTemplate.baseArgs, ...extraArgs];
+        if (request.operation === OPERATION_TYPES.NUGET_RESTORE_GRAPH) {
+            const project = request.inputs[0];
+            const resolved = require('../pathUtils').assertPathWithinWorkspace(project, request.workspaceRef);
+            if (request.inputs.length !== 1 || !resolved || !project.endsWith('.csproj') || !fs.statSync(resolved).isFile() ||
+                path.isAbsolute(project) || /[\r\n\0]/.test(project) || project.split(/[\\/]/).includes('..')) {
+                throw new ExecutionGatewayError('Offline restore requires one project within the staged repository.', 'INVALID_INPUTS');
+            }
+            finalArgs.push('./' + project);
+        }
         const limits = {
             timeoutMs: Math.min(Number(request.resourcePolicy.timeoutMs || profile.runtimeLimits.timeoutMs), profile.runtimeLimits.timeoutMs),
             memoryMb: Math.min(Number(request.resourcePolicy.memoryMb || profile.runtimeLimits.memoryMb), profile.runtimeLimits.memoryMb),

@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "0386400b-e7ce-44c1-a9d1-9ab0399e86cb",
+  "findingId": "SCAN-NUGETA-019",
+  "findingFingerprint": "3cf8f91f03a641da",
+  "applicationId": "APP-E2E-001",
+  "stage": 3,
+  "timestamp": "2026-11-21T11:26:56.232Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {},
+  "contentScreeningDecisions": [
+    {
+      "runId": "0386400b-e7ce-44c1-a9d1-9ab0399e86cb",
+      "contentSource": "finding:SCAN-NUGETA-019",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T11:23:20.977Z",
+      "redactedLocation": "GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "0386400b-e7ce-44c1-a9d1-9ab0399e86cb",
+      "contentSource": "source:src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T11:23:21.097Z",
+      "redactedLocation": "GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "0386400b-e7ce-44c1-a9d1-9ab0399e86cb",
+      "contentSource": "repo:README.md",
+      "trustClass": "UNTRUSTED_README",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T11:23:21.097Z",
+      "redactedLocation": "README.md",
+      "matchCount": 0
+    },
+    {
+      "runId": "0386400b-e7ce-44c1-a9d1-9ab0399e86cb",
+      "contentSource": "llm:classification",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T11:24:46.447Z",
+      "redactedLocation": "GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "0386400b-e7ce-44c1-a9d1-9ab0399e86cb",
+      "contentSource": "llm:rca",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T11:26:49.947Z",
+      "redactedLocation": "GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "0386400b-e7ce-44c1-a9d1-9ab0399e86cb",
+      "contentSource": "sandbox:DOTNET_TEST",
+      "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+      "ruleId": "INJ-008",
+      "outcome": "BLOCK",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T11:26:56.228Z",
+      "redactedLocation": "SCAN-NUGETA-019_0386400b-e7ce-44c1-a9d1-9ab0399e86cb/worktree:line=61",
+      "matchCount": 1
+    }
+  ],
+  "commandPolicyDecisions": [
+    {
+      "stage": "BASELINE_TEST",
+      "command": "dotnet test --no-restore --nologo -v normal -v normal --logger trx --results-directory /sandbox-out",
+      "executable": "dotnet",
+      "allowlisted": false,
+      "exitCode": 1,
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-NUGETA-019_0386400b-e7ce-44c1-a9d1-9ab0399e86cb/worktree"
+    }
+  ],
+  "testCommand": "N/A",
+  "actualExitCode": null,
+  "testResultCounts": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": null,
+  "approvalReference": null,
+  "proposedDiffSha256": null,
+  "appliedDiffSha256": null,
+  "filesChanged": [],
+  "scopeVerificationOutcome": "NOT_APPLIED",
+  "remediationPreferenceDecision": null,
+  "sourceToSinkEvidence": null,
+  "sandboxExecution": null,
+  "publication": null,
+  "sbomEvidence": null,
+  "finalOutcome": {
+    "scannerOutcome": "NOT_VERIFIED",
+    "testOutcome": "UNTESTED",
+    "workflowOutcome": "BLOCKED",
+    "finalValidationOutcome": "NOT_VERIFIED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE"
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

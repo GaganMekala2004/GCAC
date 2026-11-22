@@ -1,0 +1,41 @@
+{
+  "vulnerabilityType": "UNKNOWN",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "fileName",
+    "file": "src/GcasE2ETestApi/FileController.cs",
+    "line": 12,
+    "snippet": "public IActionResult Get([FromQuery] string fileName)"
+  },
+  "dataPropagationEvidence": [
+    {
+      "line": 12,
+      "snippet": "public IActionResult Get([FromQuery] string fileName)",
+      "note": "References candidate untrusted input 'fileName'."
+    },
+    {
+      "line": 15,
+      "snippet": "var path = Path.Combine(BaseDirectory, fileName);",
+      "note": "References candidate untrusted input 'fileName'."
+    }
+  ],
+  "dangerousSink": {
+    "file": "src/GcasE2ETestApi/FileController.cs",
+    "line": 9,
+    "snippet": "private static readonly string BaseDirectory = Path.Combine(AppContext.BaseDirectory, \"data\");"
+  },
+  "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+  "affectedFile": "src/GcasE2ETestApi/FileController.cs",
+  "affectedFunction": "Get([FromQuery] string fileName)",
+  "affectedLines": "Line 9",
+  "proposedRemediation": "Fix cs/path-injection: Uncontrolled data used in path expression. See https://codeql.github.com/codeql-query-help/ for detailed remediation guidance.",
+  "baselineTestEvidence": {
+    "status": "NOT_EXECUTED",
+    "command": null,
+    "exitCode": null,
+    "summary": "No reproducible baseline test runner executed yet; documented static inspection evidence."
+  }
+}

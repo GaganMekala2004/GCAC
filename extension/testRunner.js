@@ -736,7 +736,7 @@ function mapToolAndArgsToOperation(executable, args = []) {
         const extraArgs = [];
         for (let i = 1; i < args.length; i++) {
             const tok = String(args[i] ?? '');
-            if (tok === '--verbosity') {
+            if (tok === '-v' || tok === '--verbosity') {
                 const next = String(args[i + 1] || '').toLowerCase();
                 if (next === 'normal' || next === 'minimal') {
                     i++;

@@ -386,6 +386,11 @@ class ContainerSandboxBackend extends ExecutionBackend {
         const startMs = Date.now();
         const timeoutMs = Number(preparedEnv.policy?.timeoutMs || request.timeoutMs || 60000);
 
+        let graphPath;
+        if (request.operation === 'NUGET_RESTORE_GRAPH') {
+            graphPath = path.join(preparedEnv.staged.workDir, path.dirname(request.inputs[0]), 'obj', 'project.assets.json');
+            if (fs.existsSync(graphPath)) fs.unlinkSync(graphPath);
+        }
         const runArgs = this.buildContainerRunArgs({
             containerName: preparedEnv.containerName,
             instanceId: preparedEnv.instanceId,
@@ -534,6 +539,19 @@ class ContainerSandboxBackend extends ExecutionBackend {
                 const outputArtifactHashes = this._collectOutputHashes(preparedEnv.staged.outDir);
                 const outputArtifacts = this._collectOutputArtifacts(preparedEnv.staged.outDir);
 
+                if (graphPath) {
+                    delete outputArtifacts['project.assets.json'];
+                    delete outputArtifactHashes['project.assets.json'];
+                }
+                if (graphPath && code === 0) {
+                    const contained = require('../pathUtils').assertPathWithinWorkspace(graphPath, preparedEnv.staged.workDir);
+                    if (contained && fs.existsSync(contained) && fs.lstatSync(graphPath).isFile() && fs.statSync(contained).size <= 32 * 1024 * 1024) {
+                        const bytes = fs.readFileSync(contained);
+                        const digest = { bytes: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+                        outputArtifactHashes['project.assets.json'] = digest;
+                        outputArtifacts['project.assets.json'] = { ...digest, fileName: 'project.assets.json', content: bytes.toString('utf8') };
+                    }
+                }
                 if (request.artifactDestinationDir) {
                     try {
                         fs.mkdirSync(request.artifactDestinationDir, { recursive: true });
@@ -654,7 +672,7 @@ class ContainerSandboxBackend extends ExecutionBackend {
             const files = fs.readdirSync(outDir);
             for (const f of files.sort()) {
                 const full = path.join(outDir, f);
-                if (fs.statSync(full).isFile()) {
+                if (fs.lstatSync(full).isFile()) {
                     const buf = fs.readFileSync(full);
                     hashes[f] = {
                         sha256: crypto.createHash('sha256').update(buf).digest('hex'),
@@ -673,7 +691,7 @@ class ContainerSandboxBackend extends ExecutionBackend {
             const files = fs.readdirSync(outDir);
             for (const f of files.sort()) {
                 const full = path.join(outDir, f);
-                if (fs.statSync(full).isFile()) {
+                if (fs.lstatSync(full).isFile()) {
                     const buf = fs.readFileSync(full);
                     artifacts[f] = {
                         fileName: f,

@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-798 - Hardcoded API Secret or Private Key",
+  "severity": "HIGH",
+  "exploitability": "High - The presence of hardcoded API secrets significantly increases the risk of unauthorized access, as an attacker can easily extract and use these credentials.",
+  "route": "ConfigUpdate",
+  "strategy": "Extract the hardcoded API secret from the source code and store it in a secure environment variable or key management service like Azure Key Vault or AWS Secrets Manager.",
+  "attackVector": "An attacker with access to the source code can directly read the hardcoded secret. Alternatively, if the application is deployed, an attacker could potentially extract the secret from memory or logs.",
+  "confidence": 95,
+  "summary": "A HIGH severity vulnerability due to a hardcoded API secret in the source code, which poses a significant risk of unauthorized access and should be remediated by moving the secret to a secure environment variable or key management service.",
+  "vulnerabilityId": "SCAN-SECRET-021",
+  "scannerProvenance": {
+    "scannerId": "secrets-config",
+    "ruleId": "SEC-001",
+    "cwe": "CWE-798",
+    "detectionMethod": "DETERMINISTIC_REGEX"
+  },
+  "advisoryCwe": "CWE-798: Improper Authentication",
+  "classificationMismatch": false,
+  "cveId": "CWE-798",
+  "originalScannerSeverity": "HIGH",
+  "advisoryAiClassification": {
+    "cwe": "CWE-798: Improper Authentication",
+    "advisorySuggestedSeverity": "HIGH",
+    "route": "ConfigUpdate",
+    "exploitability": "High - The presence of hardcoded API secrets significantly increases the risk of unauthorized access, as an attacker can easily extract and use these credentials.",
+    "strategy": "Extract the hardcoded API secret from the source code and store it in a secure environment variable or key management service like Azure Key Vault or AWS Secrets Manager.",
+    "attackVector": "An attacker with access to the source code can directly read the hardcoded secret. Alternatively, if the application is deployed, an attacker could potentially extract the secret from memory or logs.",
+    "summary": "A HIGH severity vulnerability due to a hardcoded API secret in the source code, which poses a significant risk of unauthorized access and should be remediated by moving the secret to a secure environment variable or key management service.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 95,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

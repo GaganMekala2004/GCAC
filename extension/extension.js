@@ -89,6 +89,7 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'getSourceCode',
     'launchCopilot',
     'configureProvider',
+    'configureScannerProvider',
     'providerStatus',
     'runProvider',
     'loadReports',
@@ -247,6 +248,7 @@ function buildConfigPayload(extra = {}) {
         : 0;
     return {
         type: 'CONFIG_UPDATED',
+        scannerProvider: providerHost?.selection('scanner') || { id: 'none' },
         provider: providerHost?.selection() || { id: 'copilot' },
         executionMode: engine?.executionMode || 'ENTERPRISE',
         activeRepo: currentScanTarget || currentWorkspaceRoot,
@@ -413,7 +415,7 @@ function validateWebviewMessage(message) {
     if (!ALLOWED_IPC_COMMANDS.has(message.command)) {
         return { valid: false, error: `Unauthorized IPC command: '${message.command}'` };
     }
-    if (['configureProvider','providerStatus','runProvider'].includes(message.command) &&
+    if (['configureScannerProvider','configureProvider','providerStatus','runProvider'].includes(message.command) &&
         (Object.keys(message).some(key => !['command','vulnerabilityId'].includes(key)) ||
         (message.command === 'runProvider' && !message.vulnerabilityId))) return { valid: false, error: 'Invalid provider action' };
     if (message.vulnerabilityId !== undefined) {
@@ -936,6 +938,9 @@ function activate(context) {
                 } catch (err) {
                     try {
                         const refreshed = loadVulnerabilityDetails(currentWorkspaceRoot, vulnId);
+                        if (refreshed && engine) refreshed.retryEligibility = engine.evaluateRetryEligibility(refreshed.runState || vulnId, {
+                            workspaceTrusted: vscode.workspace.isTrusted
+                        });
                         broadcast({ type: 'DETAILS_LOADED', details: refreshed });
                     } catch { }
                     response.markdown(formatErrorMarkdown('Pipeline Execution Stopped', err.message));
@@ -1561,8 +1566,8 @@ async function handleWebviewMessage(message, webview) {
                 const scanResult = await scanController.startScan({
                     scannerIds: message.scannerIds,
                     selectCandidateContext: async root => {
-                        const selected = providerHost.selection();
-                        if (selected.id === 'copilot') throw Error('Choose a direct inference provider for candidate review.');
+                        const selected = providerHost.selection('scanner');
+                        if (selected.id === 'none') throw Error('Choose a scanner AI provider in Settings for candidate review.');
                         const items = vscode.window.visibleTextEditors.filter(editor => !editor.selection.isEmpty &&
                             editor.document.uri.scheme === 'file' && !editor.document.isDirty &&
                             assertPathWithinWorkspace(editor.document.uri.fsPath,root)).map(editor => ({
@@ -2191,10 +2196,12 @@ async function handleWebviewMessage(message, webview) {
             webview.postMessage({ type:'PROVIDER_STATUS', status });
             break;
         }
+        case 'configureScannerProvider':
         case 'configureProvider': {
             if (!vscode.workspace.isTrusted) return;
             try {
-                await providerHost.configure(resolveAuthorizedTarget(currentScanTarget || currentWorkspaceRoot));
+                await providerHost.configure(resolveAuthorizedTarget(currentScanTarget || currentWorkspaceRoot),
+                    message.command === 'configureScannerProvider' ? 'scanner' : 'remediation');
                 broadcast(buildConfigPayload());
             } catch (error) { webview.postMessage({ type: 'ACTION_FEEDBACK', text: error.message, status: 'error' }); }
             break;

@@ -1,0 +1,36 @@
+{
+  "instanceId": "gcac-cc225b47b346",
+  "runId": "0386400b-e7ce-44c1-a9d1-9ab0399e86cb",
+  "vulnerabilityId": "SCAN-NUGETA-019",
+  "applicationId": "APP-E2E-001",
+  "operation": "DOTNET_TEST",
+  "backendType": "local-container",
+  "toolchainProfileId": "dotnet-9.0-sts",
+  "state": "BLOCKED",
+  "history": [
+    {
+      "state": "PENDING",
+      "timestamp": "2026-11-21T11:26:52.884Z",
+      "detail": "Instance registered."
+    },
+    {
+      "state": "PREPARING",
+      "timestamp": "2026-11-21T11:26:52.885Z",
+      "detail": "Staging credential-free source snapshot."
+    },
+    {
+      "state": "RUNNING",
+      "timestamp": "2026-11-21T11:26:52.908Z",
+      "detail": "Executing DOTNET_TEST via local-container."
+    },
+    {
+      "state": "BLOCKED",
+      "timestamp": "2026-11-21T11:26:56.228Z",
+      "detail": "Untrusted build/test output blocked by ContentInjectionScreen (INJ-008): Instruction to read, print, or exfiltrate credentials/secrets detected."
+    }
+  ],
+  "createdAt": "2026-11-21T11:26:52.884Z",
+  "updatedAt": "2026-11-21T11:26:56.228Z",
+  "stagingDir": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-sandbox-staging/gcac-cc225b47b346",
+  "containerName": "gcac-gcac-cc225b47b346"
+}

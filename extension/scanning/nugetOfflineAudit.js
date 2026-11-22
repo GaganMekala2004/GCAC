@@ -2,7 +2,8 @@
 const fs = require('fs');
 const { isSeparateRepositoryDirectory } = require('../repositoryContext');
 const path = require('path');
-const { inRange, compareVersions } = require('./nugetAdvisories');
+const { assertPathWithinWorkspace } = require('../pathUtils');
+const { readSnapshot, snapshotPath, inRange, compareVersions } = require('./nugetAdvisories');
 
 // Only offer stable, published packages already restored from NuGet.org.
 function cachedUpgrade(id, current, advisories, cacheRoot) {
@@ -23,7 +24,7 @@ function cachedUpgrade(id, current, advisories, cacheRoot) {
     }) || '';
 }
 
-function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = process.env.NUGET_PACKAGES || path.join(require('os').homedir(), '.nuget', 'packages')) {
+function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = process.env.NUGET_PACKAGES || path.join(require('os').homedir(), '.nuget', 'packages'), restoredGraph = null) {
     const projects = [];
     const skipped = new Set(['.git', 'node_modules', 'bin', 'obj', 'packages', 'output', 'remediation-output', 'workspaces', 'evidence']);
     const walk = dir => {
@@ -44,7 +45,7 @@ function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = proces
         const dir = path.dirname(project);
         // These imports can alter dependency resolution outside the project.
         const assetsFile = path.join(dir, 'obj', 'project.assets.json');
-        const assets = JSON.parse(fs.readFileSync(assetsFile, 'utf8'));
+        const assets = restoredGraph || JSON.parse(fs.readFileSync(assetsFile, 'utf8'));
         if (!assets.targets || !assets.libraries || !assets.project?.frameworks ||
             assets.logs?.some(log => log.level === 'Error')) throw new Error('Resolved package graph is incomplete; restore in the approved sandbox first.');
         const source = fs.readFileSync(project, 'utf8');
@@ -74,8 +75,7 @@ function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = proces
         // Reject graphs older than project/central/import manifests. Never silently
         // audit cached dependencies after an edit to package declarations.
         let parent = dir;
-        const graphTime = fs.statSync(assetsFile).mtimeMs;
-        if (fs.statSync(project).mtimeMs > graphTime) throw new Error('Resolved package graph predates the project; restore before auditing.');
+        if (!restoredGraph && fs.statSync(project).mtimeMs > fs.statSync(assetsFile).mtimeMs) throw new Error('Resolved package graph predates the project; restore before auditing.');
         while (true) {
             for (const name of ['Directory.Packages.props', 'Directory.Build.props', 'Directory.Build.targets']) {
                 const file = path.join(parent, name);
@@ -86,8 +86,8 @@ function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = proces
         }
         if (/<Import\b/i.test(source)) throw new Error('Imported dependencies require sandbox NuGet auditing.');
         const projectReferences = [...source.matchAll(/<ProjectReference\b[^>]*Include=["']([^"']+)["']/gi)];
-        if ((source.match(/<ProjectReference\b/gi) || []).length !== projectReferences.length || projectReferences.some(reference =>
-            !projects.some(candidate => path.resolve(candidate) === path.resolve(dir, reference[1].replace(/\\/g, '/'))))) {
+        if ((source.match(/<ProjectReference\b/gi) || []).length !== projectReferences.length || (!restoredGraph && projectReferences.some(reference =>
+            !projects.some(candidate => path.resolve(candidate) === path.resolve(dir, reference[1].replace(/\\/g, '/')))))) {
             throw new Error('Referenced projects outside the audited target require sandbox NuGet auditing.');
         }
         for (const [identity, library] of Object.entries(assets.libraries)) {
@@ -105,7 +105,11 @@ function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = proces
                 seen.add(key);
                 const direct = references.filter(ref => ref[1].toLowerCase() === id.toLowerCase());
                 const exact = direct.length === 1 && direct[0][0].match(/\bVersion=["']([^"']+)["']/i)?.[1] === version;
-                const fixedVersion = exact ? cachedUpgrade(id, version, snapshot.packages[id.toLowerCase()], cacheRoot) : '';
+                // A single-framework project can explicitly pin a resolved transitive package.
+                const frameworks = Object.values(assets.project.frameworks);
+                const transitivePin = !direct.length && frameworks.length === 1 && !Object.keys(frameworks[0].dependencies || {})
+                    .some(name => name.toLowerCase() === id.toLowerCase());
+                const fixedVersion = exact || transitivePin ? cachedUpgrade(id, version, snapshot.packages[id.toLowerCase()], cacheRoot) : '';
                 results.push({ path: project, frameworks: [{ [direct.length ? 'topLevelPackages' : 'transitivePackages']: [{ id, resolvedVersion: version, fixedVersion,
                     vulnerabilities: [{ advisoryUrl: advisory.url, severity: ['Low', 'Moderate', 'High', 'Critical'][advisory.severity] }] }] }] });
             }
@@ -113,4 +117,25 @@ function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = proces
     }
     return { projects: results, projectsChecked: projects.length, packagesChecked };
 }
-module.exports = { auditResolvedProjects };
+function verifiedNugetUpgrade(finding, repository, workspace) {
+    const project = assertPathWithinWorkspace(finding.Location_Path, repository);
+    if (!project?.endsWith('.csproj')) return null;
+    const assets = path.join(path.dirname(project), 'obj', 'project.assets.json');
+    if (!assertPathWithinWorkspace(assets, repository)) return null;
+    const snapshot = readSnapshot(snapshotPath(workspace));
+    const audit = auditResolvedProjects(repository, snapshot);
+    for (const item of audit.projects) {
+        if (path.resolve(item.path) !== path.resolve(project)) continue;
+        for (const framework of item.frameworks) {
+            for (const pkg of [...(framework.topLevelPackages || []), ...(framework.transitivePackages || [])]) {
+                if (pkg.id.toLowerCase() === String(finding.Package_Name).toLowerCase() &&
+                    pkg.resolvedVersion === finding.Current_Version && pkg.fixedVersion &&
+                    pkg.vulnerabilities.some(entry => entry.advisoryUrl === finding.Advisory_URL)) {
+                    return { version: pkg.fixedVersion, transitive: Boolean(framework.transitivePackages) };
+                }
+            }
+        }
+    }
+    return null;
+}
+module.exports = { auditResolvedProjects, verifiedNugetUpgrade };

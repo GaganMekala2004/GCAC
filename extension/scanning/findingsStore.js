@@ -162,6 +162,7 @@ class FindingsStore {
                 const match = existingMap.get(key);
                 if (finding.scannerId === 'nuget-audit') {
                     match.fixedVersion = finding.fixedVersion;
+                    match.remediationGuidance = finding.remediationGuidance;
                     match.currentVersion = finding.currentVersion;
                 }
                 match.line = finding.line || match.line;

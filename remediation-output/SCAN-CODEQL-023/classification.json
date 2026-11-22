@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-078 - Uncontrolled command line",
+  "severity": "MEDIUM",
+  "exploitability": "Medium - The vulnerability can be exploited if an attacker can control input to the command line, but it requires specific conditions.",
+  "route": "SpecializedAction",
+  "strategy": "Implement input validation and sanitization to ensure that user inputs do not lead to command injection vulnerabilities.",
+  "attackVector": "Command line injection through uncontrolled user input, requiring access to the affected application.",
+  "confidence": 75,
+  "summary": "The finding indicates a medium-severity command line injection vulnerability that could be exploited under certain conditions.",
+  "vulnerabilityId": "SCAN-CODEQL-023",
+  "scannerProvenance": {
+    "scannerId": "codeql",
+    "ruleId": "cs/command-line-injection",
+    "cwe": "CWE-078",
+    "detectionMethod": "CODEQL_SEMANTIC_SAST"
+  },
+  "advisoryCwe": "CWE-078: Improper Neutralization of Special Elements in Output Used by a Command ('Command Injection')",
+  "classificationMismatch": false,
+  "cveId": "CWE-078",
+  "originalScannerSeverity": "MEDIUM",
+  "advisoryAiClassification": {
+    "cwe": "CWE-078: Improper Neutralization of Special Elements in Output Used by a Command ('Command Injection')",
+    "advisorySuggestedSeverity": "MEDIUM",
+    "route": "SpecializedAction",
+    "exploitability": "Medium - The vulnerability can be exploited if an attacker can control input to the command line, but it requires specific conditions.",
+    "strategy": "Implement input validation and sanitization to ensure that user inputs do not lead to command injection vulnerabilities.",
+    "attackVector": "Command line injection through uncontrolled user input, requiring access to the affected application.",
+    "summary": "The finding indicates a medium-severity command line injection vulnerability that could be exploited under certain conditions.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 75,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-1395 - Vulnerable Dependency: Newtonsoft.Json (12.0.1)",
+  "severity": "HIGH",
+  "exploitability": "High: The vulnerability in the dependency can be exploited if the application is using the affected version.",
+  "route": "SpecializedAction",
+  "strategy": "Upgrade the 'Newtonsoft.Json' package to a secure version as per the guidance provided.",
+  "attackVector": "Exploitation through malicious input processed by the vulnerable dependency.",
+  "confidence": 85,
+  "summary": "The application is at high risk due to the use of a vulnerable version of Newtonsoft.Json, necessitating immediate remediation.",
+  "vulnerabilityId": "SCAN-NUGETA-019",
+  "scannerProvenance": {
+    "scannerId": "nuget-audit",
+    "ruleId": "GHSA-5CRP-9R3C-P9VR",
+    "cwe": "CWE-1395",
+    "detectionMethod": "NUGET_ADVISORY_DATA"
+  },
+  "advisoryCwe": "CWE-1395: Insecure Dependency",
+  "classificationMismatch": false,
+  "cveId": "CWE-1395",
+  "originalScannerSeverity": "HIGH",
+  "advisoryAiClassification": {
+    "cwe": "CWE-1395: Insecure Dependency",
+    "advisorySuggestedSeverity": "HIGH",
+    "route": "SpecializedAction",
+    "exploitability": "High: The vulnerability in the dependency can be exploited if the application is using the affected version.",
+    "strategy": "Upgrade the 'Newtonsoft.Json' package to a secure version as per the guidance provided.",
+    "attackVector": "Exploitation through malicious input processed by the vulnerable dependency.",
+    "summary": "The application is at high risk due to the use of a vulnerable version of Newtonsoft.Json, necessitating immediate remediation.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 85,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

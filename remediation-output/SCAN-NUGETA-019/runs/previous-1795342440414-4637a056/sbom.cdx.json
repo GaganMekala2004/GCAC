@@ -1,0 +1,137 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:821801cd-02fc-4c55-ab98-6b8f057d5d05",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-21T11:45:51.561Z",
+    "tools": [
+      {
+        "vendor": "GCAC",
+        "name": "gcac-manifest-sbom-extractor",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "APP-E2E-001",
+      "bomRef": "APP-E2E-001"
+    },
+    "properties": [
+      {
+        "name": "gcac:runId",
+        "value": "821801cd-02fc-4c55-ab98-6b8f057d5d05"
+      },
+      {
+        "name": "gcac:vulnerabilityId",
+        "value": "SCAN-NUGETA-019"
+      },
+      {
+        "name": "gcac:imageDigest",
+        "value": "sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84"
+      },
+      {
+        "name": "gcac:externalSbomCliStatus",
+        "value": "NOT_AVAILABLE"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "Newtonsoft.Json",
+      "version": "13.0.1",
+      "purl": "pkg:nuget/Newtonsoft.Json@13.0.1",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "src/GcasE2ETestApi/GcasE2ETestApi.csproj"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Microsoft.Data.Sqlite",
+      "version": "9.0.0",
+      "purl": "pkg:nuget/Microsoft.Data.Sqlite@9.0.0",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "src/GcasE2ETestApi/GcasE2ETestApi.csproj"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Microsoft.NET.Test.Sdk",
+      "version": "17.12.0",
+      "purl": "pkg:nuget/Microsoft.NET.Test.Sdk@17.12.0",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "xunit",
+      "version": "2.9.2",
+      "purl": "pkg:nuget/xunit@2.9.2",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "xunit.runner.visualstudio",
+      "version": "2.8.2",
+      "purl": "pkg:nuget/xunit.runner.visualstudio@2.8.2",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Microsoft.AspNetCore.Mvc.Testing",
+      "version": "9.0.0",
+      "purl": "pkg:nuget/Microsoft.AspNetCore.Mvc.Testing@9.0.0",
+      "properties": [
+        {
+          "name": "gcac:ecosystem",
+          "value": "nuget"
+        },
+        {
+          "name": "gcac:sourceFile",
+          "value": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj"
+        }
+      ]
+    }
+  ]
+}

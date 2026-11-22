@@ -1,0 +1,19 @@
+{
+  "contextSchemaVersion": "GCAC-FINDING-CTX-1.0",
+  "findingId": "SCAN-NUGETA-020",
+  "applicationId": "APP-E2E-001",
+  "applicationName": "GCAS Agentic E2E Test API",
+  "applicationIdentitySource": "ENTERPRISE_REGISTRY",
+  "canonicalRepositoryId": "73b61c0a6ab0",
+  "repositoryReference": "sample-repos/gcas-agentic-e2e-test-repo",
+  "repositoryPath": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/gcas-agentic-e2e-test-repo",
+  "projectPath": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+  "scannerId": "nuget-audit",
+  "scanExecutionId": "SCAN-1795263117177",
+  "sourceOrigin": "LocalScanner",
+  "detectionMethod": "NUGET_ADVISORY_DATA",
+  "findingFingerprint": "b39158c0bfe26f47",
+  "originalSeverity": "HIGH",
+  "technology": "dotnet",
+  "evidenceLocation": "src/GcasE2ETestApi/GcasE2ETestApi.csproj:1"
+}

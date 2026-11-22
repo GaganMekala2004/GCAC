@@ -642,6 +642,9 @@
     function initTheme() {
         const savedTheme = localStorage.getItem('gcac-theme') || 'auto';
         setTheme(savedTheme);
+        const followHost = () => { if (currentTheme === 'auto') setTheme('auto'); };
+        new MutationObserver(followHost).observe(document.body, { attributes: true, attributeFilter: ['class', 'data-vscode-theme-kind'] });
+        window.matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener('change', followHost);
     }
 
     function setTheme(theme) {
@@ -652,13 +655,15 @@
         if (theme === 'auto') {
             const isVsCodeDark = document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast');
             const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            effectiveTheme = (isVsCodeDark || prefersDark) ? 'dark' : 'light';
+            const isVsCodeLight = document.body.matches('.vscode-light, .vscode-high-contrast-light');
+            effectiveTheme = isVsCodeDark || (!isVsCodeLight && prefersDark) ? 'dark' : 'light';
         } else {
             effectiveTheme = theme;
         }
 
         document.documentElement.setAttribute('data-theme', effectiveTheme);
-        document.body.className = effectiveTheme === 'dark' ? 'theme-dark' : 'theme-light';
+        document.body.classList.toggle('theme-dark', effectiveTheme === 'dark');
+        document.body.classList.toggle('theme-light', effectiveTheme === 'light');
 
         // Update header switcher UI
         if (themeCurrentIcon && themeCurrentLabel) {
@@ -1054,6 +1059,7 @@
         }
 
         document.getElementById('checkProvider')?.addEventListener('click', () => postToHost({ command: 'providerStatus' }));
+        document.getElementById('configureScannerProvider')?.addEventListener('click', () => postToHost({ command: 'configureScannerProvider' }));
         document.getElementById('configureProvider')?.addEventListener('click', () => postToHost({ command: 'configureProvider' }));
         document.getElementById('runProvider')?.addEventListener('click', () => {
             if (selectedVulnerability) postToHost({ command: 'runProvider', vulnerabilityId: selectedVulnerability.Vulnerability_ID });
@@ -1334,6 +1340,10 @@
                 case 'CONFIG_UPDATED':
                     {
                         const provider = message.provider || {id:'copilot'};
+                        const scanner = message.scannerProvider;
+                        document.getElementById('scannerProviderSelection').textContent = scanner && scanner.id !== 'none'
+                            ? [scanner.id, scanner.model, scanner.endpoint].filter(Boolean).join(' · ') : 'AI candidate review disabled';
+                        btnLaunchCopilot?.classList.toggle('u-hidden', provider.id !== 'copilot');
                         const label = provider.id === 'copilot' ? 'GitHub Copilot (default)' :
                             provider.id === 'ollama' ? 'Ollama on Extension Host loopback · ' + provider.model :
                             (provider.endpoint || ({openai: 'OpenAI', anthropic: 'Anthropic Claude', gemini: 'Google Gemini'})[provider.id] || provider.id) + ' · ' + provider.model + ' · repository permission and per-request consent required';
@@ -1402,12 +1412,18 @@
 
                 case 'DETAILS_LOADED':
                     if (selectedVulnerability && message.details?.vulnerabilityId !== selectedVulnerability.Vulnerability_ID) break;
+                    if (currentDetails?.runId && currentDetails.runId === message.details?.runId &&
+                        currentDetails.attemptNumber === message.details.attemptNumber &&
+                        message.details.workflowLifecycle === 'IN_PROGRESS' &&
+                        message.details.lastAppliedSeq < currentDetails.lastAppliedSeq) break;
                     currentDetails = message.details;
                     if (currentDetails && currentDetails.vulnerabilityId) {
                         detailsCache.set(currentDetails.vulnerabilityId, currentDetails);
                     }
                     if (!currentDetails || currentDetails.workflowLifecycle !== 'IN_PROGRESS') {
                         isRemediating = false;
+                        if (headerRunIndicator) headerRunIndicator.style.display = 'none';
+                        if (navActiveRunPulse) navActiveRunPulse.style.display = 'none';
                     }
                     renderInspectorDetails(currentDetails);
                     renderDashboardMetrics();
@@ -1559,15 +1575,15 @@
 
         if (selectTargetCsv) {
             const list = currentConfig.availableCsvs || [];
-            let html = '';
-            if (list.length === 0 && currentConfig.activeCsv) {
+            let html = currentConfig.activeCsv ? '' : '<option value="" selected disabled>No CSV selected</option>';
+            if (currentConfig.activeCsv && !list.some(c => c.fsPath === currentConfig.activeCsv)) {
                 html += `<option value="${escapeHtml(currentConfig.activeCsv)}" selected>${escapeHtml(csvBaseName)}</option>`;
-            } else {
-                list.forEach(c => {
-                    const isSelected = c.fsPath === currentConfig.activeCsv;
-                    html += `<option value="${escapeHtml(c.fsPath)}" ${isSelected ? 'selected' : ''}>${escapeHtml(c.relPath || c.name)}</option>`;
-                });
             }
+            list.forEach(c => {
+                const isSelected = c.fsPath === currentConfig.activeCsv;
+                html += `<option value="${escapeHtml(c.fsPath)}" ${isSelected ? 'selected' : ''}>${escapeHtml(c.relPath || c.name)}</option>`;
+            });
+            selectTargetCsv.disabled = list.length === 0;
             selectTargetCsv.innerHTML = html;
         }
 
@@ -1613,6 +1629,10 @@
         }
         if (currentDetails && currentDetails.runId && evt.runId && evt.runId !== currentDetails.runId && evt.type !== 'RUN_STARTED') {
             return;
+        }
+        if (evt.type === 'RUN_STARTED' && currentDetails && currentDetails.runId !== evt.runId) {
+            currentDetails.lastAppliedSeq = 0;
+            currentDetails.attemptNumber = evt.attemptNumber || 1;
         }
         if (currentDetails && evt.attemptNumber && currentDetails.attemptNumber && evt.attemptNumber < currentDetails.attemptNumber) {
             return;
@@ -1688,7 +1708,17 @@
                 if (activeRunSummaryStage) activeRunSummaryStage.textContent = `Stage ${evt.stageNumber} Failed`;
                 break;
 
-            case 'STAGE_BLOCKED':
+            case 'STAGE_BLOCKED': {
+                isRemediating = false;
+                const reason = evt.summary || evt.reason || evt.failureCategory || 'Prerequisite unavailable.';
+                if (idx >= 0) setStageStatus(idx, 'blocked', reason);
+                if (headerRunIndicator) headerRunIndicator.style.display = 'none';
+                if (navActiveRunPulse) navActiveRunPulse.style.display = 'none';
+                if (activeRunSummaryStage) activeRunSummaryStage.textContent = evt.stageNumber ? `Stage ${evt.stageNumber} blocked` : 'Stage blocked';
+                if (activeRunSummaryStatus) activeRunSummaryStatus.textContent = 'Blocked';
+                showToast(reason, 'warning');
+                break;
+            }
             case 'FINAL_GATE_BLOCKED':
                 isRemediating = false;
                 if (idx >= 0) setStageStatus(idx, 'blocked', evt.summary || 'Gate blocked — post-fix validation failed.');
@@ -2673,7 +2703,7 @@
         const identity = details?.provider || details?.runState?.provider;
         const proposal = details?.runState?.proposalSource;
         document.getElementById('runProviderIdentity').textContent = identity
-            ? 'Run provider: ' + [identity.id === 'copilot' ? 'Copilot' : identity.id, identity.model, proposal?.kind === 'DOTNET_REPAIR_RECIPE' ? '.NET repair recipe' : ''].filter(Boolean).join(' · ') : '';
+            ? 'Provider for this run: ' + [identity.id === 'copilot' ? 'Copilot' : identity.id, identity.model, proposal?.kind === 'DOTNET_REPAIR_RECIPE' ? '.NET repair recipe' : ''].filter(Boolean).join(' · ') : '';
         if (!details) return;
 
         // 1. Render Stepper
@@ -2684,7 +2714,7 @@
             let showGate4 = false;
             let showGate6 = false;
             let hasFailure = false;
-            let allDone = true;
+            let allDone = stages.length > 0;
 
             stages.forEach((stage, idx) => {
                 const li = document.createElement('li');
@@ -2758,7 +2788,7 @@
 
             // Overall status badge
             if (pipelineOverallStatus) {
-                const isOverallBlocked = details.status === 'BLOCKED' || details.workflowLifecycle === 'BLOCKED' || isStage3Blocked;
+                const isOverallBlocked = details.status === 'BLOCKED' || details.workflowLifecycle === 'BLOCKED' || stages.some(stage => stage.status === 'blocked') || isStage3Blocked;
                 if (details.workflowLifecycle === 'HANDED_OFF_TO_COPILOT' || details.findingState === 'AWAITING_VERIFIED_RESULT') {
                     pipelineOverallStatus.textContent = 'Awaiting Verified Result';
                     pipelineOverallStatus.className = 'badge badge-status-review';
@@ -2775,6 +2805,9 @@
                 } else if (showGate4 || showGate6) {
                     pipelineOverallStatus.textContent = 'Awaiting Gate';
                     pipelineOverallStatus.className = 'badge badge-status-review';
+                } else if (stages.some(stage => stage.status === 'active' || stage.status === 'in_progress')) {
+                    pipelineOverallStatus.textContent = 'In Progress';
+                    pipelineOverallStatus.className = 'badge badge-status-active';
                 } else if (allDone) {
                     pipelineOverallStatus.textContent = 'Concluded';
                     pipelineOverallStatus.className = 'badge badge-status-pending';
@@ -2834,7 +2867,7 @@
             }
 
             if (finalGateCard) finalGateCard.style.display = showGate6 ? 'flex' : 'none';
-            const hasFailedRunState = details.runState && (details.runState.status === 'FAILED' || details.runState.status === 'INTERRUPTED' || Boolean(details.failedStage));
+            const hasFailedRunState = Boolean(details.failedStage) || ['FAILED', 'BLOCKED', 'INTERRUPTED'].includes(details.runState?.status);
             const showFailurePanel = hasFailure || hasFailedRunState;
             const retryState = buildRetryUiState(details, isRemediating);
             if (activeRunSummaryRetries) {
@@ -3021,22 +3054,25 @@
                     </div>
                 </div>
 
-                <div class="diagnostic-detail-grid">
-                    <div><strong>Stage &amp; Phase:</strong> <code>${escapeHtml(primaryVal?.stage || (val ? 'Stage 6: Post-Fix Bench Test' : 'Stage 3: Baseline Security Test'))}</code> (${escapeHtml(primaryVal?.testPhase || 'POST_FIX_TEST')})</div>
-                    <div><strong>Command:</strong> <code>${escapeHtml(primaryVal?.command || 'N/A')}</code> | <strong>Repository / Project:</strong> <code>${escapeHtml(primaryVal?.repositoryTested || primaryVal?.workingDirectory || 'N/A')}</code></div>
-                    <div><strong>Failure Category:</strong> <code>${escapeHtml(summary.failCat || 'NONE')}</code> | <strong>Retry Eligible:</strong> <code>${primaryVal?.retryEligible === true ? 'YES' : 'NO'}</code></div>
-                    ${(primaryVal?.rootError || primaryVal?.reason) ? `<div class="u-text-danger u-mt-4"><strong>Root Diagnostic:</strong> ${escapeHtml(primaryVal.rootError || primaryVal.reason)}</div>` : ''}
-                    ${primaryVal?.testReportLocation ? `<div><strong>Test Report Artifact:</strong> <code>${escapeHtml(primaryVal.testReportLocation)}</code></div>` : ''}
-                    ${primaryVal?.suggestedNextAction ? `<div class="u-text-warning u-mt-4"><strong>Suggested Next Action:</strong> ${escapeHtml(primaryVal.suggestedNextAction)}</div>` : ''}
-                    ${baseVal && val ? `<div class="u-mt-4"><strong>Baseline vs Post-Fix:</strong> Baseline=<code>${escapeHtml(baseVal.status || 'N/A')}</code> (${escapeHtml(String(baseVal.testsPassed ?? 0))} passed / ${escapeHtml(String(baseVal.testsFailed ?? 0))} failed) → Post-Fix=<code>${escapeHtml(summary.statusLabel)}</code></div>` : ''}
-                    ${reScan ? `<div><strong>Post-Fix Re-Scan Verification:</strong> <code>${escapeHtml(reScan.status || 'NOT VERIFIED')}</code> — ${escapeHtml(reScan.reason || '')}</div>` : ''}
-                </div>
-
-                <div class="sandbox-meta-strip">
-                    <div><strong>Execution Backend:</strong> <code>${escapeHtml(sandboxBadgeText)}</code> (<code>${escapeHtml(backendText)}</code>) | <strong>Toolchain Profile:</strong> <code>${escapeHtml(profileText)}</code></div>
-                    <div><strong>Network Policy:</strong> <code>${escapeHtml(networkText)}</code> | <strong>Dependency Policy:</strong> <code>${escapeHtml(depText)}</code>${sbom ? ` | <strong>SBOM:</strong> <code>${escapeHtml(sbom.format || 'CycloneDX/1.5')}</code> (${escapeHtml(sbom.sbomStatus || 'NOT_AVAILABLE')})` : ''}</div>
-                </div>
-
+                <dl class="diagnostic-detail-grid">
+                    <dt>Stage</dt><dd>${escapeHtml(primaryVal?.stage || (val ? 'Post-fix bench test' : 'Baseline security test'))} (${escapeHtml(primaryVal?.testPhase || (val ? 'POST_FIX_TEST' : 'BASELINE_SECURITY_TEST'))})</dd>
+                    <dt>Command</dt><dd><code>${escapeHtml(primaryVal?.command || 'N/A')}</code></dd>
+                    <dt>Repository / project</dt><dd><code>${escapeHtml(primaryVal?.repositoryTested || primaryVal?.workingDirectory || 'N/A')}</code></dd>
+                    ${summary.buildPass ? '' : `<dt>Failure category</dt><dd>${escapeHtml(summary.failCat || 'Unknown')}</dd>
+                    <dt>Retry eligible</dt><dd>${primaryVal?.retryEligible ? 'Yes' : 'No'}</dd>`}
+                    ${(primaryVal?.rootError || primaryVal?.reason) ? `<dt>${summary.buildPass ? 'Result' : 'Diagnostic'}</dt><dd>${escapeHtml(primaryVal.rootError || primaryVal.reason)}</dd>` : ''}
+                    ${primaryVal?.testReportLocation ? `<dt>Test report</dt><dd><code>${escapeHtml(primaryVal.testReportLocation)}</code></dd>` : ''}
+                    ${primaryVal?.suggestedNextAction ? `<dt>Next action</dt><dd>${escapeHtml(primaryVal.suggestedNextAction)}</dd>` : ''}
+                    ${baseVal && val ? `<dt>Baseline vs post-fix</dt><dd>${escapeHtml(baseVal.status || 'N/A')} (${escapeHtml(String(baseVal.testsPassed ?? 'unknown'))} passed, ${escapeHtml(String(baseVal.testsFailed ?? 'unknown'))} failed) → ${escapeHtml(summary.statusLabel)}</dd>` : ''}
+                    ${reScan ? `<dt>Post-fix re-scan</dt><dd><strong>${escapeHtml(reScan.status || 'Not verified')}</strong> · ${escapeHtml(reScan.reason || '')}</dd>` : ''}
+                </dl>
+                <dl class="sandbox-meta-strip">
+                    <dt>Execution backend</dt><dd>${escapeHtml(sandboxBadgeText)} · ${escapeHtml(backendText)}</dd>
+                    <dt>Toolchain profile</dt><dd><code>${escapeHtml(profileText)}</code></dd>
+                    <dt>Network policy</dt><dd>${escapeHtml(networkText)}</dd>
+                    <dt>Dependency policy</dt><dd>${escapeHtml(depText)}</dd>
+                    ${sbom ? `<dt>SBOM</dt><dd>${escapeHtml(sbom.format || 'CycloneDX/1.5')} (${escapeHtml(sbom.sbomStatus || 'NOT_AVAILABLE')})</dd>` : ''}
+                </dl>
                 <div class="evidence-checklist-card">
                     <div class="u-flex-between u-mb-8">
                         <div>

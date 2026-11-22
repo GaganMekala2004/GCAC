@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-022 - Uncontrolled data used in path expression",
+  "severity": "MEDIUM",
+  "exploitability": "Medium: The vulnerability can be exploited if an attacker can control the input used in the path expression.",
+  "route": "SpecializedAction",
+  "strategy": "Implement input validation and sanitization to ensure that user-controlled data does not influence path expressions.",
+  "attackVector": "Path traversal through user input, requiring the attacker to manipulate input data to access unauthorized files.",
+  "confidence": 75,
+  "summary": "The finding indicates a medium-severity path injection vulnerability that could allow unauthorized file access if exploited.",
+  "vulnerabilityId": "SCAN-CODEQL-022",
+  "scannerProvenance": {
+    "scannerId": "codeql",
+    "ruleId": "cs/path-injection",
+    "cwe": "CWE-022",
+    "detectionMethod": "CODEQL_SEMANTIC_SAST"
+  },
+  "advisoryCwe": "CWE-022: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')",
+  "classificationMismatch": false,
+  "cveId": "CWE-022",
+  "originalScannerSeverity": "MEDIUM",
+  "advisoryAiClassification": {
+    "cwe": "CWE-022: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')",
+    "advisorySuggestedSeverity": "MEDIUM",
+    "route": "SpecializedAction",
+    "exploitability": "Medium: The vulnerability can be exploited if an attacker can control the input used in the path expression.",
+    "strategy": "Implement input validation and sanitization to ensure that user-controlled data does not influence path expressions.",
+    "attackVector": "Path traversal through user input, requiring the attacker to manipulate input data to access unauthorized files.",
+    "summary": "The finding indicates a medium-severity path injection vulnerability that could allow unauthorized file access if exploited.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 75,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

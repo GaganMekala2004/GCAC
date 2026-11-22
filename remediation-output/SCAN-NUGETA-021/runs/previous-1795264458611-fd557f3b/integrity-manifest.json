@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "GCAC-PH2-MANIFEST-1.0",
+  "runId": "df40fc8f-b679-4049-86d6-bec49148c72d",
+  "findingId": "SCAN-NUGETA-021",
+  "applicationId": "APP-E2E-001",
+  "createdAt": "2026-11-20T04:19:05.241Z",
+  "evidenceWriterInterface": "LocalTamperDetectableEvidenceWriter",
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "chainSummary": {
+    "eventCount": 7,
+    "headHash": "603a656a126926efd7d3636f17e076bbb13aad85f3055e3603f0bbff8d3b7a2d",
+    "tailHash": "32065c4e3c2261fb54d8ea10216c478d7ffbc78d146fe453784594d3d8f5ef8e"
+  },
+  "artifacts": {
+    "agent-execution-trace.log": {
+      "sha256": "30fd5ed184e996f9d2f275e0404aa626a4f6e23555ed0d3b15d7c4162c289dff",
+      "sizeBytes": 1179
+    },
+    "events-chain.jsonl": {
+      "sha256": "c3fe1ff5b8b0bbc679aea7d4d7631d6f3ec41418b6718e66719ef3b95b87e6ae",
+      "sizeBytes": 2969
+    },
+    "evidence-record.json": {
+      "sha256": "a0e4bcd452854740b1e5146322a0ded131a8793950c2053326611dbb60158572",
+      "sizeBytes": 6334
+    },
+    "finding.json": {
+      "sha256": "8e4938ee4dc4d1eefd6c200e9c10efc9a7a5b6caf0f4fdeaf9694541f1d8f9a2",
+      "sizeBytes": 1616
+    },
+    "remediation-decision.json": {
+      "sha256": "bc7b8ccc9656255a4104314cb7d848fdaa739289986652d4cc1bf22faa9ac931",
+      "sizeBytes": 1576
+    },
+    "remediation-report.md": {
+      "sha256": "9a6a9017aa091ea9a28fbd425c816ca27822472b4aa065f88a7b66c8366162be",
+      "sizeBytes": 4716
+    },
+    "run-state.json": {
+      "sha256": "a9c805171425995055616751b2b6b0d28ba89bcce426c70f57cf1fd8645dc483",
+      "sizeBytes": 12613
+    },
+    "source-to-sink.json": {
+      "sha256": "164bb99fe60afef0d73c44fc83c0a0e1865beff046545566a40a4b6624991691",
+      "sizeBytes": 1362
+    }
+  },
+  "manifestSha256": "e195742e516601f3a8f21d728bdb84ddcc530bcb7302a41ba4662ba046210af9",
+  "previousRunStateSha256": "f972143ea82eb76ffda97984f54122c21646b5d13d391a260f08e289ea30d260",
+  "trustedStateRevision": 2,
+  "lastTrustedStateWriteAt": "2026-11-21T12:34:17.610Z"
+}

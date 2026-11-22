@@ -76,6 +76,28 @@
             "--vulnerable",
             "--include-transitive"
           ]
+        },
+        "NUGET_RESTORE_GRAPH": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "restore",
+            "--force",
+            "--source",
+            "/sandbox-cache/nuget",
+            "-p:NuGetAudit=false"
+          ]
+        },
+        "DOTNET_TEST_RESTORED": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "test",
+            "-p:RestoreSources=/sandbox-cache/nuget",
+            "-p:RestoreForce=true",
+            "-p:NuGetAudit=false",
+            "--nologo",
+            "-v",
+            "normal"
+          ]
         }
       },
       "permittedArguments": [
@@ -121,7 +143,7 @@
         "/sandbox-out/roslyn.sarif"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "95552373559b5b43ac3aeee21c32e1997460346cffe8f21b54b25c085593c459",
+      "profileSha256": "aff0989c5035fa51dd44aaf93f5026eb9943639ea7458b3a80b4e36525adc130",
       "digestStatus": "TEMPLATE_PLACEHOLDER"
     },
     {
@@ -183,6 +205,28 @@
             "--vulnerable",
             "--include-transitive"
           ]
+        },
+        "NUGET_RESTORE_GRAPH": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "restore",
+            "--force",
+            "--source",
+            "/sandbox-cache/nuget",
+            "-p:NuGetAudit=false"
+          ]
+        },
+        "DOTNET_TEST_RESTORED": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "test",
+            "-p:RestoreSources=/sandbox-cache/nuget",
+            "-p:RestoreForce=true",
+            "-p:NuGetAudit=false",
+            "--nologo",
+            "-v",
+            "normal"
+          ]
         }
       },
       "permittedArguments": [
@@ -228,7 +272,7 @@
         "/sandbox-out/roslyn.sarif"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "bc2cae92c04ffd43cf4a9b9050194857d2a1abfb89117ea59e24f5132671531e",
+      "profileSha256": "fd1a2e4d185d49c21ccb8c159be197b95c213b053af1ae527a3d27402527c41b",
       "digestStatus": "VERIFIED_IMAGE_DIGEST"
     },
     {
@@ -383,6 +427,28 @@
             "--vulnerable",
             "--include-transitive"
           ]
+        },
+        "NUGET_RESTORE_GRAPH": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "restore",
+            "--force",
+            "--source",
+            "/sandbox-cache/nuget",
+            "-p:NuGetAudit=false"
+          ]
+        },
+        "DOTNET_TEST_RESTORED": {
+          "executable": "dotnet",
+          "baseArgs": [
+            "test",
+            "-p:RestoreSources=/sandbox-cache/nuget",
+            "-p:RestoreForce=true",
+            "-p:NuGetAudit=false",
+            "--nologo",
+            "-v",
+            "normal"
+          ]
         }
       },
       "permittedArguments": [
@@ -428,7 +494,7 @@
         "/sandbox-out/roslyn.sarif"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "ae3bb9ba317890519a59736e5ea19f8d244166cb5258227c9722d7011f8b822b",
+      "profileSha256": "df3ffeb77321b060e33ea8d9836e8e19a0487b6e1ee34c16b1b1fdf7f433b566",
       "digestStatus": "VERIFIED_IMAGE_DIGEST"
     }
   ]

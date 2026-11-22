@@ -57,6 +57,13 @@ async function run() {
         const crlf = canonicalizeProposedPatch(root, `--- a/${target}\n+++ b/${target}\n@@ -77,99 +77,99 @@\n first\n-old\n+new\n last\n`, target);
         applyExactPatch(root, crlf);
         assert.strictEqual(fs.readFileSync(path.join(root, target), 'utf8'), 'first\r\nnew\r\nlast\r\n');
+        for (const [cwe, rule, expected] of [
+            ['CWE-022', 'cs/path-injection', 'PATH_TRAVERSAL'],
+            ['CWE-078', 'cs/command-line-injection', 'COMMAND_INJECTION']
+        ]) {
+            assert.strictEqual(inferVulnerabilityType({ CVE_ID: cwe }), expected);
+            assert.strictEqual(inferVulnerabilityType({ Rule_ID: rule }), expected);
+        }
         const cryptoDecision = evaluateRemediationStrategy({ finding: { Vulnerability_ID: 'CRYPTO', Title: 'Use of Broken Cryptographic Algorithm (DES/MD5)', Location_Path: 'src/LegacyCrypto.cs' },
             sourceCode: 'public byte[] Encrypt(byte[] data, byte[] key, byte[] iv) { using var des = DES.Create(); }' });
         assert.strictEqual(cryptoDecision.automatedExecutionAllowed, false);

@@ -1,0 +1,1 @@
+{"edits":[{"oldText":"        process.StartInfo.Arguments = \"-c \\\"ping -c 1 \" + host + \"\\\"\";","newText":"        var allowedHosts = new[] { \"localhost\", \"127.0.0.1\" };\\n        if (!allowedHosts.Contains(host)) {\\n            return BadRequest(\"Invalid host.\");\\n        }\\n        process.StartInfo.Arguments = \"-c \\\"ping -c 1 \" + host + \"\\\"\";"}]}

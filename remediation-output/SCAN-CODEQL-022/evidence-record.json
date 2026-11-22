@@ -1,0 +1,274 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+  "findingId": "SCAN-CODEQL-022",
+  "findingFingerprint": "662ae4711059c763",
+  "applicationId": "APP-E2E-001",
+  "stage": 9,
+  "timestamp": "2026-11-22T10:18:06.266Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "7a82df23d67c1aab8ed19dd70ce6578cd09d6a7f1d5ad63615a9061ffedf8ed1",
+    "baseSourceSha256": "fe8201128b8e131a0f99953c016729e7f03822e2eb016fdff74733fa202283cb",
+    "baseCommitSha": "7075159c77b3ed28fc2ca45b67c754fff799178d"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+      "contentSource": "finding:SCAN-CODEQL-022",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T10:17:05.802Z",
+      "redactedLocation": "GcasE2ETestApi/FileController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+      "contentSource": "source:src/GcasE2ETestApi/FileController.cs",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T10:17:05.807Z",
+      "redactedLocation": "GcasE2ETestApi/FileController.cs",
+      "matchCount": 0
+    },
+    {
+      "runId": "cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+      "contentSource": "repo:README.md",
+      "trustClass": "UNTRUSTED_README",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T10:17:05.808Z",
+      "redactedLocation": "README.md",
+      "matchCount": 0
+    },
+    {
+      "runId": "cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+      "contentSource": "sandbox:DOTNET_TEST",
+      "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T10:17:14.661Z",
+      "redactedLocation": "SCAN-CODEQL-022_cf0a20b2-8429-4da3-ba11-8727b0285b5f/worktree",
+      "matchCount": 0
+    },
+    {
+      "runId": "cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+      "contentSource": "llm:securityReview",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-22T10:18:01.709Z",
+      "redactedLocation": "GcasE2ETestApi/FileController.cs",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [
+    {
+      "stage": "POST_FIX_TEST",
+      "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+      "executable": "dotnet",
+      "allowlisted": true,
+      "exitCode": 0,
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-CODEQL-022_cf0a20b2-8429-4da3-ba11-8727b0285b5f/worktree"
+    }
+  ],
+  "testCommand": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+  "actualExitCode": 0,
+  "testResultCounts": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": {
+    "scannerId": "codeql",
+    "scannerOutcome": "RESOLVED",
+    "stillPresent": false,
+    "newFindingsCount": 0
+  },
+  "approvalReference": {
+    "runId": "cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+    "decision": "APPROVED",
+    "approvalMode": "LOCAL_POC_APPROVAL",
+    "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
+    "proposedDiffSha256": "e5998605a7df0d374189a5630ec652ba62f7f6abd955120eba8f34fcbf12fd6e",
+    "approvedFilePaths": [
+      "src/GcasE2ETestApi/FileController.cs"
+    ],
+    "expiresAt": "2026-11-22T11:37:20.450Z",
+    "timestamp": "2026-11-21T11:37:36.712Z"
+  },
+  "proposedDiffSha256": "e5998605a7df0d374189a5630ec652ba62f7f6abd955120eba8f34fcbf12fd6e",
+  "appliedDiffSha256": "e5998605a7df0d374189a5630ec652ba62f7f6abd955120eba8f34fcbf12fd6e",
+  "filesChanged": [],
+  "scopeVerificationOutcome": "SCOPE_VERIFIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-CODEQL-022",
+    "vulnerabilityType": "PATH_TRAVERSAL",
+    "affectedComponent": "src/GcasE2ETestApi/FileController.cs",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "LOW",
+    "selectedTier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+    "recommendedStrategy": "Apply minimal targeted secure coding fix in application-authored 'src/GcasE2ETestApi/FileController.cs'.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Root cause lies in application source code logic or architectural/vendor layer rather than declarative config."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Finding originates in custom/application code or infrastructure, not an outdated dependency manifest."
+      },
+      {
+        "tier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+        "feasible": true,
+        "suitable": true,
+        "reason": "Config/runtime/dependency options cannot fix custom application dataflow; minimal targeted code change in application-authored file is smallest safe fix."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": false,
+        "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+      }
+    ],
+    "requiresManualReview": false,
+    "automatedExecutionAllowed": true,
+    "disposition": "AUTOMATED_CANDIDATE",
+    "blockingReason": null,
+    "manualReviewPlan": []
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "PATH_TRAVERSAL",
+    "executionEvidence": null,
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "fileName",
+      "file": "src/GcasE2ETestApi/FileController.cs",
+      "line": 12,
+      "snippet": "public IActionResult Get([FromQuery] string fileName)"
+    },
+    "dataPropagationEvidence": [
+      {
+        "line": 12,
+        "snippet": "public IActionResult Get([FromQuery] string fileName)",
+        "note": "References candidate untrusted input 'fileName'."
+      },
+      {
+        "line": 15,
+        "snippet": "var path = Path.Combine(BaseDirectory, fileName);",
+        "note": "References candidate untrusted input 'fileName'."
+      }
+    ],
+    "dangerousSink": {
+      "file": "src/GcasE2ETestApi/FileController.cs",
+      "line": 9,
+      "snippet": "private static readonly string BaseDirectory = Path.Combine(AppContext.BaseDirectory, \"data\");"
+    },
+    "missingValidationOrEncoding": "File path input lacks canonical Path.GetFullPath() + base-directory prefix containment validation.",
+    "affectedFile": "src/GcasE2ETestApi/FileController.cs",
+    "affectedFunction": "Get([FromQuery] string fileName)",
+    "affectedLines": "Lines 12-21",
+    "proposedRemediation": "Implement validation and sanitization of the 'fileName' input to ensure it does not contain any path traversal characters (e.g., '../') and restrict access to only allowed files.",
+    "baselineTestEvidence": {
+      "status": "PASS",
+      "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+      "exitCode": 0,
+      "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+    }
+  },
+  "sandboxExecution": {
+    "sandboxStatus": "SANDBOX_READY",
+    "backendType": "local-container",
+    "toolchainProfileId": "dotnet-9.0-sts",
+    "toolchainProfileHash": "fd1a2e4d185d49c21ccb8c159be197b95c213b053af1ae527a3d27402527c41b",
+    "imageDigest": "sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84",
+    "networkPolicy": "NO_NETWORK",
+    "dependencyStatus": "PREPROVISIONED_CACHE",
+    "dependencyWarnings": [
+      "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+    ],
+    "instanceId": "gcac-78cd669f474d",
+    "timedOut": false,
+    "cancelled": false,
+    "gatewayAuditDecisions": [
+      {
+        "timestamp": "2026-11-22T10:15:33.620Z",
+        "runId": "cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+        "instanceId": "gcac-c988ef8a9638",
+        "vulnerabilityId": "SCAN-CODEQL-022",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-9.0-sts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-22T10:17:07.461Z",
+        "runId": "cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+        "instanceId": "gcac-78cd669f474d",
+        "vulnerabilityId": "SCAN-CODEQL-022",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-9.0-sts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      }
+    ],
+    "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
+  },
+  "publication": {
+    "status": "CREATED",
+    "url": "https://github.com/ksgl-rohith/gcas-agentic-e2e-test-repo/pull/7",
+    "number": 7,
+    "branch": "gcac/scan-codeql-022/cf0a20b2-8429-4da3-ba11-8727b0285b5f",
+    "commit": "b1dfe41e1a1301e3d5aa9518ecfa856e6ccf0da3",
+    "draft": true
+  },
+  "sbomEvidence": {
+    "sbomStatus": "MANIFEST_INVENTORY_ONLY_EXTERNAL_CLI_NOT_AVAILABLE",
+    "externalSbomCliStatus": "NOT_AVAILABLE",
+    "format": "CycloneDX/1.5",
+    "componentCount": 6,
+    "artifactHash": "91da7b8d778f4c702507d2fe576630e1c0ba0ed45a291f40055ed1eb1fab7ee2"
+  },
+  "finalOutcome": {
+    "scannerOutcome": "RESOLVED",
+    "testOutcome": "PASSED",
+    "workflowOutcome": "VerifiedLocally_PendingPR",
+    "finalValidationOutcome": "PASSED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE",
+    "legacyRemediationStatus": "Remediated",
+    "legacyFinalValidationStatus": "PASS",
+    "isResolved": true,
+    "blockingReasons": []
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

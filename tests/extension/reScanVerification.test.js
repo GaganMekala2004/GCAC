@@ -119,6 +119,31 @@ async function run() {
     assert.strictEqual(partial.machineStatus, 'INCONCLUSIVE');
     assert.strictEqual(partial.isResolved, false);
 
+    const projectPath = 'src/App/App.csproj';
+    const priorPackage = { scannerId: 'nuget-audit', filePath: projectPath, packageName: 'Existing',
+        currentVersion: '1.0.0', ruleId: 'GHSA-EXISTING' };
+    let remaining = [priorPackage];
+    const nuget = { id: 'nuget-audit', name: 'NuGet', isAvailable: async () => ({ available: true }),
+        scan: async (scanRoot, file, options) => {
+            assert.strictEqual(scanRoot, tempDir);
+            assert.strictEqual(options.advisorySnapshotPath, path.join(workspaceRoot, 'output/scans/nuget-advisories.json'));
+            return { status: SCANNER_STATUS.COMPLETED, findings: remaining };
+        } };
+    const nugetVerifier = new ReScanVerifier(workspaceRoot, {
+        scanners: new Map([[nuget.id, nuget]]), findingsStore: { getFindings: filter => {
+            assert.deepStrictEqual(filter, { scanId: 'baseline', canonicalRepositoryId: 'repo' });
+            return [priorPackage];
+        } }
+    });
+    const request = { workspaceRoot: tempDir, originalFinding: { Scanner_ID: nuget.id, Rule_ID: 'GHSA-TARGET',
+        Location_Path: projectPath, Canonical_Repository_ID: 'repo', Scan_ID: 'baseline' },
+        testResult: { passed: true, total: 1, failed: 0 } };
+    assert.strictEqual((await nugetVerifier.verifyRemediation(request)).machineStatus, 'RESOLVED');
+    remaining = [{ ...priorPackage, ruleId: 'GHSA-TARGET' }];
+    assert.strictEqual((await nugetVerifier.verifyRemediation(request)).machineStatus, 'STILL_PRESENT');
+    remaining = [{ ...priorPackage, ruleId: 'GHSA-NEW' }];
+    assert.strictEqual((await nugetVerifier.verifyRemediation(request)).machineStatus, 'REGRESSION_DETECTED');
+
     // 6. RemediationEngine Stage 6 & Markdown Evidence Generation
     const engine = new RemediationEngine(workspaceRoot, null, { findingsStore: store, reScanVerifier: verifier });
     assert.strictEqual(engine.reScanVerifier, verifier, 'RemediationEngine must wire reScanVerifier from options');

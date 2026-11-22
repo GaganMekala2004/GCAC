@@ -1,0 +1,70 @@
+{
+  "sandboxStatus": "SANDBOX_READY",
+  "backendType": "local-container",
+  "toolchainProfileId": "dotnet-9.0-sts",
+  "toolchainProfileHash": "fd1a2e4d185d49c21ccb8c159be197b95c213b053af1ae527a3d27402527c41b",
+  "imageDigest": "sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84",
+  "networkPolicy": "NO_NETWORK",
+  "dependencyStatus": "PREPROVISIONED_CACHE",
+  "dependencyWarnings": [
+    "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+  ],
+  "instanceId": "gcac-c72679800582",
+  "timedOut": false,
+  "cancelled": false,
+  "gatewayAuditDecisions": [
+    {
+      "timestamp": "2026-11-21T12:13:25.056Z",
+      "runId": "50fe7246-0566-458d-8b1e-52f3bdb2fd26",
+      "instanceId": "gcac-70f9cdd057a5",
+      "vulnerabilityId": "SCAN-CODEQL-023",
+      "operation": "DOTNET_TEST",
+      "toolchainProfileId": "dotnet-9.0-sts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-21T12:13:35.198Z",
+      "runId": "50fe7246-0566-458d-8b1e-52f3bdb2fd26",
+      "instanceId": "gcac-5ef6230e4c11",
+      "vulnerabilityId": "SCAN-CODEQL-023",
+      "operation": "DOTNET_BUILD",
+      "toolchainProfileId": "dotnet-9.0-sts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_BUILD dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-21T12:13:46.958Z",
+      "runId": "50fe7246-0566-458d-8b1e-52f3bdb2fd26",
+      "instanceId": "gcac-6255984fb386",
+      "vulnerabilityId": "SCAN-CODEQL-023",
+      "operation": "DOTNET_TEST",
+      "toolchainProfileId": "dotnet-9.0-sts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-21T12:15:10.602Z",
+      "runId": "50fe7246-0566-458d-8b1e-52f3bdb2fd26",
+      "instanceId": "gcac-c72679800582",
+      "vulnerabilityId": "SCAN-CODEQL-023",
+      "operation": "DOTNET_TEST",
+      "toolchainProfileId": "dotnet-9.0-sts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    }
+  ],
+  "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
+}

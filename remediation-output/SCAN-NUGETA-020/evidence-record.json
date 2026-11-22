@@ -1,0 +1,296 @@
+{
+  "schemaVersion": "GCAC-PH2-EVIDENCE-1.0",
+  "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+  "findingId": "SCAN-NUGETA-020",
+  "findingFingerprint": "b39158c0bfe26f47",
+  "applicationId": "APP-E2E-001",
+  "stage": 9,
+  "timestamp": "2026-11-21T12:38:41.844Z",
+  "agentPolicyVersion": "GCAC-PH2-TOOL-1.0",
+  "bundleVersion": "2.0.0",
+  "inputReferenceHashes": {
+    "minimizedFindingSha256": "0a077ce593e2a450d9cd9e971e1f6e9c687699b849ae37fef404087286b5210d",
+    "baseSourceSha256": "15a5a341bd70e493d2e513a584c643354368cf347c7d32d27fd25a807d195039",
+    "baseCommitSha": "7075159c77b3ed28fc2ca45b67c754fff799178d"
+  },
+  "contentScreeningDecisions": [
+    {
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "contentSource": "finding:SCAN-NUGETA-020",
+      "trustClass": "UNTRUSTED_SCANNER_FINDING",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T12:38:23.389Z",
+      "redactedLocation": "GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "contentSource": "source:src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "trustClass": "UNTRUSTED_SOURCE_CODE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T12:38:23.394Z",
+      "redactedLocation": "GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "matchCount": 0
+    },
+    {
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "contentSource": "repo:README.md",
+      "trustClass": "UNTRUSTED_README",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T12:38:23.394Z",
+      "redactedLocation": "README.md",
+      "matchCount": 0
+    },
+    {
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "contentSource": "sandbox:DOTNET_TEST_RESTORED",
+      "trustClass": "UNTRUSTED_BUILD_TEST_OUTPUT",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T12:38:33.909Z",
+      "redactedLocation": "SCAN-NUGETA-020_51dce483-c445-479f-a5a5-76d8c3eb9cd3/worktree",
+      "matchCount": 0
+    },
+    {
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "contentSource": "llm:securityReview",
+      "trustClass": "UNTRUSTED_MODEL_RESPONSE",
+      "ruleId": "INJ-PASS",
+      "outcome": "ALLOW_UNTRUSTED_DATA",
+      "policyVersion": "GCAC-PH2-INJ-1.0",
+      "timestamp": "2026-11-21T12:38:37.877Z",
+      "redactedLocation": "GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "matchCount": 0
+    }
+  ],
+  "commandPolicyDecisions": [
+    {
+      "stage": "POST_FIX_TEST",
+      "command": "dotnet test -p:RestoreSources=/sandbox-cache/nuget -p:RestoreForce=true -p:NuGetAudit=false --nologo -v normal --logger trx --results-directory /sandbox-out",
+      "executable": "dotnet",
+      "allowlisted": true,
+      "exitCode": 0,
+      "workingDirectory": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-isolated-runs/ce3079a8af3e/SCAN-NUGETA-020_51dce483-c445-479f-a5a5-76d8c3eb9cd3/worktree"
+    }
+  ],
+  "testCommand": "dotnet test -p:RestoreSources=/sandbox-cache/nuget -p:RestoreForce=true -p:NuGetAudit=false --nologo -v normal --logger trx --results-directory /sandbox-out",
+  "actualExitCode": 0,
+  "testResultCounts": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scannerResult": {
+    "scannerId": "nuget-audit",
+    "scannerOutcome": "RESOLVED",
+    "stillPresent": false,
+    "newFindingsCount": 0
+  },
+  "approvalReference": {
+    "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+    "decision": "APPROVED",
+    "approvalMode": "LOCAL_POC_APPROVAL",
+    "reviewerAuthorizationStatus": "AUTHENTICATION_NOT_VERIFIED",
+    "proposedDiffSha256": "36c5ea966758fa0e4eaac08874c729a70f42a03b05d2b5cdf63898bee2ae9f91",
+    "approvedFilePaths": [
+      "src/GcasE2ETestApi/GcasE2ETestApi.csproj"
+    ],
+    "expiresAt": "2026-11-22T12:36:50.883Z",
+    "timestamp": "2026-11-21T12:37:41.156Z"
+  },
+  "proposedDiffSha256": "36c5ea966758fa0e4eaac08874c729a70f42a03b05d2b5cdf63898bee2ae9f91",
+  "appliedDiffSha256": "36c5ea966758fa0e4eaac08874c729a70f42a03b05d2b5cdf63898bee2ae9f91",
+  "filesChanged": [],
+  "scopeVerificationOutcome": "SCOPE_VERIFIED",
+  "remediationPreferenceDecision": {
+    "vulnerabilityId": "SCAN-NUGETA-020",
+    "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+    "affectedComponent": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+    "ownershipTier": "APPLICATION_AUTHORED",
+    "sourceIsApplicationAuthored": true,
+    "blastRadius": "LOW",
+    "selectedTier": "3_EXISTING_DEPENDENCY_UPGRADE",
+    "recommendedStrategy": "Upgrade dependency in manifest 'src/GcasE2ETestApi/GcasE2ETestApi.csproj' from '2.1.10' to '2.1.13'.",
+    "alternativesEvaluated": [
+      {
+        "tier": "1_SECURE_CONFIG_CHANGE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "Vulnerable third-party package cannot be patched safely via runtime configuration alone."
+      },
+      {
+        "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+        "feasible": false,
+        "suitable": false,
+        "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+      },
+      {
+        "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+        "feasible": true,
+        "suitable": true,
+        "reason": "Existing third-party dependency vulnerability has an approved target version (2.1.13); preferred over custom code workarounds."
+      },
+      {
+        "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+        "feasible": true,
+        "suitable": false,
+        "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+      }
+    ],
+    "requiresManualReview": false,
+    "automatedExecutionAllowed": true,
+    "disposition": "AUTOMATED_CANDIDATE",
+    "blockingReason": null,
+    "manualReviewPlan": []
+  },
+  "sourceToSinkEvidence": {
+    "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+    "executionEvidence": null,
+    "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+    "formalTaintProofSupplied": false,
+    "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+    "untrustedSource": {
+      "symbol": "Unresolved (inspect method parameters)",
+      "file": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "line": 1,
+      "snippet": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">"
+    },
+    "dataPropagationEvidence": [],
+    "dangerousSink": {
+      "file": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+      "line": 1,
+      "snippet": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">"
+    },
+    "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+    "affectedFile": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+    "affectedFunction": "UnknownMethod",
+    "affectedLines": "11",
+    "proposedRemediation": "Update the Microsoft.Data.Sqlite package to a version that does not include the vulnerable SQLitePCLRaw.lib.e_sqlite3 dependency, or explicitly exclude the vulnerable library if possible.",
+    "baselineTestEvidence": {
+      "status": "PASS",
+      "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+      "exitCode": 0,
+      "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+    }
+  },
+  "sandboxExecution": {
+    "sandboxStatus": "SANDBOX_READY",
+    "backendType": "local-container",
+    "toolchainProfileId": "dotnet-9.0-sts",
+    "toolchainProfileHash": "fd1a2e4d185d49c21ccb8c159be197b95c213b053af1ae527a3d27402527c41b",
+    "imageDigest": "sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84",
+    "networkPolicy": "NO_NETWORK",
+    "dependencyStatus": "PREPROVISIONED_CACHE",
+    "dependencyWarnings": [
+      "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+    ],
+    "instanceId": "gcac-550ac2c84c40",
+    "timedOut": false,
+    "cancelled": false,
+    "gatewayAuditDecisions": [
+      {
+        "timestamp": "2026-11-21T12:36:42.786Z",
+        "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+        "instanceId": "gcac-ad503c07bab3",
+        "vulnerabilityId": "SCAN-NUGETA-020",
+        "operation": "DOTNET_TEST",
+        "toolchainProfileId": "dotnet-9.0-sts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-21T12:37:42.570Z",
+        "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+        "instanceId": "gcac-18cd7962c14d",
+        "vulnerabilityId": "SCAN-NUGETA-020",
+        "operation": "DOTNET_TEST_RESTORED",
+        "toolchainProfileId": "dotnet-9.0-sts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST_RESTORED dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-21T12:37:54.185Z",
+        "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+        "instanceId": "gcac-768fd69e4d67",
+        "vulnerabilityId": "SCAN-NUGETA-020",
+        "operation": "NUGET_RESTORE_GRAPH",
+        "toolchainProfileId": "dotnet-9.0-sts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation NUGET_RESTORE_GRAPH dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-21T12:38:24.559Z",
+        "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+        "instanceId": "gcac-550ac2c84c40",
+        "vulnerabilityId": "SCAN-NUGETA-020",
+        "operation": "DOTNET_TEST_RESTORED",
+        "toolchainProfileId": "dotnet-9.0-sts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation DOTNET_TEST_RESTORED dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      },
+      {
+        "timestamp": "2026-11-21T12:38:35.203Z",
+        "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+        "instanceId": "gcac-d837866b6f08",
+        "vulnerabilityId": "SCAN-NUGETA-020",
+        "operation": "NUGET_RESTORE_GRAPH",
+        "toolchainProfileId": "dotnet-9.0-sts",
+        "decision": "ALLOWED",
+        "reasonCode": "POLICY_SATISFIED",
+        "reason": "Approved operation NUGET_RESTORE_GRAPH dispatched to local-container.",
+        "backendType": "local-container",
+        "policyVersion": "GCAC-PH3-GW-1.0"
+      }
+    ],
+    "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
+  },
+  "publication": {
+    "status": "CREATED",
+    "url": "https://github.com/ksgl-rohith/gcas-agentic-e2e-test-repo/pull/5",
+    "number": 5,
+    "branch": "gcac/scan-nugeta-020/51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+    "commit": "f5502fb2eb51b6c049929fb854c2698adee6db09",
+    "draft": true
+  },
+  "sbomEvidence": {
+    "sbomStatus": "MANIFEST_INVENTORY_ONLY_EXTERNAL_CLI_NOT_AVAILABLE",
+    "externalSbomCliStatus": "NOT_AVAILABLE",
+    "format": "CycloneDX/1.5",
+    "componentCount": 7,
+    "artifactHash": "f32cd4459222b11fb4518ca0956734cf262cd9df98696f6cc062e07ad669f611"
+  },
+  "finalOutcome": {
+    "scannerOutcome": "RESOLVED",
+    "testOutcome": "PASSED",
+    "workflowOutcome": "VerifiedLocally_PendingPR",
+    "finalValidationOutcome": "PASSED",
+    "closureOutcome": "PENDING_FORMAL_CLOSURE",
+    "legacyRemediationStatus": "Remediated",
+    "legacyFinalValidationStatus": "PASS",
+    "isResolved": true,
+    "blockingReasons": []
+  },
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "signingLimitationNotice": "Local SHA-256 digests and hash-chained logs detect partial/post-hoc file alteration on disk, but are not protected by hardware/PKI keys or immutable WORM storage (Phase 4)."
+}

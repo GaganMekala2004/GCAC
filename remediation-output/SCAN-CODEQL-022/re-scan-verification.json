@@ -1,0 +1,23 @@
+{
+  "status": "RESOLVED",
+  "machineStatus": "RESOLVED",
+  "testOutcome": "PASSED",
+  "executionPolicy": "READ_ONLY_STATIC_POLICY",
+  "sandboxStatus": "READ_ONLY_STATIC",
+  "isResolved": true,
+  "reason": "Original security vulnerability (CS/PATH-INJECTION) is completely absent from targeted re-scan (GitHub CodeQL (Semantic SAST) v2.20.1) with verified post-fix tests and 0 regressions.",
+  "summary": "Original security vulnerability (CS/PATH-INJECTION) is completely absent from targeted re-scan (GitHub CodeQL (Semantic SAST) v2.20.1) with verified post-fix tests and 0 regressions.",
+  "beforeFingerprint": "662ae4711059c763",
+  "reScanDurationMs": 44134,
+  "stillPresent": false,
+  "newFindingsCount": 0,
+  "evidence": [
+    "### Post-Remediation Verification & Re-Scan Audit\n- **Scanner**: `GitHub CodeQL (Semantic SAST)` (ID: `codeql`, Version: `2.20.1`)\n- **Execution Policy**: `READ_ONLY_STATIC_POLICY` (Sandbox: `READ_ONLY_STATIC`)\n- **Verification Status**: **`RESOLVED`** (`RESOLVED`)\n- **Post-Fix Validation Outcome**: `PASSED`\n- **Target Path**: `src/GcasE2ETestApi/FileController.cs`\n- **Original Rule ID**: `CS/PATH-INJECTION`\n- **Baseline Fingerprint**: `662ae4711059c763`\n- **Re-Scan Duration**: `44.13s`\n- **Findings Detected Post-Fix**: `0`\n- **Evaluation Summary**: Original security vulnerability (CS/PATH-INJECTION) is completely absent from targeted re-scan (GitHub CodeQL (Semantic SAST) v2.20.1) with verified post-fix tests and 0 regressions.\n"
+  ],
+  "evidenceMarkdown": "### Post-Remediation Verification & Re-Scan Audit\n- **Scanner**: `GitHub CodeQL (Semantic SAST)` (ID: `codeql`, Version: `2.20.1`)\n- **Execution Policy**: `READ_ONLY_STATIC_POLICY` (Sandbox: `READ_ONLY_STATIC`)\n- **Verification Status**: **`RESOLVED`** (`RESOLVED`)\n- **Post-Fix Validation Outcome**: `PASSED`\n- **Target Path**: `src/GcasE2ETestApi/FileController.cs`\n- **Original Rule ID**: `CS/PATH-INJECTION`\n- **Baseline Fingerprint**: `662ae4711059c763`\n- **Re-Scan Duration**: `44.13s`\n- **Findings Detected Post-Fix**: `0`\n- **Evaluation Summary**: Original security vulnerability (CS/PATH-INJECTION) is completely absent from targeted re-scan (GitHub CodeQL (Semantic SAST) v2.20.1) with verified post-fix tests and 0 regressions.\n",
+  "scannerDetails": {
+    "id": "codeql",
+    "name": "GitHub CodeQL (Semantic SAST)",
+    "version": "2.20.1"
+  }
+}

@@ -1,0 +1,13 @@
+diff --git a/src/GcasE2ETestApi/DiagnosticsController.cs b/src/GcasE2ETestApi/DiagnosticsController.cs
+index 4c4334b..69a103e 100644
+--- a/src/GcasE2ETestApi/DiagnosticsController.cs
++++ b/src/GcasE2ETestApi/DiagnosticsController.cs
+@@ -12,7 +12,7 @@ public sealed class DiagnosticsController : ControllerBase
+     {
+         using var process = new Process();
+         process.StartInfo.FileName = "sh";
+-        process.StartInfo.Arguments = "-c \"ping -c 1 " + host + "\"";
++        var allowedHosts = new[] { "localhost", "127.0.0.1" };\n        if (!allowedHosts.Contains(host)) {\n            return BadRequest("Invalid host.");\n        }\n        process.StartInfo.Arguments = "-c \"ping -c 1 " + host + "\"";
+         process.StartInfo.RedirectStandardOutput = true;
+         process.StartInfo.RedirectStandardError = true;
+         process.StartInfo.UseShellExecute = false;

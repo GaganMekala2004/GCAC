@@ -10,7 +10,7 @@
 
 ## 2. Switch between local AI, an external API, and Copilot
 
-Select the **repository folder** in **Local Scans**, then use **AI provider → Configure provider and model**. GCAC remembers the selection for this VS Code workspace. Use the same picker to switch back.
+Select the **repository folder** in **Local Scans**, then open **Settings**. Choose **Configure scanner provider and model** for optional AI candidate review and **Configure remediation provider and model** for findings. GCAC saves these choices independently for the workspace. Copilot is available for remediation.
 
 | Choice | What to do |
 | --- | --- |

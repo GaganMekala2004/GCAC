@@ -1,0 +1,119 @@
+{
+  "rating": "FAIL",
+  "summary": "The remediation does not meet the mandatory audit criteria due to the post-remediation re-scan status being NOT VERIFIED, indicating that the vulnerability intelligence source was inaccessible.",
+  "auditChecks": [
+    "Test status is NOT VERIFIED, therefore cannot return PASS.",
+    "Total tests executed is greater than 0 and passed, but does not meet criteria due to re-scan status.",
+    "Re-scan status is NOT VERIFIED, which fails the mandatory audit criteria."
+  ],
+  "machineOutcome": "FAILED",
+  "evidenceChecklist": {
+    "schemaVersion": "GCAC-EVIDENCE-CHECKLIST-1.0",
+    "isSecretFinding": false,
+    "recommendation": "BLOCKED",
+    "finalReviewStatus": "BLOCKED — Required validation incomplete or failed",
+    "finalSignOffAllowed": false,
+    "completionSummary": "5 of 7 required checks complete",
+    "passedCount": 5,
+    "failedCount": 1,
+    "missingCount": 1,
+    "notApplicableCount": 4,
+    "totalApplicable": 7,
+    "passedCheckIds": [
+      "ROOT_CAUSE_ANALYSIS",
+      "SOURCE_TO_SINK_EVIDENCE",
+      "BASELINE_EVIDENCE",
+      "CODE_DIFF_INTEGRITY",
+      "POST_FIX_TEST_EXECUTION"
+    ],
+    "failedCheckIds": [
+      "INDEPENDENT_SECURITY_CHECKS"
+    ],
+    "missingCheckIds": [
+      "SCANNER_RESCAN"
+    ],
+    "secretRemediationActions": [],
+    "checks": [
+      {
+        "id": "ROOT_CAUSE_ANALYSIS",
+        "label": "Root cause analysis documented",
+        "status": "PASS",
+        "required": true,
+        "detail": "The inclusion of a vulnerable version of Newtonsoft.Json in the project file is the root cause of the security risk, necessitating an update to a secure version."
+      },
+      {
+        "id": "SOURCE_TO_SINK_EVIDENCE",
+        "label": "Source-to-sink or vulnerability location evidence",
+        "status": "PASS",
+        "required": true,
+        "detail": "Method: DETERMINISTIC_SOURCE_SINK_HEURISTIC | FormalTaintProof: false"
+      },
+      {
+        "id": "BASELINE_EVIDENCE",
+        "label": "Baseline test reproduction or documented constraint",
+        "status": "PASS",
+        "required": true,
+        "detail": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+      },
+      {
+        "id": "CODE_DIFF_INTEGRITY",
+        "label": "Approved code diff & scope integrity verified",
+        "status": "PASS",
+        "required": true,
+        "detail": "Diff SHA-256 1391279a04ba authorized & scoped."
+      },
+      {
+        "id": "POST_FIX_TEST_EXECUTION",
+        "label": "Post-fix build & test execution passed (>0 tests)",
+        "status": "PASS",
+        "required": true,
+        "detail": "Passed 1/1 targeted tests (Exit code 0)."
+      },
+      {
+        "id": "SCANNER_RESCAN",
+        "label": "Originating scanner post-fix re-scan verified",
+        "status": "MISSING",
+        "required": true,
+        "detail": "Originating scanner 'NuGet Dependency Auditor' ended in status 'Failed': AUDIT UNAVAILABLE — Vulnerability intelligence source inaccessible"
+      },
+      {
+        "id": "INDEPENDENT_SECURITY_CHECKS",
+        "label": "Security suppression & regression validation passed",
+        "status": "FAIL",
+        "required": true,
+        "detail": "The remediation does not meet the mandatory audit criteria due to the post-remediation re-scan status being NOT VERIFIED, indicating that the vulnerability intelligence source was inaccessible."
+      },
+      {
+        "id": "SECRET_MANAGER_REPLACEMENT",
+        "label": "Secret-manager externalization check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      },
+      {
+        "id": "SECRET_REVOCATION_CONFIRMED",
+        "label": "Credential revocation check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      },
+      {
+        "id": "SECRET_ROTATION_CONFIRMED",
+        "label": "Credential rotation check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      },
+      {
+        "id": "EXPOSED_CREDENTIAL_INVALIDATED",
+        "label": "Exposed credential invalidation check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      }
+    ]
+  },
+  "recommendation": "BLOCKED",
+  "finalReviewStatus": "BLOCKED — Required validation incomplete or failed",
+  "completionSummary": "5 of 7 required checks complete"
+}

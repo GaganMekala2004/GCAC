@@ -1,0 +1,23 @@
+{
+  "status": "NOT VERIFIED",
+  "machineStatus": "NOT_VERIFIED",
+  "testOutcome": "PASSED",
+  "executionPolicy": "SANDBOX_GATEWAY",
+  "sandboxStatus": "SANDBOX_READY",
+  "isResolved": false,
+  "reason": "Originating scanner 'NuGet Dependency Auditor' ended in status 'Failed': AUDIT UNAVAILABLE — Vulnerability intelligence source inaccessible",
+  "summary": "Originating scanner 'NuGet Dependency Auditor' ended in status 'Failed': AUDIT UNAVAILABLE — Vulnerability intelligence source inaccessible",
+  "beforeFingerprint": "3cf8f91f03a641da",
+  "reScanDurationMs": 47110,
+  "stillPresent": false,
+  "newFindingsCount": 0,
+  "evidence": [
+    "### Post-Remediation Verification & Re-Scan Audit\n- **Scanner**: `NuGet Dependency Auditor` (ID: `nuget-audit`, Version: `8.0.0`)\n- **Execution Policy**: `SANDBOX_GATEWAY` (Sandbox: `SANDBOX_READY`)\n- **Verification Status**: **`NOT VERIFIED`** (`NOT_VERIFIED`)\n- **Post-Fix Validation Outcome**: `PASSED`\n- **Target Path**: `src/GcasE2ETestApi/GcasE2ETestApi.csproj`\n- **Original Rule ID**: `CWE-1395`\n- **Baseline Fingerprint**: `3cf8f91f03a641da`\n- **Re-Scan Duration**: `47.11s`\n- **Findings Detected Post-Fix**: `0`\n- **Evaluation Summary**: Originating scanner 'NuGet Dependency Auditor' ended in status 'Failed': AUDIT UNAVAILABLE — Vulnerability intelligence source inaccessible\n"
+  ],
+  "evidenceMarkdown": "### Post-Remediation Verification & Re-Scan Audit\n- **Scanner**: `NuGet Dependency Auditor` (ID: `nuget-audit`, Version: `8.0.0`)\n- **Execution Policy**: `SANDBOX_GATEWAY` (Sandbox: `SANDBOX_READY`)\n- **Verification Status**: **`NOT VERIFIED`** (`NOT_VERIFIED`)\n- **Post-Fix Validation Outcome**: `PASSED`\n- **Target Path**: `src/GcasE2ETestApi/GcasE2ETestApi.csproj`\n- **Original Rule ID**: `CWE-1395`\n- **Baseline Fingerprint**: `3cf8f91f03a641da`\n- **Re-Scan Duration**: `47.11s`\n- **Findings Detected Post-Fix**: `0`\n- **Evaluation Summary**: Originating scanner 'NuGet Dependency Auditor' ended in status 'Failed': AUDIT UNAVAILABLE — Vulnerability intelligence source inaccessible\n",
+  "scannerDetails": {
+    "id": "nuget-audit",
+    "name": "NuGet Dependency Auditor",
+    "version": "8.0.0"
+  }
+}

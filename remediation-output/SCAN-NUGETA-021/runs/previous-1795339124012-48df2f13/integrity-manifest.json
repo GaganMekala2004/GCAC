@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "GCAC-PH2-MANIFEST-1.0",
+  "runId": "9c1d8a7c-247b-4c4f-9de4-fdd04f59a6d7",
+  "findingId": "SCAN-NUGETA-021",
+  "applicationId": "APP-E2E-001",
+  "createdAt": "2026-11-22T09:14:05.833Z",
+  "evidenceWriterInterface": "LocalTamperDetectableEvidenceWriter",
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "chainSummary": {
+    "eventCount": 14,
+    "headHash": "6aa33b74955c2e03a9147eb61b1ccab31888bffcb7f2ccbc925395a8e9a525f0",
+    "tailHash": "087ff6ee3ffb261c224cb6302e01b5ed38e8dbf974bbdef5beba55e3061a4457"
+  },
+  "artifacts": {
+    "agent-execution-trace.log": {
+      "sha256": "ef069462763cd8e72eb9ec5f9f84d86dacb1153a00a12ea1ca1e6bcdf37553fe",
+      "sizeBytes": 3088
+    },
+    "events-chain.jsonl": {
+      "sha256": "e64680b5d288860fa8954a8dd60403a17be8b51826d2b4ac0836b441003f6a48",
+      "sizeBytes": 5970
+    },
+    "evidence-record.json": {
+      "sha256": "2e43abbe0b89e3f4e761c70798742ae880b9b078e6234c62d63fbe82b8cb8aad",
+      "sizeBytes": 5655
+    },
+    "run-state.json": {
+      "sha256": "db464e4b2ac855f4c31aad1c54200dd59898e900f4e63b9dca5cdaa228445683",
+      "sizeBytes": 441425
+    }
+  },
+  "manifestSha256": "6184c81546a09a0ed549c8e0fcb692c2c7064c90c1a7f17a1a00810373fbbb4c"
+}

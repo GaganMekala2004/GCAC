@@ -1,0 +1,34 @@
+{
+  "cwe": "CWE-1395 - Vulnerable Dependency: SQLitePCLRaw.lib.e_sqlite3 (2.1.10)",
+  "severity": "HIGH",
+  "exploitability": "Medium",
+  "route": "3PP",
+  "strategy": "Upgrade the 'SQLitePCLRaw.lib.e_sqlite3' package to version 2.1.13 or later, and validate that all dependencies are correctly restored.",
+  "attackVector": "An attacker with access to the application could potentially inject malicious commands through improperly handled input, leveraging the vulnerable dependency.",
+  "confidence": 85,
+  "summary": "The project uses a vulnerable version of 'SQLitePCLRaw.lib.e_sqlite3' that could lead to OS command injection. Upgrade to a secure version and validate dependencies.",
+  "vulnerabilityId": "SCAN-NUGETA-020",
+  "scannerProvenance": {
+    "scannerId": "nuget-audit",
+    "ruleId": "GHSA-2M69-GCR7-JV3Q",
+    "cwe": "CWE-1395",
+    "detectionMethod": "NUGET_ADVISORY_DATA"
+  },
+  "advisoryCwe": "CWE-1395: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')",
+  "classificationMismatch": false,
+  "cveId": "CWE-1395",
+  "originalScannerSeverity": "HIGH",
+  "advisoryAiClassification": {
+    "cwe": "CWE-1395: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')",
+    "advisorySuggestedSeverity": "HIGH",
+    "route": "3PP",
+    "exploitability": "Medium",
+    "strategy": "Upgrade the 'SQLitePCLRaw.lib.e_sqlite3' package to version 2.1.13 or later, and validate that all dependencies are correctly restored.",
+    "attackVector": "An attacker with access to the application could potentially inject malicious commands through improperly handled input, leveraging the vulnerable dependency.",
+    "summary": "The project uses a vulnerable version of 'SQLitePCLRaw.lib.e_sqlite3' that could lead to OS command injection. Upgrade to a secure version and validate dependencies.",
+    "isNoActionSuggestion": false
+  },
+  "aiConfidence": 85,
+  "reviewRecommendation": "STANDARD_HUMAN_REVIEW",
+  "finalGovernanceDisposition": "PENDING_HUMAN_GOVERNANCE"
+}

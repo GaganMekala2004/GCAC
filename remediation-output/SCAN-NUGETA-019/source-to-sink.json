@@ -19,12 +19,12 @@
   "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
   "affectedFile": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
   "affectedFunction": "UnknownMethod",
-  "affectedLines": "Line 1",
-  "proposedRemediation": "Upgrade package 'Newtonsoft.Json' to a secure version verified against https://github.com/advisories/GHSA-5crp-9r3c-p9vr.",
+  "affectedLines": "10",
+  "proposedRemediation": "Update the PackageReference for Newtonsoft.Json to a secure version, such as 13.0.1 or later, to eliminate the known vulnerabilities.",
   "baselineTestEvidence": {
-    "status": "NOT_EXECUTED",
-    "command": null,
-    "exitCode": null,
-    "summary": "No reproducible baseline test runner executed yet; documented static inspection evidence."
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
   }
 }

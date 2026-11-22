@@ -1,0 +1,30 @@
+{
+  "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "Unresolved (inspect method parameters)",
+    "file": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+    "line": 1,
+    "snippet": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">"
+  },
+  "dataPropagationEvidence": [],
+  "dangerousSink": {
+    "file": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+    "line": 1,
+    "snippet": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">"
+  },
+  "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+  "affectedFile": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+  "affectedFunction": "UnknownMethod",
+  "affectedLines": "11",
+  "proposedRemediation": "Update the Microsoft.Data.Sqlite package to a version that does not include the vulnerable SQLitePCLRaw.lib.e_sqlite3 dependency, or explicitly exclude the vulnerable library if possible.",
+  "baselineTestEvidence": {
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+  }
+}

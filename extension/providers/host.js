@@ -9,8 +9,11 @@ class ProviderHost {
         this.vscode = vscode;
         this.context = context;
     }
-    selection() {
-        return this.context.workspaceState?.get('gcac.provider') || { id: DEFAULT_PROVIDER };
+    selection(role = 'remediation') {
+        const state = this.context.workspaceState;
+        const selected = state?.get('gcac.' + role + 'Provider') || state?.get('gcac.provider');
+        if (role === 'scanner' && (!selected || selected.id === DEFAULT_PROVIDER)) return { id: 'none' };
+        return selected || { id: DEFAULT_PROVIDER };
     }
     cloudAllowed(repository, id = 'openai', base) {
         if (process.env.GCAC_DISABLE_CLOUD_AI === '1') return false;
@@ -78,20 +81,20 @@ class ProviderHost {
             throw Error('Invalid selected model');
         return new DirectClient(this.adapter(selection.id, repository, selection.endpoint), selection.model);
     }
-    async configure(repository) {
+    async configure(repository, role = 'remediation') {
         const { window } = this.vscode;
         const choice = await window.showQuickPick(
             [
-                { label: 'GitHub Copilot', id: DEFAULT_PROVIDER },
+                role === 'scanner' ? { label: 'Disable AI candidate review', id: 'none' } : { label: 'GitHub Copilot', id: DEFAULT_PROVIDER },
                 { label: 'Ollama on the Extension Host', id: 'ollama' },
                 ...Object.entries(providers).map(([id, entry]) => ({ id, label: entry.label }))
             ],
-            { title: 'AI provider' }
+            { title: role === 'scanner' ? 'Scanner AI provider' : 'Remediation AI provider' }
         );
         if (!choice) return;
         let model;
         let endpoint;
-        if (choice.id !== DEFAULT_PROVIDER) {
+        if (choice.id !== DEFAULT_PROVIDER && choice.id !== 'none') {
             let enterKey = false;
             let credential;
             if (Object.hasOwn(providers, choice.id)) {
@@ -137,7 +140,7 @@ class ProviderHost {
             if (!model) return;
             await adapter.check(model, { probeDeployment: true });
         }
-        await this.context.workspaceState.update('gcac.provider', { id: choice.id, model, ...(endpoint ? { endpoint } : {}) });
+        await this.context.workspaceState.update('gcac.' + role + 'Provider', { id: choice.id, model, ...(endpoint ? { endpoint } : {}) });
     }
 }
 module.exports = { ProviderHost };

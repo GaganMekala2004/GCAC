@@ -6,7 +6,7 @@
   "Scanner_ID": "nuget-audit",
   "Rule_ID": "GHSA-2M69-GCR7-JV3Q",
   "Scanner_Version": "8.0.0",
-  "Scan_ID": "SCAN-1795147863815",
+  "Scan_ID": "SCAN-1795343078160",
   "Detection_Method": "NUGET_ADVISORY_DATA",
   "Finding_Fingerprint": "92b4c484308d4895",
   "Application_Number": "APP-E2E-001",
@@ -28,6 +28,7 @@
   "Project_Path": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
   "Package_Name": "SQLitePCLRaw.lib.e_sqlite3",
   "Current_Version": "2.1.10",
+  "Fixed_Version": "2.1.13",
   "Advisory_URL": "https://github.com/advisories/GHSA-2m69-gcr7-jv3q",
-  "Remediation_Guidance": "Upgrade package 'SQLitePCLRaw.lib.e_sqlite3' to a secure version verified against https://github.com/advisories/GHSA-2m69-gcr7-jv3q."
+  "Remediation_Guidance": "Pin the resolved transitive package 'SQLitePCLRaw.lib.e_sqlite3' in the project at verified version 2.1.13 and validate the restored graph."
 }

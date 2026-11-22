@@ -1,6 +1,7 @@
 'use strict';
 const { execFileSync } = require('child_process');
 const https = require('https');
+const zlib = require('node:zlib');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -19,16 +20,34 @@ function api(method, resource, token, body) {
     return new Promise((resolve, reject) => {
         const payload = body ? JSON.stringify(body) : null;
         const request = https.request({ hostname: 'api.github.com', path: resource, method, timeout: 30000,
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json',
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Accept-Encoding': 'identity',
                 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'GCAC-Remediation',
                 ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}) }
         }, response => {
-            let data = ''; response.setEncoding('utf8');
-            response.on('data', chunk => { data += chunk; if (data.length > 2 * 1024 * 1024) response.destroy(new Error('GitHub response too large.')); });
+            const chunks = [];
+            let size = 0;
+            const limit = 2 * 1024 * 1024;
+            response.on('data', chunk => {
+                size += chunk.length;
+                if (size > limit) response.destroy(new Error('GitHub response exceeds the publication limit.'));
+                else chunks.push(Buffer.from(chunk));
+            });
             response.on('error', reject);
             response.on('end', () => {
-                if (response.statusCode < 200 || response.statusCode >= 300) return reject(new Error(`GitHub API returned HTTP ${response.statusCode}.`));
-                try { resolve(JSON.parse(data)); } catch { reject(new Error('Invalid GitHub API response.')); }
+                const status = response.statusCode;
+                if (status < 200 || status >= 300) return reject(new Error(`GitHub ${method} pulls returned HTTP ${status}.`));
+                try {
+                    let bytes = Buffer.concat(chunks);
+                    const encoding = response.headers['content-encoding'];
+                    if (bytes[0] === 0x1f && bytes[1] === 0x8b) bytes = zlib.gunzipSync(bytes, { maxOutputLength: limit });
+                    else if (encoding === 'br') bytes = zlib.brotliDecompressSync(bytes, { maxOutputLength: limit });
+                    else if (encoding === 'deflate') bytes = zlib.inflateSync(bytes, { maxOutputLength: limit });
+                    resolve(JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, '')));
+                } catch {
+                    const error = new Error(`GitHub ${method} pulls returned HTTP ${status} with an unreadable response (${size} bytes). Check the Extension Host GitHub connection and proxy, then retry publication.`);
+                    error.code = 'GITHUB_RESPONSE_UNREADABLE';
+                    reject(error);
+                }
             });
         });
         request.on('timeout', () => request.destroy(new Error('GitHub request timed out.')));
@@ -66,8 +85,18 @@ class GitHubPublication {
         const token = await this.getToken?.();
         if (!token) throw new Error('GitHub authentication is required to create the reviewed pull request.');
         const endpoint = `/repos/${plan.owner}/${plan.repository}/pulls`;
-        const existing = await this.api('GET', `${endpoint}?state=all&head=${encodeURIComponent(plan.owner + ':' + plan.branch)}`, token);
-        const prior = existing.find(pr => pr.head?.ref === plan.branch);
+        const lookup = async () => {
+            const existing = await this.api('GET', `${endpoint}?state=all&head=${encodeURIComponent(plan.owner + ':' + plan.branch)}`, token);
+            if (!Array.isArray(existing)) throw Error('GitHub pull-request lookup returned an unexpected response.');
+            return existing.find(pr => pr.head?.ref === plan.branch && Number.isInteger(pr.number) &&
+                pr.html_url === `https://github.com/${plan.owner}/${plan.repository}/pull/${pr.number}`);
+        };
+        let prior;
+        try { prior = await lookup(); }
+        catch (error) {
+            if (error.code !== 'GITHUB_RESPONSE_UNREADABLE') throw error;
+            prior = await lookup();
+        }
         if (prior) return { status: 'CREATED', url: prior.html_url, number: prior.number, branch: plan.branch, reused: true };
         if (!approvedFiles?.length || approvedFiles.some(file => !expectedFiles?.[file] ||
             crypto.createHash('sha256').update(fs.readFileSync(path.join(worktreeDir, file))).digest('hex') !== expectedFiles[file])) {
@@ -88,10 +117,10 @@ class GitHubPublication {
         const changed = this.git(worktreeDir, ['diff', '--name-only', 'HEAD']).split('\n').filter(Boolean);
         if (!resuming && (!changed.length || changed.some(file => !approvedFiles.includes(file)))) throw new Error('PUBLICATION_SCOPE_CHANGED: Only approved files may be committed.');
         if (!resuming) {
-        this.git(worktreeDir, ['checkout', '-b', plan.branch]);
-        this.git(worktreeDir, ['add', '--', ...approvedFiles]);
-        this.git(worktreeDir, ['-c', 'user.name=GCAC Remediation', '-c', 'user.email=gcac-remediation@users.noreply.github.com',
-            'commit', '--no-gpg-sign', '-m', commitTitle]);
+            if (this.git(worktreeDir, ['branch', '--show-current']) !== plan.branch) this.git(worktreeDir, ['checkout', '-b', plan.branch]);
+            this.git(worktreeDir, ['add', '--', ...approvedFiles]);
+            this.git(worktreeDir, ['-c', 'user.name=GCAC Remediation', '-c', 'user.email=gcac-remediation@users.noreply.github.com',
+                'commit', '--no-gpg-sign', '-m', commitTitle]);
         }
         const commit = this.git(worktreeDir, ['rev-parse', 'HEAD']);
         const auth = Buffer.from(`x-access-token:${token}`).toString('base64');
@@ -100,8 +129,14 @@ class GitHubPublication {
                 GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${auth}`
             });
         } catch { throw new Error(`GITHUB_PUSH_FAILED: Approved commit ${commit} remains in the isolated branch; no PR was reported as created.`); }
-        const pr = await this.api('POST', endpoint, token, { title: commitTitle, head: plan.branch, base: plan.baseBranch, body: summary, draft: true });
-        if (!Number.isInteger(pr.number) || !String(pr.html_url).startsWith(`https://github.com/${plan.owner}/${plan.repository}/pull/`)) throw new Error('GitHub did not return a verifiable pull request URL.');
+        let pr;
+        try {
+            pr = await this.api('POST', endpoint, token, { title: commitTitle, head: plan.branch, base: plan.baseBranch, body: summary, draft: true });
+        } catch (error) {
+            pr = await lookup();
+            if (!pr) throw error;
+        }
+        if (!Number.isInteger(pr?.number) || pr.html_url !== `https://github.com/${plan.owner}/${plan.repository}/pull/${pr.number}`) throw new Error('GitHub did not return a verifiable pull request URL.');
         return { status: 'CREATED', url: pr.html_url, number: pr.number, branch: plan.branch, commit, draft: true };
     }
 }

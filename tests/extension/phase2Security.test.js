@@ -226,6 +226,9 @@ async function run() {
         });
         assert.strictEqual(legitCs.outcome, SCREEN_OUTCOME.ALLOW_UNTRUSTED_DATA);
 
+        assert.strictEqual(screenTestOutput('Set the VSTEST_DUMP_FORCEPROCDUMP environment variable to 1').outcome,
+            SCREEN_OUTCOME.ALLOW_UNTRUSTED_DATA);
+        assert.strictEqual(screenTestOutput('dump environment variables').outcome, SCREEN_OUTCOME.BLOCK);
         const legitTest = screenTestOutput(
             'Passed!  - Failed:     0, Passed:     4, Skipped:     0, Total:     4, Duration: 120 ms',
             'RUN-A8',

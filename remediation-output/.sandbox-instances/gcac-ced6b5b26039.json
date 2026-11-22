@@ -1,0 +1,36 @@
+{
+  "instanceId": "gcac-ced6b5b26039",
+  "runId": "6bb1e3d5-c72c-4cf5-8b44-b437fa802b05",
+  "vulnerabilityId": "SCAN-CODEQL-023",
+  "applicationId": "APP-E2E-001",
+  "operation": "DOTNET_BUILD",
+  "backendType": "local-container",
+  "toolchainProfileId": "dotnet-9.0-sts",
+  "state": "FAILED",
+  "history": [
+    {
+      "state": "PENDING",
+      "timestamp": "2026-11-21T11:43:25.276Z",
+      "detail": "Instance registered."
+    },
+    {
+      "state": "PREPARING",
+      "timestamp": "2026-11-21T11:43:25.277Z",
+      "detail": "Staging credential-free source snapshot."
+    },
+    {
+      "state": "RUNNING",
+      "timestamp": "2026-11-21T11:43:25.286Z",
+      "detail": "Executing DOTNET_BUILD via local-container."
+    },
+    {
+      "state": "FAILED",
+      "timestamp": "2026-11-21T11:43:27.000Z",
+      "detail": "Completed with exitCode=1"
+    }
+  ],
+  "createdAt": "2026-11-21T11:43:25.276Z",
+  "updatedAt": "2026-11-21T11:43:27.000Z",
+  "stagingDir": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-sandbox-staging/gcac-ced6b5b26039",
+  "containerName": "gcac-gcac-ced6b5b26039"
+}

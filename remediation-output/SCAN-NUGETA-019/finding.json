@@ -6,7 +6,7 @@
   "Scanner_ID": "nuget-audit",
   "Rule_ID": "GHSA-5CRP-9R3C-P9VR",
   "Scanner_Version": "8.0.0",
-  "Scan_ID": "SCAN-1795147863815",
+  "Scan_ID": "SCAN-1795338322985",
   "Detection_Method": "NUGET_ADVISORY_DATA",
   "Finding_Fingerprint": "3cf8f91f03a641da",
   "Application_Number": "APP-E2E-001",
@@ -28,6 +28,7 @@
   "Project_Path": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
   "Package_Name": "Newtonsoft.Json",
   "Current_Version": "12.0.1",
+  "Fixed_Version": "13.0.1",
   "Advisory_URL": "https://github.com/advisories/GHSA-5crp-9r3c-p9vr",
   "Remediation_Guidance": "Upgrade package 'Newtonsoft.Json' to a secure version verified against https://github.com/advisories/GHSA-5crp-9r3c-p9vr."
 }

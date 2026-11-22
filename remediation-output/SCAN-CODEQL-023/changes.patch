@@ -1,0 +1,14 @@
+diff --git a/src/GcasE2ETestApi/DiagnosticsController.cs b/src/GcasE2ETestApi/DiagnosticsController.cs
+index 4c4334b..8afea1e 100644
+--- a/src/GcasE2ETestApi/DiagnosticsController.cs
++++ b/src/GcasE2ETestApi/DiagnosticsController.cs
+@@ -12,6 +12,9 @@ public sealed class DiagnosticsController : ControllerBase
+     {
+         using var process = new Process();
+         process.StartInfo.FileName = "sh";
++        if (!System.Text.RegularExpressions.Regex.IsMatch(host, "^[a-zA-Z0-9.-]+$")) {
++            return BadRequest("Invalid host input.");
++        }
+         process.StartInfo.Arguments = "-c \"ping -c 1 " + host + "\"";
+         process.StartInfo.RedirectStandardOutput = true;
+         process.StartInfo.RedirectStandardError = true;

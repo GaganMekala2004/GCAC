@@ -1,0 +1,30 @@
+{
+  "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "Unresolved (inspect method parameters)",
+    "file": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+    "line": 1,
+    "snippet": "<Project Sdk=\"Microsoft.NET.Sdk\">"
+  },
+  "dataPropagationEvidence": [],
+  "dangerousSink": {
+    "file": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+    "line": 1,
+    "snippet": "<Project Sdk=\"Microsoft.NET.Sdk\">"
+  },
+  "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+  "affectedFile": "tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj",
+  "affectedFunction": "UnknownMethod",
+  "affectedLines": "Line 9",
+  "proposedRemediation": "To fix this vulnerability, update the package reference for SQLitePCLRaw.lib.e_sqlite3 to a version that is not vulnerable. This can be done by modifying Line 9 of the GcasE2ETestApi.Tests.csproj file to include a newer, secure version of the package.",
+  "baselineTestEvidence": {
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+  }
+}

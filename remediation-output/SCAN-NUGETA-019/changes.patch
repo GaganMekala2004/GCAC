@@ -1,0 +1,13 @@
+diff --git a/src/GcasE2ETestApi/GcasE2ETestApi.csproj b/src/GcasE2ETestApi/GcasE2ETestApi.csproj
+index 62c6212..73808b9 100644
+--- a/src/GcasE2ETestApi/GcasE2ETestApi.csproj
++++ b/src/GcasE2ETestApi/GcasE2ETestApi.csproj
+@@ -7,7 +7,7 @@
+ 
+   <ItemGroup>
+     <!-- Intentionally old for dependency-remediation testing. -->
+-    <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
++    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+   </ItemGroup>
+ </Project>

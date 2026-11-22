@@ -307,7 +307,21 @@ function buildRunEvent(fields = {}) {
     };
 }
 
+function reconcileFailureAttribution(state) {
+    if (state.failedStage === 8 && state.failureCategory === 'SECURITY_VERIFICATION_INCOMPLETE' &&
+        state.postFixValidation?.passed && state.reScanVerification?.machineStatus === 'NOT_VERIFIED') {
+        return { ...state, failedStage: 6, failedStageId: 'bench-test', failureCategory: 'SCAN_FAILED_TRANSIENT',
+            failureReason: state.reScanVerification.reason };
+    }
+    if (state.failedStage === 9 && state.failureCategory === 'RUNNER_CRASH' && state.failureReason === 'Invalid GitHub API response.') {
+        return { ...state, failureCategory: 'GITHUB_PUBLICATION_FAILED',
+            failureReason: 'GitHub returned an unreadable pull-request response during publication.' };
+    }
+    return state;
+}
+
 function normalizeCanonicalRunState(raw = {}, findingId = '') {
+    raw = reconcileFailureAttribution(raw);
     const effectiveFindingId = raw.findingId || raw.vulnerabilityId || findingId || '';
     const lifecycle = mapLegacyStatusToLifecycle(raw);
     const stages = Array.isArray(raw.stages) && raw.stages.length === CANONICAL_STAGES.length
@@ -639,6 +653,7 @@ module.exports = {
     deriveTerminalBanner,
     buildRunEvent,
     normalizeCanonicalRunState,
+    reconcileFailureAttribution,
     RunStateManager
 };
 

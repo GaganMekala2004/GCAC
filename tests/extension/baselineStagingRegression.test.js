@@ -32,9 +32,12 @@ async function run() {
         assert.strictEqual(aggregateTrxReports([report, '<TestRun>']).valid, false);
         fs.mkdirSync(path.join(source, 'TestResults'));
         fs.writeFileSync(path.join(source, 'TestResults', 'stale.trx'), report);
-        const result = await executeRealTestRunner('dotnet', ['test', '--logger', 'trx'], source, {
+        const result = await executeRealTestRunner('dotnet', ['test', '-v', 'normal', '--logger', 'trx'], source, {
             toolchainProfileId: 'unit-test-profile',
-            executionGateway: { executeOperation: async () => ({ executed: true, exitCode: 0, stdout: '', stderr: '', outputArtifacts: {} }) }
+            executionGateway: { executeOperation: async request => {
+                assert(!request.extraArgs.includes('-v'), 'Toolchain already supplies dotnet test verbosity');
+                return { executed: true, exitCode: 0, stdout: '', stderr: '', outputArtifacts: {} };
+            } }
         });
         assert.strictEqual(result.machineStatus, 'UNTESTED', 'Prior workspace TRX must never certify the current run');
         assert.strictEqual(result.testReportLocation, null);

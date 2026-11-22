@@ -1,0 +1,118 @@
+{
+  "rating": "NOT_VERIFIED",
+  "summary": "The post-remediation re-scan status is NOT VERIFIED, and the vulnerability intelligence source is inaccessible. Therefore, it is not possible to confirm whether the root cause has been eliminated.",
+  "auditChecks": [
+    "Test status is PASS, which meets the criteria for passing tests.",
+    "Tests Total is 1, with 1 passed test, meeting the criteria for executed tests.",
+    "Post-Remediation Re-Scan Verification Status is NOT_VERIFIED, failing the criteria for a verified re-scan."
+  ],
+  "machineOutcome": "NOT_VERIFIED",
+  "evidenceChecklist": {
+    "schemaVersion": "GCAC-EVIDENCE-CHECKLIST-1.0",
+    "isSecretFinding": false,
+    "recommendation": "BLOCKED",
+    "finalReviewStatus": "BLOCKED — Required validation incomplete or failed",
+    "finalSignOffAllowed": false,
+    "completionSummary": "5 of 7 required checks complete",
+    "passedCount": 5,
+    "failedCount": 0,
+    "missingCount": 2,
+    "notApplicableCount": 4,
+    "totalApplicable": 7,
+    "passedCheckIds": [
+      "ROOT_CAUSE_ANALYSIS",
+      "SOURCE_TO_SINK_EVIDENCE",
+      "BASELINE_EVIDENCE",
+      "CODE_DIFF_INTEGRITY",
+      "POST_FIX_TEST_EXECUTION"
+    ],
+    "failedCheckIds": [],
+    "missingCheckIds": [
+      "SCANNER_RESCAN",
+      "INDEPENDENT_SECURITY_CHECKS"
+    ],
+    "secretRemediationActions": [],
+    "checks": [
+      {
+        "id": "ROOT_CAUSE_ANALYSIS",
+        "label": "Root cause analysis documented",
+        "status": "PASS",
+        "required": true,
+        "detail": "The vulnerability is due to an outdated Microsoft.Data.Sqlite package that transitively includes a vulnerable SQLitePCLRaw.lib.e_sqlite3 dependency."
+      },
+      {
+        "id": "SOURCE_TO_SINK_EVIDENCE",
+        "label": "Source-to-sink or vulnerability location evidence",
+        "status": "PASS",
+        "required": true,
+        "detail": "Method: DETERMINISTIC_SOURCE_SINK_HEURISTIC | FormalTaintProof: false"
+      },
+      {
+        "id": "BASELINE_EVIDENCE",
+        "label": "Baseline test reproduction or documented constraint",
+        "status": "PASS",
+        "required": true,
+        "detail": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+      },
+      {
+        "id": "CODE_DIFF_INTEGRITY",
+        "label": "Approved code diff & scope integrity verified",
+        "status": "PASS",
+        "required": true,
+        "detail": "Diff SHA-256 e7a4268a7e39 authorized & scoped."
+      },
+      {
+        "id": "POST_FIX_TEST_EXECUTION",
+        "label": "Post-fix build & test execution passed (>0 tests)",
+        "status": "PASS",
+        "required": true,
+        "detail": "Passed 1/1 targeted tests (Exit code 0)."
+      },
+      {
+        "id": "SCANNER_RESCAN",
+        "label": "Originating scanner post-fix re-scan verified",
+        "status": "MISSING",
+        "required": true,
+        "detail": "Originating scanner 'NuGet Dependency Auditor' ended in status 'Failed': AUDIT UNAVAILABLE — Vulnerability intelligence source inaccessible"
+      },
+      {
+        "id": "INDEPENDENT_SECURITY_CHECKS",
+        "label": "Security suppression & regression validation passed",
+        "status": "MISSING",
+        "required": true,
+        "detail": "Independent security & suppression checks have not yet completed."
+      },
+      {
+        "id": "SECRET_MANAGER_REPLACEMENT",
+        "label": "Secret-manager externalization check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      },
+      {
+        "id": "SECRET_REVOCATION_CONFIRMED",
+        "label": "Credential revocation check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      },
+      {
+        "id": "SECRET_ROTATION_CONFIRMED",
+        "label": "Credential rotation check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      },
+      {
+        "id": "EXPOSED_CREDENTIAL_INVALIDATED",
+        "label": "Exposed credential invalidation check",
+        "status": "NOT_APPLICABLE",
+        "required": false,
+        "detail": "Not applicable (non-credential finding)."
+      }
+    ]
+  },
+  "recommendation": "BLOCKED",
+  "finalReviewStatus": "BLOCKED — Required validation incomplete or failed",
+  "completionSummary": "5 of 7 required checks complete"
+}

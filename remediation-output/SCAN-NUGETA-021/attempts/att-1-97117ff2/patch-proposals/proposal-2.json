@@ -1,0 +1,8 @@
+{
+  "baseCommitSha": "7075159c77b3ed28fc2ca45b67c754fff799178d",
+  "sourceSha256": "f5ea5c936eaae017e66ad12cdb3b3f3400d068ec74428e0795a25c9c2243f3d4",
+  "diagnostic": {
+    "reasonCode": "EXACT_EDITS_INVALID"
+  },
+  "failureCategory": "PATCH_INVALID"
+}

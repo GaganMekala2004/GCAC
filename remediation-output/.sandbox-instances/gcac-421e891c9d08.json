@@ -1,0 +1,36 @@
+{
+  "instanceId": "gcac-421e891c9d08",
+  "runId": "821801cd-02fc-4c55-ab98-6b8f057d5d05",
+  "vulnerabilityId": "SCAN-NUGETA-019",
+  "applicationId": "APP-E2E-001",
+  "operation": "NUGET_AUDIT",
+  "backendType": "local-container",
+  "toolchainProfileId": "dotnet-9.0-sts",
+  "state": "FAILED",
+  "history": [
+    {
+      "state": "PENDING",
+      "timestamp": "2026-11-21T11:45:03.861Z",
+      "detail": "Instance registered."
+    },
+    {
+      "state": "PREPARING",
+      "timestamp": "2026-11-21T11:45:03.861Z",
+      "detail": "Staging credential-free source snapshot."
+    },
+    {
+      "state": "RUNNING",
+      "timestamp": "2026-11-21T11:45:03.866Z",
+      "detail": "Executing NUGET_AUDIT via local-container."
+    },
+    {
+      "state": "FAILED",
+      "timestamp": "2026-11-21T11:45:49.977Z",
+      "detail": "Completed with exitCode=1"
+    }
+  ],
+  "createdAt": "2026-11-21T11:45:03.861Z",
+  "updatedAt": "2026-11-21T11:45:49.977Z",
+  "stagingDir": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-sandbox-staging/gcac-421e891c9d08",
+  "containerName": "gcac-gcac-421e891c9d08"
+}

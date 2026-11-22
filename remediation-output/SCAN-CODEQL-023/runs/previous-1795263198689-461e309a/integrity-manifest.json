@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "GCAC-PH2-MANIFEST-1.0",
+  "runId": "6bb1e3d5-c72c-4cf5-8b44-b437fa802b05",
+  "findingId": "SCAN-CODEQL-023",
+  "applicationId": "APP-E2E-001",
+  "createdAt": "2026-11-21T11:43:35.315Z",
+  "evidenceWriterInterface": "LocalTamperDetectableEvidenceWriter",
+  "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+  "cryptographicallySigned": false,
+  "chainSummary": {
+    "eventCount": 14,
+    "headHash": "ee3652b656ab8cf80c5c4cb2f328e8ab521731c666c5bd8c89b1568ca3f01bcf",
+    "tailHash": "bfc9ab6632c7dfde7c8e80f83eb0c0e3692efb03816c57f4b29efc0e46c8efdb"
+  },
+  "artifacts": {
+    "agent-execution-trace.log": {
+      "sha256": "bda9e3c134f0ce8e8d724054c17889410e8b705c4ff10a77b4cb75fa4555cf03",
+      "sizeBytes": 6567
+    },
+    "events-chain.jsonl": {
+      "sha256": "f0f8146f5dfa45bfdf63c4d16a3fca9675f225ce8c82176ac0758687ffc61f8f",
+      "sizeBytes": 5970
+    },
+    "evidence-record.json": {
+      "sha256": "7507b11e0b0b88aeb9c0f0aef2137277d40e454d4e1cdcdd030faa8534dbc035",
+      "sizeBytes": 5581
+    },
+    "run-state.json": {
+      "sha256": "bf2ee042f5f76e74dc29e4421329f99f03ec60e80a1135f3fa139180ad433f5c",
+      "sizeBytes": 445289
+    }
+  },
+  "manifestSha256": "9ebfa1d7c3913ad582914a9cc4316faead73969884109ac63929b0f3ef10c038",
+  "previousRunStateSha256": "36a005a910c24c2628a5f33ca0fc959c1d412431eda3c1488205e16299864aaa",
+  "trustedStateRevision": 1,
+  "lastTrustedStateWriteAt": "2026-11-21T12:13:17.389Z"
+}

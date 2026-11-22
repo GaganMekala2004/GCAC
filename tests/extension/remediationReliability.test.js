@@ -72,6 +72,14 @@ async function run() {
         assert.strictEqual(unsafe.projects[0].frameworks[0].topLevelPackages[0].fixedVersion, '');
         assert.strictEqual(audited.projects.length, 1);
         assert.strictEqual(audited.packagesChecked, 1);
+        const graph = JSON.parse(fs.readFileSync(assetsPath));
+        fs.writeFileSync(project, '<Project/>');
+        graph.project.frameworks.net10.dependencies = {};
+        fs.writeFileSync(assetsPath, JSON.stringify(graph));
+        const transitive = auditResolvedProjects(root, snapshot, null, cacheRoot);
+        assert.strictEqual(transitive.projects[0].frameworks[0].transitivePackages[0].fixedVersion, '2.0.0');
+        graph.project.frameworks.net10.dependencies = { Example: { version: '[1.0.0, )' } };
+        fs.writeFileSync(assetsPath, JSON.stringify(graph));
         const scanner = new NuGetAuditScanner();
         const findings = scanner.parseJsonAuditOutput(audited, project, root, 'TEST');
         assert.strictEqual(findings.length, 1);

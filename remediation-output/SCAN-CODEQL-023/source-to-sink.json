@@ -1,0 +1,41 @@
+{
+  "vulnerabilityType": "COMMAND_INJECTION",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "host",
+    "file": "src/GcasE2ETestApi/DiagnosticsController.cs",
+    "line": 11,
+    "snippet": "public IActionResult Ping([FromQuery] string host)"
+  },
+  "dataPropagationEvidence": [
+    {
+      "line": 11,
+      "snippet": "public IActionResult Ping([FromQuery] string host)",
+      "note": "References candidate untrusted input 'host'."
+    },
+    {
+      "line": 15,
+      "snippet": "process.StartInfo.Arguments = \"-c \\\"ping -c 1 \" + host + \"\\\"\";",
+      "note": "References candidate untrusted input 'host'."
+    }
+  ],
+  "dangerousSink": {
+    "file": "src/GcasE2ETestApi/DiagnosticsController.cs",
+    "line": 14,
+    "snippet": "process.StartInfo.FileName = \"sh\";"
+  },
+  "missingValidationOrEncoding": "User-supplied input reaches shell/process command invocation without strict allowlist validation or ArgumentList separation.",
+  "affectedFile": "src/GcasE2ETestApi/DiagnosticsController.cs",
+  "affectedFunction": "Ping([FromQuery] string host)",
+  "affectedLines": "Lines 11-15",
+  "proposedRemediation": "Validate and sanitize the 'host' input to ensure it only contains safe characters (e.g., alphanumeric and specific symbols) before using it in the command line.",
+  "baselineTestEvidence": {
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "vulnerabilityType": "UNKNOWN",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "host",
+    "file": "src/GcasE2ETestApi/DiagnosticsController.cs",
+    "line": 11,
+    "snippet": "public IActionResult Ping([FromQuery] string host)"
+  },
+  "dataPropagationEvidence": [
+    {
+      "line": 11,
+      "snippet": "public IActionResult Ping([FromQuery] string host)",
+      "note": "References candidate untrusted input 'host'."
+    },
+    {
+      "line": 15,
+      "snippet": "process.StartInfo.Arguments = \"-c \\\"ping -c 1 \" + host + \"\\\"\";",
+      "note": "References candidate untrusted input 'host'."
+    }
+  ],
+  "dangerousSink": {
+    "file": "src/GcasE2ETestApi/DiagnosticsController.cs",
+    "line": 14,
+    "snippet": "process.StartInfo.FileName = \"sh\";"
+  },
+  "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+  "affectedFile": "src/GcasE2ETestApi/DiagnosticsController.cs",
+  "affectedFunction": "Ping([FromQuery] string host)",
+  "affectedLines": "Line 14",
+  "proposedRemediation": "Fix cs/command-line-injection: Uncontrolled command line. See https://codeql.github.com/codeql-query-help/ for detailed remediation guidance.",
+  "baselineTestEvidence": {
+    "status": "NOT_EXECUTED",
+    "command": null,
+    "exitCode": null,
+    "summary": "No reproducible baseline test runner executed yet; documented static inspection evidence."
+  }
+}

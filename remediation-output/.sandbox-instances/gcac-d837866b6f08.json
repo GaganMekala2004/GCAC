@@ -1,0 +1,36 @@
+{
+  "instanceId": "gcac-d837866b6f08",
+  "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+  "vulnerabilityId": "SCAN-NUGETA-020",
+  "applicationId": "APP-E2E-001",
+  "operation": "NUGET_RESTORE_GRAPH",
+  "backendType": "local-container",
+  "toolchainProfileId": "dotnet-9.0-sts",
+  "state": "COMPLETED",
+  "history": [
+    {
+      "state": "PENDING",
+      "timestamp": "2026-11-21T12:38:35.193Z",
+      "detail": "Instance registered."
+    },
+    {
+      "state": "PREPARING",
+      "timestamp": "2026-11-21T12:38:35.193Z",
+      "detail": "Staging credential-free source snapshot."
+    },
+    {
+      "state": "RUNNING",
+      "timestamp": "2026-11-21T12:38:35.203Z",
+      "detail": "Executing NUGET_RESTORE_GRAPH via local-container."
+    },
+    {
+      "state": "COMPLETED",
+      "timestamp": "2026-11-21T12:38:36.726Z",
+      "detail": "Completed with exitCode=0"
+    }
+  ],
+  "createdAt": "2026-11-21T12:38:35.193Z",
+  "updatedAt": "2026-11-21T12:38:36.726Z",
+  "stagingDir": "/private/var/folders/0c/6xvq71x156q5p6bzlgvj_6jr0000gn/T/gcac-sandbox-staging/gcac-d837866b6f08",
+  "containerName": "gcac-gcac-d837866b6f08"
+}

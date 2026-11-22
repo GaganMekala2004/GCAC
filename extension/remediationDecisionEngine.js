@@ -23,6 +23,17 @@ const VULNERABILITY_TYPES = Object.freeze({
     UNKNOWN: 'UNKNOWN'
 });
 
+const CWE_TYPES = Object.freeze({
+    22: VULNERABILITY_TYPES.PATH_TRAVERSAL,
+    78: VULNERABILITY_TYPES.COMMAND_INJECTION,
+    79: VULNERABILITY_TYPES.XSS,
+    89: VULNERABILITY_TYPES.SQL_INJECTION,
+    327: VULNERABILITY_TYPES.WEAK_CRYPTO_MIGRATION,
+    328: VULNERABILITY_TYPES.WEAK_CRYPTO_MIGRATION,
+    798: VULNERABILITY_TYPES.HARDCODED_SECRET,
+    1395: VULNERABILITY_TYPES.DEPENDENCY_VULNERABILITY
+});
+
 function inferVulnerabilityType(finding = {}) {
     const combined = `${finding.Title || ''} ${finding.Detailed_Name || ''} ${finding.CVE_ID || ''} ${finding.Source_Classification || ''} ${finding.Remediation_Guidance || ''}`.toLowerCase();
     const loc = String(finding.Location_Path || '').toLowerCase();
@@ -31,25 +42,30 @@ function inferVulnerabilityType(finding = {}) {
         return VULNERABILITY_TYPES.INFRASTRUCTURE_NON_CODE;
     }
     if (combined.includes('3pp') || loc.endsWith('.csproj') || loc.endsWith('pom.xml') || loc.endsWith('package.json') ||
-        (finding.Current_Version && finding.Fixed_Version) || combined.includes('nuget') || combined.includes('cwe-1395')) {
+        (finding.Current_Version && finding.Fixed_Version) || combined.includes('nuget')) {
         return VULNERABILITY_TYPES.DEPENDENCY_VULNERABILITY;
     }
-    if (combined.includes('sql') || combined.includes('cwe-89')) {
+    const cwe = /\bcwe-0*(\d+)\b/i.exec(combined);
+    if (cwe && CWE_TYPES[cwe[1]]) return CWE_TYPES[cwe[1]];
+    const rule = String(finding.Rule_ID || '').split('/').pop();
+    if (rule === 'path-injection') return VULNERABILITY_TYPES.PATH_TRAVERSAL;
+    if (rule === 'command-line-injection') return VULNERABILITY_TYPES.COMMAND_INJECTION;
+    if (combined.includes('sql')) {
         return VULNERABILITY_TYPES.SQL_INJECTION;
     }
-    if (combined.includes('command injection') || combined.includes('os command') || combined.includes('cwe-78')) {
+    if (combined.includes('command injection') || combined.includes('os command')) {
         return VULNERABILITY_TYPES.COMMAND_INJECTION;
     }
-    if (combined.includes('path traversal') || combined.includes('directory traversal') || combined.includes('cwe-22')) {
+    if (combined.includes('path traversal') || combined.includes('directory traversal')) {
         return VULNERABILITY_TYPES.PATH_TRAVERSAL;
     }
-    if (combined.includes('xss') || combined.includes('cross-site scripting') || combined.includes('cwe-79')) {
+    if (combined.includes('xss') || combined.includes('cross-site scripting')) {
         return VULNERABILITY_TYPES.XSS;
     }
-    if (combined.includes('cryptographic') || /\b(?:des|3des|md5|rc2|sha-?1)\b/.test(combined) || combined.includes('cwe-327') || combined.includes('cwe-328') || combined.includes('protocol migration')) {
+    if (combined.includes('cryptographic') || /\b(?:des|3des|md5|rc2|sha-?1)\b/.test(combined) || combined.includes('protocol migration')) {
         return VULNERABILITY_TYPES.WEAK_CRYPTO_MIGRATION;
     }
-    if (combined.includes('secret') || combined.includes('api key') || combined.includes('cwe-798') || combined.includes('password')) {
+    if (combined.includes('secret') || combined.includes('api key') || combined.includes('password')) {
         return VULNERABILITY_TYPES.HARDCODED_SECRET;
     }
     if (loc.endsWith('.json') || loc.endsWith('.config') || loc.endsWith('.yml') || loc.endsWith('.yaml') || combined.includes('auth') || combined.includes('config')) {
@@ -158,7 +174,9 @@ function evaluateRemediationStrategy({ finding = {}, sourceCode = '', ownershipC
             requiresManualReview = true;
             automatedExecutionAllowed = false;
             blastRadius = 'MEDIUM';
-            blockingReason = 'Dependency upgrade missing verified target version or approved manifest ownership.';
+            blockingReason = !hasFixedVersion
+                ? 'No verified upgrade target is available. Refresh the advisory snapshot, restore a patched package in the approved cache, and scan again.'
+                : `The manifest '${loc}' requires ownership approval before a dependency upgrade.`;
             recommendedStrategy = 'Manual dependency advisory review required.';
         }
     } else if (!selectedTier) {

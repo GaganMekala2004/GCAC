@@ -1,0 +1,30 @@
+{
+  "vulnerabilityType": "HARDCODED_SECRET",
+  "executionEvidence": null,
+  "analysisMethod": "DETERMINISTIC_SOURCE_SINK_HEURISTIC",
+  "formalTaintProofSupplied": false,
+  "formalTaintNotice": "Heuristic AST-free static source/sink trace on target file; not a formal whole-program taint proof.",
+  "untrustedSource": {
+    "symbol": "Unresolved (inspect method parameters)",
+    "file": "src/GcasE2ETestApi/SecretService.cs",
+    "line": 6,
+    "snippet": "private const string ApiKey = \"gcas-demo-prod-api-key-9f3c7b1a\";"
+  },
+  "dataPropagationEvidence": [],
+  "dangerousSink": {
+    "file": "src/GcasE2ETestApi/SecretService.cs",
+    "line": 6,
+    "snippet": "private const string ApiKey = \"gcas-demo-prod-api-key-9f3c7b1a\";"
+  },
+  "missingValidationOrEncoding": "Missing explicit validation/encoding/parameterization verified along candidate path.",
+  "affectedFile": "src/GcasE2ETestApi/SecretService.cs",
+  "affectedFunction": "UnknownMethod",
+  "affectedLines": "Lines 6-8",
+  "proposedRemediation": "Remove the hardcoded API key from the source code and replace it with a secure method of retrieving the key, such as environment variables or a secrets management service.",
+  "baselineTestEvidence": {
+    "status": "PASS",
+    "command": "dotnet test --no-restore --nologo -v normal --logger trx --results-directory /sandbox-out",
+    "exitCode": 0,
+    "summary": "PASS — Tests passed (1/1) via local-container, Exit Code: 0"
+  }
+}

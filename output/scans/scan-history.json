@@ -1,5 +1,611 @@
 [
   {
+    "scanId": "SCAN-1795343078160",
+    "scanMode": "comprehensive",
+    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
+    "omittedScanners": [
+      "osv",
+      "ai-candidate"
+    ],
+    "timestamp": "2026-11-22T10:24:38.528Z",
+    "targetPath": "sample-repos/gcas-agentic-e2e-test-repo",
+    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/gcas-agentic-e2e-test-repo",
+    "canonicalRepositoryId": "73b61c0a6ab0",
+    "applicationNumber": "APP-E2E-001",
+    "durationMs": 368,
+    "status": "Completed",
+    "cancelled": false,
+    "timedOut": false,
+    "noScannableInputs": false,
+    "unverifiedCoverage": false,
+    "scannersCount": 4,
+    "scannerSummary": [
+      {
+        "id": "secrets-config",
+        "status": "Completed",
+        "coverage": "100% (12 non-empty file(s) scanned)",
+        "findingsCount": 1,
+        "fromCache": true,
+        "cachedAt": "2026-11-22T09:05:27.064Z",
+        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
+        "errors": []
+      },
+      {
+        "id": "dotnet-security",
+        "status": "Completed",
+        "coverage": "100% (Sandboxed Roslyn analyzers active)",
+        "findingsCount": 0,
+        "fromCache": true,
+        "cachedAt": "2026-11-22T09:05:34.098Z",
+        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
+        "errors": []
+      },
+      {
+        "id": "nuget-audit",
+        "status": "Completed",
+        "coverage": "100% (60 resolved direct/transitive packages across 2 projects)",
+        "findingsCount": 3,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "codeql",
+        "status": "Completed",
+        "coverage": "100% (CodeQL csharp semantic analysis — 2 finding(s))",
+        "findingsCount": 2,
+        "fromCache": true,
+        "cachedAt": "2026-11-22T09:06:56.034Z",
+        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
+        "errors": []
+      }
+    ],
+    "findingsSummary": {
+      "total": 6,
+      "critical": 0,
+      "high": 4,
+      "medium": 2,
+      "low": 0,
+      "informational": 0
+    },
+    "ingestStats": {
+      "added": 0,
+      "updated": 6,
+      "total": 23,
+      "activeTotal": 6,
+      "newCount": 0,
+      "updatedCount": 6
+    },
+    "metrics": {
+      "environmentProbeMs": 267.05,
+      "discoveryMs": 82.05,
+      "cacheLookupMs": 0.49,
+      "normalizationMs": 3.81,
+      "persistenceMs": 0,
+      "uiUpdateMs": 0.78,
+      "uiProgressEmitCount": 9,
+      "cancellationMs": 0,
+      "totalMs": 368.61,
+      "repositoryFileCount": 18,
+      "eligibleFileCount": 18,
+      "filesScanned": 12,
+      "cacheHits": 3,
+      "cacheMisses": 0,
+      "scannerTimings": {
+        "secrets-config": 0,
+        "dotnet-security": 0,
+        "codeql": 0,
+        "nuget-audit": 12.19
+      }
+    }
+  },
+  {
+    "scanId": "SCAN-1795338322985",
+    "scanMode": "comprehensive",
+    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
+    "omittedScanners": [
+      "osv",
+      "ai-candidate"
+    ],
+    "timestamp": "2026-11-22T09:06:56.039Z",
+    "targetPath": "sample-repos/gcas-agentic-e2e-test-repo",
+    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/gcas-agentic-e2e-test-repo",
+    "canonicalRepositoryId": "73b61c0a6ab0",
+    "applicationNumber": "APP-E2E-001",
+    "durationMs": 93054,
+    "status": "Completed",
+    "cancelled": false,
+    "timedOut": false,
+    "noScannableInputs": false,
+    "unverifiedCoverage": false,
+    "scannersCount": 4,
+    "scannerSummary": [
+      {
+        "id": "secrets-config",
+        "status": "Completed",
+        "coverage": "100% (12 non-empty file(s) scanned)",
+        "findingsCount": 1,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "dotnet-security",
+        "status": "Completed",
+        "coverage": "100% (Sandboxed Roslyn analyzers active)",
+        "findingsCount": 0,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "nuget-audit",
+        "status": "Completed",
+        "coverage": "100% (60 resolved direct/transitive packages across 2 projects)",
+        "findingsCount": 3,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "codeql",
+        "status": "Completed",
+        "coverage": "100% (CodeQL csharp semantic analysis — 2 finding(s))",
+        "findingsCount": 2,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      }
+    ],
+    "findingsSummary": {
+      "total": 6,
+      "critical": 0,
+      "high": 4,
+      "medium": 2,
+      "low": 0,
+      "informational": 0
+    },
+    "ingestStats": {
+      "added": 0,
+      "updated": 6,
+      "total": 23,
+      "activeTotal": 6,
+      "newCount": 0,
+      "updatedCount": 6
+    },
+    "metrics": {
+      "environmentProbeMs": 1945.55,
+      "discoveryMs": 33.4,
+      "cacheLookupMs": 3.34,
+      "normalizationMs": 4.07,
+      "persistenceMs": 0,
+      "uiUpdateMs": 3.07,
+      "uiProgressEmitCount": 13,
+      "cancellationMs": 0,
+      "totalMs": 93054.15,
+      "repositoryFileCount": 18,
+      "eligibleFileCount": 18,
+      "filesScanned": 12,
+      "cacheHits": 0,
+      "cacheMisses": 3,
+      "scannerTimings": {
+        "secrets-config": 2095.55,
+        "nuget-audit": 1469.99,
+        "dotnet-security": 9128.79,
+        "codeql": 87494.09
+      }
+    }
+  },
+  {
+    "scanId": "SCAN-1795263117177",
+    "scanMode": "comprehensive",
+    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
+    "omittedScanners": [
+      "osv",
+      "ai-candidate"
+    ],
+    "timestamp": "2026-11-21T12:11:57.349Z",
+    "targetPath": "sample-repos/gcas-agentic-e2e-test-repo",
+    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/gcas-agentic-e2e-test-repo",
+    "canonicalRepositoryId": "73b61c0a6ab0",
+    "applicationNumber": "APP-E2E-001",
+    "durationMs": 172,
+    "status": "Completed",
+    "cancelled": false,
+    "timedOut": false,
+    "noScannableInputs": false,
+    "unverifiedCoverage": false,
+    "scannersCount": 4,
+    "scannerSummary": [
+      {
+        "id": "secrets-config",
+        "status": "Completed",
+        "coverage": "100% (12 non-empty file(s) scanned)",
+        "findingsCount": 1,
+        "fromCache": true,
+        "cachedAt": "2026-11-21T05:32:07.514Z",
+        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
+        "errors": []
+      },
+      {
+        "id": "dotnet-security",
+        "status": "Completed",
+        "coverage": "100% (Sandboxed Roslyn analyzers active)",
+        "findingsCount": 0,
+        "fromCache": true,
+        "cachedAt": "2026-11-21T05:32:12.932Z",
+        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
+        "errors": []
+      },
+      {
+        "id": "nuget-audit",
+        "status": "Completed",
+        "coverage": "100% (60 resolved direct/transitive packages across 2 projects)",
+        "findingsCount": 3,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "codeql",
+        "status": "Completed",
+        "coverage": "100% (CodeQL csharp semantic analysis — 2 finding(s))",
+        "findingsCount": 2,
+        "fromCache": true,
+        "cachedAt": "2026-11-21T05:33:23.544Z",
+        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
+        "errors": []
+      }
+    ],
+    "findingsSummary": {
+      "total": 6,
+      "critical": 0,
+      "high": 4,
+      "medium": 2,
+      "low": 0,
+      "informational": 0
+    },
+    "ingestStats": {
+      "added": 0,
+      "updated": 6,
+      "total": 23,
+      "activeTotal": 6,
+      "newCount": 0,
+      "updatedCount": 6
+    },
+    "metrics": {
+      "environmentProbeMs": 122.31,
+      "discoveryMs": 34.44,
+      "cacheLookupMs": 0.38,
+      "normalizationMs": 3.35,
+      "persistenceMs": 0,
+      "uiUpdateMs": 0.7,
+      "uiProgressEmitCount": 9,
+      "cancellationMs": 0,
+      "totalMs": 172.06,
+      "repositoryFileCount": 18,
+      "eligibleFileCount": 18,
+      "filesScanned": 12,
+      "cacheHits": 3,
+      "cacheMisses": 0,
+      "scannerTimings": {
+        "secrets-config": 0,
+        "dotnet-security": 0,
+        "codeql": 0,
+        "nuget-audit": 8.84
+      }
+    }
+  },
+  {
+    "scanId": "SCAN-1795260973373",
+    "scanMode": "comprehensive",
+    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
+    "omittedScanners": [
+      "osv",
+      "ai-candidate"
+    ],
+    "timestamp": "2026-11-21T11:36:13.579Z",
+    "targetPath": "sample-repos/gcas-agentic-e2e-test-repo",
+    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/gcas-agentic-e2e-test-repo",
+    "canonicalRepositoryId": "73b61c0a6ab0",
+    "applicationNumber": "APP-E2E-001",
+    "durationMs": 206,
+    "status": "Completed",
+    "cancelled": false,
+    "timedOut": false,
+    "noScannableInputs": false,
+    "unverifiedCoverage": false,
+    "scannersCount": 4,
+    "scannerSummary": [
+      {
+        "id": "secrets-config",
+        "status": "Completed",
+        "coverage": "100% (12 non-empty file(s) scanned)",
+        "findingsCount": 1,
+        "fromCache": true,
+        "cachedAt": "2026-11-21T05:32:07.514Z",
+        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
+        "errors": []
+      },
+      {
+        "id": "dotnet-security",
+        "status": "Completed",
+        "coverage": "100% (Sandboxed Roslyn analyzers active)",
+        "findingsCount": 0,
+        "fromCache": true,
+        "cachedAt": "2026-11-21T05:32:12.932Z",
+        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
+        "errors": []
+      },
+      {
+        "id": "nuget-audit",
+        "status": "Completed",
+        "coverage": "100% (60 resolved direct/transitive packages across 2 projects)",
+        "findingsCount": 3,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "codeql",
+        "status": "Completed",
+        "coverage": "100% (CodeQL csharp semantic analysis — 2 finding(s))",
+        "findingsCount": 2,
+        "fromCache": true,
+        "cachedAt": "2026-11-21T05:33:23.544Z",
+        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
+        "errors": []
+      }
+    ],
+    "findingsSummary": {
+      "total": 6,
+      "critical": 0,
+      "high": 4,
+      "medium": 2,
+      "low": 0,
+      "informational": 0
+    },
+    "ingestStats": {
+      "added": 0,
+      "updated": 6,
+      "total": 23,
+      "activeTotal": 6,
+      "newCount": 0,
+      "updatedCount": 6
+    },
+    "metrics": {
+      "environmentProbeMs": 154.71,
+      "discoveryMs": 36.11,
+      "cacheLookupMs": 0.38,
+      "normalizationMs": 3.29,
+      "persistenceMs": 0,
+      "uiUpdateMs": 0.76,
+      "uiProgressEmitCount": 9,
+      "cancellationMs": 0,
+      "totalMs": 206.74,
+      "repositoryFileCount": 18,
+      "eligibleFileCount": 18,
+      "filesScanned": 12,
+      "cacheHits": 3,
+      "cacheMisses": 0,
+      "scannerTimings": {
+        "secrets-config": 0,
+        "dotnet-security": 0,
+        "codeql": 0,
+        "nuget-audit": 9.33
+      }
+    }
+  },
+  {
+    "scanId": "SCAN-1795239126572",
+    "scanMode": "comprehensive",
+    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
+    "omittedScanners": [
+      "osv",
+      "ai-candidate"
+    ],
+    "timestamp": "2026-11-21T05:33:23.552Z",
+    "targetPath": "sample-repos/gcas-agentic-e2e-test-repo",
+    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/gcas-agentic-e2e-test-repo",
+    "canonicalRepositoryId": "73b61c0a6ab0",
+    "applicationNumber": "APP-E2E-001",
+    "durationMs": 76980,
+    "status": "Completed",
+    "cancelled": false,
+    "timedOut": false,
+    "noScannableInputs": false,
+    "unverifiedCoverage": false,
+    "scannersCount": 4,
+    "scannerSummary": [
+      {
+        "id": "secrets-config",
+        "status": "Completed",
+        "coverage": "100% (12 non-empty file(s) scanned)",
+        "findingsCount": 1,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "dotnet-security",
+        "status": "Completed",
+        "coverage": "100% (Sandboxed Roslyn analyzers active)",
+        "findingsCount": 0,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "nuget-audit",
+        "status": "Completed",
+        "coverage": "100% (60 resolved direct/transitive packages across 2 projects)",
+        "findingsCount": 3,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "codeql",
+        "status": "Completed",
+        "coverage": "100% (CodeQL csharp semantic analysis — 2 finding(s))",
+        "findingsCount": 2,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      }
+    ],
+    "findingsSummary": {
+      "total": 6,
+      "critical": 0,
+      "high": 4,
+      "medium": 2,
+      "low": 0,
+      "informational": 0
+    },
+    "ingestStats": {
+      "added": 2,
+      "updated": 4,
+      "total": 23,
+      "activeTotal": 6,
+      "newCount": 2,
+      "updatedCount": 4
+    },
+    "metrics": {
+      "environmentProbeMs": 835.23,
+      "discoveryMs": 33.35,
+      "cacheLookupMs": 1.13,
+      "normalizationMs": 1.96,
+      "persistenceMs": 0,
+      "uiUpdateMs": 3.31,
+      "uiProgressEmitCount": 13,
+      "cancellationMs": 0,
+      "totalMs": 76978.39,
+      "repositoryFileCount": 18,
+      "eligibleFileCount": 18,
+      "filesScanned": 12,
+      "cacheHits": 0,
+      "cacheMisses": 3,
+      "scannerTimings": {
+        "secrets-config": 70.58,
+        "nuget-audit": 3753.31,
+        "dotnet-security": 5487.83,
+        "codeql": 72272.25
+      }
+    }
+  },
+  {
+    "scanId": "SCAN-1795239046481",
+    "scanMode": "comprehensive",
+    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
+    "omittedScanners": [
+      "osv",
+      "ai-candidate"
+    ],
+    "timestamp": "2026-11-21T05:31:33.265Z",
+    "targetPath": "sample-repos/storefront-api",
+    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/storefront-api",
+    "canonicalRepositoryId": "d8273a39314e",
+    "applicationNumber": "APP-1005",
+    "durationMs": 46784,
+    "status": "Completed",
+    "cancelled": false,
+    "timedOut": false,
+    "noScannableInputs": false,
+    "unverifiedCoverage": false,
+    "scannersCount": 4,
+    "scannerSummary": [
+      {
+        "id": "secrets-config",
+        "status": "Completed",
+        "coverage": "100% (3 non-empty file(s) scanned)",
+        "findingsCount": 0,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "dotnet-security",
+        "status": "Completed",
+        "coverage": "100% (Sandboxed Roslyn analyzers active)",
+        "findingsCount": 0,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "nuget-audit",
+        "status": "No Scannable Inputs",
+        "coverage": "0% (Empty dependency manifest — 0 packages declared)",
+        "findingsCount": 0,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      },
+      {
+        "id": "codeql",
+        "status": "Completed",
+        "coverage": "100% (CodeQL csharp semantic analysis — 0 finding(s))",
+        "findingsCount": 0,
+        "fromCache": false,
+        "cachedAt": null,
+        "freshnessStatus": null,
+        "errors": []
+      }
+    ],
+    "findingsSummary": {
+      "total": 0,
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "informational": 0
+    },
+    "ingestStats": {
+      "added": 0,
+      "updated": 0,
+      "total": 21,
+      "activeTotal": 0,
+      "newCount": 0,
+      "updatedCount": 0
+    },
+    "metrics": {
+      "environmentProbeMs": 1731.73,
+      "discoveryMs": 32.14,
+      "cacheLookupMs": 2.78,
+      "normalizationMs": 0,
+      "persistenceMs": 0,
+      "uiUpdateMs": 2.18,
+      "uiProgressEmitCount": 13,
+      "cancellationMs": 0,
+      "totalMs": 46782.97,
+      "repositoryFileCount": 4,
+      "eligibleFileCount": 4,
+      "filesScanned": 3,
+      "cacheHits": 0,
+      "cacheMisses": 3,
+      "scannerTimings": {
+        "secrets-config": 1723.16,
+        "nuget-audit": 1.41,
+        "dotnet-security": 4960.27,
+        "codeql": 43284.66
+      }
+    }
+  },
+  {
     "scanId": "SCAN-1795147863815",
     "scanMode": "comprehensive",
     "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
@@ -1399,561 +2005,6 @@
         "dotnet-security": 0,
         "nuget-audit": 9.28,
         "codeql": 46311.65
-      }
-    }
-  },
-  {
-    "scanId": "SCAN-1794838616559",
-    "scanMode": "comprehensive",
-    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
-    "omittedScanners": [],
-    "timestamp": "2026-11-16T14:18:06.994Z",
-    "targetPath": "sample-repos/payments-api",
-    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/payments-api",
-    "canonicalRepositoryId": "ab25f2acb29a",
-    "applicationNumber": "APP-1001",
-    "durationMs": 70435,
-    "status": "Partial",
-    "cancelled": false,
-    "timedOut": true,
-    "noScannableInputs": false,
-    "unverifiedCoverage": true,
-    "scannersCount": 4,
-    "scannerSummary": [
-      {
-        "id": "secrets-config",
-        "status": "Completed",
-        "coverage": "100% (8 non-empty file(s) scanned)",
-        "findingsCount": 4,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": []
-      },
-      {
-        "id": "dotnet-security",
-        "status": "Completed",
-        "coverage": "100% (Sandboxed Roslyn analyzers active)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": []
-      },
-      {
-        "id": "nuget-audit",
-        "status": "Failed",
-        "coverage": "0% (Audit source inaccessible)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": [
-          "AUDIT UNAVAILABLE — Vulnerability intelligence source inaccessible"
-        ]
-      },
-      {
-        "id": "codeql",
-        "status": "Failed",
-        "coverage": "0% (Timed out — incomplete execution)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": [
-          "CodeQL analysis timed out after 60s (incomplete execution)."
-        ]
-      }
-    ],
-    "findingsSummary": {
-      "total": 4,
-      "critical": 1,
-      "high": 3,
-      "medium": 0,
-      "low": 0,
-      "informational": 0
-    },
-    "ingestStats": {
-      "added": 0,
-      "updated": 4,
-      "total": 16,
-      "activeTotal": 4,
-      "newCount": 0,
-      "updatedCount": 4
-    },
-    "metrics": {
-      "environmentProbeMs": 139.02,
-      "discoveryMs": 35.95,
-      "cacheLookupMs": 5.67,
-      "normalizationMs": 4.55,
-      "persistenceMs": 0,
-      "uiUpdateMs": 2.55,
-      "uiProgressEmitCount": 12,
-      "cancellationMs": 0,
-      "totalMs": 70434.94,
-      "repositoryFileCount": 9,
-      "eligibleFileCount": 9,
-      "filesScanned": 8,
-      "cacheHits": 0,
-      "cacheMisses": 4,
-      "scannerTimings": {
-        "secrets-config": 2433.41,
-        "dotnet-security": 6035.38,
-        "nuget-audit": 36448.48,
-        "codeql": 64216.58
-      }
-    }
-  },
-  {
-    "scanId": "SCAN-1794793393741",
-    "scanMode": "comprehensive",
-    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
-    "omittedScanners": [],
-    "timestamp": "2026-11-16T01:43:42.174Z",
-    "targetPath": "sample-repos/customer-service",
-    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/customer-service",
-    "canonicalRepositoryId": "62dd95384ac1",
-    "applicationNumber": "APP-1002",
-    "durationMs": 28433,
-    "status": "Partial",
-    "cancelled": false,
-    "timedOut": false,
-    "noScannableInputs": false,
-    "unverifiedCoverage": true,
-    "scannersCount": 4,
-    "scannerSummary": [
-      {
-        "id": "secrets-config",
-        "status": "Completed",
-        "coverage": "100% (3 non-empty file(s) scanned)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": []
-      },
-      {
-        "id": "dotnet-security",
-        "status": "No Scannable Inputs",
-        "coverage": "0% (No .NET project detected)",
-        "findingsCount": 0,
-        "fromCache": true,
-        "cachedAt": "2026-11-15T15:05:20.340Z",
-        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
-        "errors": []
-      },
-      {
-        "id": "nuget-audit",
-        "status": "No Scannable Inputs",
-        "coverage": "0% (No .NET project detected)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": []
-      },
-      {
-        "id": "codeql",
-        "status": "Failed",
-        "coverage": "0% (Execution failure)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": [
-          "CodeQL execution error: CodeQL exited with code 2: Running queries.\nA fatal error occurred: Query pack codeql/java-queries:codeql-suites/java-code-scanning.qls cannot be found. Check the spelling of the pack."
-        ]
-      }
-    ],
-    "findingsSummary": {
-      "total": 0,
-      "critical": 0,
-      "high": 0,
-      "medium": 0,
-      "low": 0,
-      "informational": 0
-    },
-    "ingestStats": {
-      "added": 0,
-      "updated": 0,
-      "total": 16,
-      "activeTotal": 0,
-      "newCount": 0,
-      "updatedCount": 0
-    },
-    "metrics": {
-      "environmentProbeMs": 126.18,
-      "discoveryMs": 28.46,
-      "cacheLookupMs": 1.08,
-      "normalizationMs": 0,
-      "persistenceMs": 0,
-      "uiUpdateMs": 1.55,
-      "uiProgressEmitCount": 12,
-      "cancellationMs": 0,
-      "totalMs": 28433.96,
-      "repositoryFileCount": 4,
-      "eligibleFileCount": 4,
-      "filesScanned": 3,
-      "cacheHits": 1,
-      "cacheMisses": 3,
-      "scannerTimings": {
-        "dotnet-security": 0,
-        "nuget-audit": 0.61,
-        "secrets-config": 8.19,
-        "codeql": 28272.38
-      }
-    }
-  },
-  {
-    "scanId": "SCAN-1794761705893",
-    "scanMode": "comprehensive",
-    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
-    "omittedScanners": [
-      "dotnet-security",
-      "nuget-audit"
-    ],
-    "timestamp": "2026-11-15T16:56:16.256Z",
-    "targetPath": "sample-repos/payments-api",
-    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/payments-api",
-    "canonicalRepositoryId": "ab25f2acb29a",
-    "applicationNumber": "APP-1001",
-    "durationMs": 70363,
-    "status": "Completed",
-    "cancelled": false,
-    "timedOut": false,
-    "noScannableInputs": false,
-    "unverifiedCoverage": false,
-    "scannersCount": 2,
-    "scannerSummary": [
-      {
-        "id": "secrets-config",
-        "status": "Completed",
-        "coverage": "100% (8 non-empty file(s) scanned)",
-        "findingsCount": 4,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": []
-      },
-      {
-        "id": "codeql",
-        "status": "Completed",
-        "coverage": "100% (CodeQL csharp semantic analysis — 0 finding(s))",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": []
-      }
-    ],
-    "findingsSummary": {
-      "total": 4,
-      "critical": 1,
-      "high": 3,
-      "medium": 0,
-      "low": 0,
-      "informational": 0
-    },
-    "ingestStats": {
-      "added": 0,
-      "updated": 4,
-      "total": 16,
-      "activeTotal": 4,
-      "newCount": 0,
-      "updatedCount": 4
-    },
-    "metrics": {
-      "environmentProbeMs": 0,
-      "discoveryMs": 37.18,
-      "cacheLookupMs": 0.07,
-      "normalizationMs": 3.43,
-      "persistenceMs": 0,
-      "uiUpdateMs": 1.49,
-      "uiProgressEmitCount": 8,
-      "cancellationMs": 0,
-      "totalMs": 70362.89,
-      "repositoryFileCount": 9,
-      "eligibleFileCount": 9,
-      "filesScanned": 8,
-      "cacheHits": 0,
-      "cacheMisses": 2,
-      "scannerTimings": {
-        "secrets-config": 5.92,
-        "codeql": 70319.84
-      }
-    }
-  },
-  {
-    "scanId": "SCAN-1794761677142",
-    "scanMode": "comprehensive",
-    "coverageDisclosure": "Comprehensive Scan includes all selected SAST, SCA, secrets/configuration, and optional CodeQL semantic analyzers.",
-    "omittedScanners": [],
-    "timestamp": "2026-11-15T16:54:38.878Z",
-    "targetPath": "sample-repos/inventory-manager",
-    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/inventory-manager",
-    "canonicalRepositoryId": "0da02ae32fbb",
-    "applicationNumber": "APP-1003",
-    "durationMs": 1736,
-    "status": "Partial",
-    "cancelled": false,
-    "timedOut": false,
-    "noScannableInputs": false,
-    "unverifiedCoverage": true,
-    "scannersCount": 4,
-    "scannerSummary": [
-      {
-        "id": "secrets-config",
-        "status": "Completed",
-        "coverage": "100% (3 non-empty file(s) scanned)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": []
-      },
-      {
-        "id": "dotnet-security",
-        "status": "Failed",
-        "coverage": "0% (Unprovisioned toolchain profile)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": [
-          "[.NET Security Analyzer] Target repository 'sample-repos/inventory-manager' (net9.0 -> dotnet-9.0-sts): BLOCKED (UNPROVISIONED_TOOLCHAIN_PROFILE): UNPROVISIONED_TOOLCHAIN_PROFILE: sample-repos/inventory-manager targets 'net9.0' which resolves to profile 'dotnet-9.0-sts'. However, profile 'dotnet-9.0-sts' uses template placeholder digest 'sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b' (status: TEMPLATE_PLACEHOLDER). Only verified, provisioned toolchains (such as 'dotnet-10.0-lts' @ sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb) are available in the local sandbox cache. Auto-pull is disabled by container security policy. Provision the required container image or migrate the repository to supported .NET 10 LTS."
-        ]
-      },
-      {
-        "id": "nuget-audit",
-        "status": "Failed",
-        "coverage": "0% (Unprovisioned toolchain profile)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": [
-          "[NuGet Dependency Auditor] Target repository 'sample-repos/inventory-manager' (net9.0 -> dotnet-9.0-sts): BLOCKED (UNPROVISIONED_TOOLCHAIN_PROFILE): UNPROVISIONED_TOOLCHAIN_PROFILE: sample-repos/inventory-manager targets 'net9.0' which resolves to profile 'dotnet-9.0-sts'. However, profile 'dotnet-9.0-sts' uses template placeholder digest 'sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b' (status: TEMPLATE_PLACEHOLDER). Only verified, provisioned toolchains (such as 'dotnet-10.0-lts' @ sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb) are available in the local sandbox cache. Auto-pull is disabled by container security policy. Provision the required container image or migrate the repository to supported .NET 10 LTS."
-        ]
-      },
-      {
-        "id": "codeql",
-        "status": "Completed",
-        "coverage": "100% (CodeQL csharp semantic analysis — 0 finding(s))",
-        "findingsCount": 0,
-        "fromCache": true,
-        "cachedAt": "2026-11-15T10:01:07.120Z",
-        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
-        "errors": []
-      }
-    ],
-    "findingsSummary": {
-      "total": 0,
-      "critical": 0,
-      "high": 0,
-      "medium": 0,
-      "low": 0,
-      "informational": 0
-    },
-    "ingestStats": {
-      "added": 0,
-      "updated": 0,
-      "total": 16,
-      "activeTotal": 0,
-      "newCount": 0,
-      "updatedCount": 0
-    },
-    "metrics": {
-      "environmentProbeMs": 1693.29,
-      "discoveryMs": 33.2,
-      "cacheLookupMs": 0.34,
-      "normalizationMs": 0,
-      "persistenceMs": 0,
-      "uiUpdateMs": 0.79,
-      "uiProgressEmitCount": 11,
-      "cancellationMs": 0,
-      "totalMs": 1736.03,
-      "repositoryFileCount": 4,
-      "eligibleFileCount": 4,
-      "filesScanned": 3,
-      "cacheHits": 1,
-      "cacheMisses": 3,
-      "scannerTimings": {
-        "dotnet-security": 2.05,
-        "nuget-audit": 1.11,
-        "codeql": 0,
-        "secrets-config": 6.64
-      }
-    }
-  },
-  {
-    "scanId": "SCAN-1794755447887",
-    "scanMode": "quick",
-    "coverageDisclosure": "Quick Scan covers fast local secrets and configuration checks only (secrets-config, codeql). Omitted analyzers (dotnet-security, nuget-audit): not equivalent to a comprehensive security assessment.",
-    "omittedScanners": [
-      "dotnet-security",
-      "nuget-audit"
-    ],
-    "timestamp": "2026-11-15T15:11:47.077Z",
-    "targetPath": "sample-repos/payments-api",
-    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/payments-api",
-    "canonicalRepositoryId": "ab25f2acb29a",
-    "applicationNumber": "APP-1001",
-    "durationMs": 59190,
-    "status": "Completed",
-    "cancelled": false,
-    "timedOut": false,
-    "noScannableInputs": false,
-    "unverifiedCoverage": false,
-    "scannersCount": 2,
-    "scannerSummary": [
-      {
-        "id": "secrets-config",
-        "status": "Completed",
-        "coverage": "100% (8 non-empty file(s) scanned)",
-        "findingsCount": 5,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": []
-      },
-      {
-        "id": "codeql",
-        "status": "Completed",
-        "coverage": "100% (CodeQL csharp semantic analysis — 0 finding(s))",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": []
-      }
-    ],
-    "findingsSummary": {
-      "total": 5,
-      "critical": 1,
-      "high": 4,
-      "medium": 0,
-      "low": 0,
-      "informational": 0
-    },
-    "ingestStats": {
-      "added": 0,
-      "updated": 5,
-      "total": 16,
-      "activeTotal": 5,
-      "newCount": 0,
-      "updatedCount": 5
-    },
-    "metrics": {
-      "environmentProbeMs": 0,
-      "discoveryMs": 32.57,
-      "cacheLookupMs": 0.06,
-      "normalizationMs": 3.59,
-      "persistenceMs": 0,
-      "uiUpdateMs": 1.76,
-      "uiProgressEmitCount": 8,
-      "cancellationMs": 0,
-      "totalMs": 59190.35,
-      "repositoryFileCount": 9,
-      "eligibleFileCount": 9,
-      "filesScanned": 8,
-      "cacheHits": 0,
-      "cacheMisses": 2,
-      "scannerTimings": {
-        "secrets-config": 641.62,
-        "codeql": 59149.49
-      }
-    }
-  },
-  {
-    "scanId": "SCAN-1794755279938",
-    "scanMode": "quick",
-    "coverageDisclosure": "Quick Scan covers fast local secrets and configuration checks only (secrets-config, dotnet-security, nuget-audit). Omitted analyzers (codeql): not equivalent to a comprehensive security assessment.",
-    "omittedScanners": [
-      "codeql"
-    ],
-    "timestamp": "2026-11-15T15:08:00.099Z",
-    "targetPath": "sample-repos/inventory-manager",
-    "repositoryRoot": "/Users/ksglrohith/Documents/GitHub/GCAC/sample-repos/inventory-manager",
-    "canonicalRepositoryId": "0da02ae32fbb",
-    "applicationNumber": "APP-1003",
-    "durationMs": 161,
-    "status": "Partial",
-    "cancelled": false,
-    "timedOut": false,
-    "noScannableInputs": false,
-    "unverifiedCoverage": true,
-    "scannersCount": 3,
-    "scannerSummary": [
-      {
-        "id": "secrets-config",
-        "status": "Completed",
-        "coverage": "100% (3 non-empty file(s) scanned)",
-        "findingsCount": 0,
-        "fromCache": true,
-        "cachedAt": "2026-11-15T11:19:57.730Z",
-        "freshnessStatus": "CACHED_SOURCE_HASH_VERIFIED",
-        "errors": []
-      },
-      {
-        "id": "dotnet-security",
-        "status": "Failed",
-        "coverage": "0% (Unprovisioned toolchain profile)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": [
-          "[.NET Security Analyzer] Target repository 'sample-repos/inventory-manager' (net9.0 -> dotnet-9.0-sts): BLOCKED (UNPROVISIONED_TOOLCHAIN_PROFILE): UNPROVISIONED_TOOLCHAIN_PROFILE: sample-repos/inventory-manager targets 'net9.0' which resolves to profile 'dotnet-9.0-sts'. However, profile 'dotnet-9.0-sts' uses template placeholder digest 'sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b' (status: TEMPLATE_PLACEHOLDER). Only verified, provisioned toolchains (such as 'dotnet-10.0-lts' @ sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb) are available in the local sandbox cache. Auto-pull is disabled by container security policy. Provision the required container image or migrate the repository to supported .NET 10 LTS."
-        ]
-      },
-      {
-        "id": "nuget-audit",
-        "status": "Failed",
-        "coverage": "0% (Unprovisioned toolchain profile)",
-        "findingsCount": 0,
-        "fromCache": false,
-        "cachedAt": null,
-        "freshnessStatus": null,
-        "errors": [
-          "[NuGet Dependency Auditor] Target repository 'sample-repos/inventory-manager' (net9.0 -> dotnet-9.0-sts): BLOCKED (UNPROVISIONED_TOOLCHAIN_PROFILE): UNPROVISIONED_TOOLCHAIN_PROFILE: sample-repos/inventory-manager targets 'net9.0' which resolves to profile 'dotnet-9.0-sts'. However, profile 'dotnet-9.0-sts' uses template placeholder digest 'sha256:9f6b8c7d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b' (status: TEMPLATE_PLACEHOLDER). Only verified, provisioned toolchains (such as 'dotnet-10.0-lts' @ sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb) are available in the local sandbox cache. Auto-pull is disabled by container security policy. Provision the required container image or migrate the repository to supported .NET 10 LTS."
-        ]
-      }
-    ],
-    "findingsSummary": {
-      "total": 0,
-      "critical": 0,
-      "high": 0,
-      "medium": 0,
-      "low": 0,
-      "informational": 0
-    },
-    "ingestStats": {
-      "added": 0,
-      "updated": 0,
-      "total": 16,
-      "activeTotal": 0,
-      "newCount": 0,
-      "updatedCount": 0
-    },
-    "metrics": {
-      "environmentProbeMs": 122.27,
-      "discoveryMs": 34.1,
-      "cacheLookupMs": 0.18,
-      "normalizationMs": 0,
-      "persistenceMs": 0,
-      "uiUpdateMs": 0.52,
-      "uiProgressEmitCount": 7,
-      "cancellationMs": 0,
-      "totalMs": 160.82,
-      "repositoryFileCount": 4,
-      "eligibleFileCount": 4,
-      "filesScanned": 3,
-      "cacheHits": 1,
-      "cacheMisses": 2,
-      "scannerTimings": {
-        "secrets-config": 0,
-        "dotnet-security": 2.9,
-        "nuget-audit": 1.01
       }
     }
   }

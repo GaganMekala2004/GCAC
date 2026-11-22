@@ -1,0 +1,47 @@
+{
+  "vulnerabilityId": "SCAN-CODEQL-023",
+  "vulnerabilityType": "UNKNOWN",
+  "affectedComponent": "src/GcasE2ETestApi/DiagnosticsController.cs",
+  "ownershipTier": "APPLICATION_AUTHORED",
+  "sourceIsApplicationAuthored": true,
+  "blastRadius": "LOW",
+  "selectedTier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+  "recommendedStrategy": "Halt automated editing and escalate to Manual Architectural / Security Review.",
+  "alternativesEvaluated": [
+    {
+      "tier": "1_SECURE_CONFIG_CHANGE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "Root cause lies in application source code logic or architectural/vendor layer rather than declarative config."
+    },
+    {
+      "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+    },
+    {
+      "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "Finding originates in custom/application code or infrastructure, not an outdated dependency manifest."
+    },
+    {
+      "tier": "4_MINIMAL_APPLICATION_CODE_CHANGE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "Vulnerability type or source ownership is uncertain; cannot safely automate source code changes."
+    },
+    {
+      "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+      "feasible": true,
+      "suitable": true,
+      "reason": "No safe automated low-blast-radius remediation strategy; manual architectural or governance review required."
+    }
+  ],
+  "requiresManualReview": true,
+  "automatedExecutionAllowed": false,
+  "disposition": "MANUAL_REVIEW",
+  "blockingReason": "No safe automated low-blast-radius remediation strategy; manual architectural or governance review required.",
+  "manualReviewPlan": []
+}

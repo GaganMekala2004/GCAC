@@ -1,0 +1,9 @@
+{
+  "baseCommitSha": "7075159c77b3ed28fc2ca45b67c754fff799178d",
+  "sourceSha256": "7e6e076400c8b09050b8ac30018c0d6b5a4734d5872f808205996ae02fec5b06",
+  "diagnostic": {
+    "reasonCode": "PROPOSAL_BUILD_FAILED",
+    "exitCode": 1
+  },
+  "failureCategory": "PATCH_INVALID"
+}

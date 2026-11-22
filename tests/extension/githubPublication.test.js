@@ -31,15 +31,22 @@ async function run() {
         assert.strictEqual(plan.baseBranch, 'main');
         const pushes = [], requests = [];
         let remotePR = null;
+        let initialLookup = true;
         const service = new GitHubPublication({ getToken: async () => 'fixture-token',
             gitFn: (cwd, args, env) => {
                 if (args.includes('push')) { pushes.push({ args, env }); return ''; }
                 return git(args);
             }, apiFn: async (method, endpoint, token, body) => {
                 requests.push({ method, endpoint, body });
-                if (method === 'GET') return remotePR ? [remotePR] : [];
+                if (method === 'GET') {
+                    if (initialLookup) {
+                        initialLookup = false;
+                        throw Object.assign(new Error('Truncated response'), { code: 'GITHUB_RESPONSE_UNREADABLE' });
+                    }
+                    return remotePR ? [remotePR] : [];
+                }
                 remotePR = { number: 17, html_url: 'https://github.com/owner/repo/pull/17', head: { ref: plan.branch } };
-                return remotePR;
+                throw new Error('Response lost after draft creation');
             }
         });
         const input = { plan, worktreeDir: root, approvedFiles: ['source.cs'], patchDiff, runId: 'run-test', expectedHead: base,
@@ -48,6 +55,7 @@ async function run() {
         assert.strictEqual(pushes.length, 0);
         await assert.rejects(service.publish({ ...input, finalApproved: true, patchDiff: 'changed' }), /APPROVAL_MISMATCH/);
         const result = await service.publish({ ...input, finalApproved: true });
+        assert.strictEqual(requests.filter(r => r.method === 'POST').length, 1);
         assert.strictEqual(result.url, 'https://github.com/owner/repo/pull/17');
         assert.strictEqual(pushes.length, 1);
         assert(!pushes[0].args.join(' ').includes('fixture-token'));

@@ -1,0 +1,83 @@
+{
+  "sandboxStatus": "SANDBOX_READY",
+  "backendType": "local-container",
+  "toolchainProfileId": "dotnet-9.0-sts",
+  "toolchainProfileHash": "fd1a2e4d185d49c21ccb8c159be197b95c213b053af1ae527a3d27402527c41b",
+  "imageDigest": "sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84",
+  "networkPolicy": "NO_NETWORK",
+  "dependencyStatus": "PREPROVISIONED_CACHE",
+  "dependencyWarnings": [
+    "No packages.lock.json or Directory.Packages.props found; build relies on pre-provisioned NuGet cache with --no-restore."
+  ],
+  "instanceId": "gcac-550ac2c84c40",
+  "timedOut": false,
+  "cancelled": false,
+  "gatewayAuditDecisions": [
+    {
+      "timestamp": "2026-11-21T12:36:42.786Z",
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "instanceId": "gcac-ad503c07bab3",
+      "vulnerabilityId": "SCAN-NUGETA-020",
+      "operation": "DOTNET_TEST",
+      "toolchainProfileId": "dotnet-9.0-sts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_TEST dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-21T12:37:42.570Z",
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "instanceId": "gcac-18cd7962c14d",
+      "vulnerabilityId": "SCAN-NUGETA-020",
+      "operation": "DOTNET_TEST_RESTORED",
+      "toolchainProfileId": "dotnet-9.0-sts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_TEST_RESTORED dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-21T12:37:54.185Z",
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "instanceId": "gcac-768fd69e4d67",
+      "vulnerabilityId": "SCAN-NUGETA-020",
+      "operation": "NUGET_RESTORE_GRAPH",
+      "toolchainProfileId": "dotnet-9.0-sts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation NUGET_RESTORE_GRAPH dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-21T12:38:24.559Z",
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "instanceId": "gcac-550ac2c84c40",
+      "vulnerabilityId": "SCAN-NUGETA-020",
+      "operation": "DOTNET_TEST_RESTORED",
+      "toolchainProfileId": "dotnet-9.0-sts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation DOTNET_TEST_RESTORED dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    },
+    {
+      "timestamp": "2026-11-21T12:38:35.203Z",
+      "runId": "51dce483-c445-479f-a5a5-76d8c3eb9cd3",
+      "instanceId": "gcac-d837866b6f08",
+      "vulnerabilityId": "SCAN-NUGETA-020",
+      "operation": "NUGET_RESTORE_GRAPH",
+      "toolchainProfileId": "dotnet-9.0-sts",
+      "decision": "ALLOWED",
+      "reasonCode": "POLICY_SATISFIED",
+      "reason": "Approved operation NUGET_RESTORE_GRAPH dispatched to local-container.",
+      "backendType": "local-container",
+      "policyVersion": "GCAC-PH3-GW-1.0"
+    }
+  ],
+  "gatewayBoundaryNote": "TrustedExecutionGateway governs application-controlled build, test, and scan subprocesses; native Copilot Chat agent tools operate outside VS Code Extension Host interception."
+}

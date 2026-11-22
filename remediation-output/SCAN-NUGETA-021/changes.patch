@@ -1,0 +1,12 @@
+diff --git a/tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj b/tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj
+index bb5e89c..62f9681 100644
+--- a/tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj
++++ b/tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj
+@@ -14,4 +14,7 @@
+   <ItemGroup>
+     <ProjectReference Include="..\..\src\GcasE2ETestApi\GcasE2ETestApi.csproj" />
+   </ItemGroup>
++  <ItemGroup>
++    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
++  </ItemGroup>
+ </Project>

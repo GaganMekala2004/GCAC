@@ -1,0 +1,16 @@
+{
+  "nextRunId": "0f99348f-bd54-4495-96ce-f0ef1ae4e5e1",
+  "archivedAt": "2026-11-21T11:46:52.773Z",
+  "priorIntegrity": {
+    "hasManifest": true,
+    "verified": true,
+    "status": "VERIFIED_LOCAL_DIGESTS",
+    "runId": "4447617e-8258-49ed-9300-2607ce9f40ea",
+    "findingId": "SCAN-NUGETA-020",
+    "storageGuarantee": "LOCAL_TAMPER_DETECTION_ONLY_NOT_IMMUTABLE_WORM",
+    "cryptographicallySigned": false,
+    "mismatches": [],
+    "chainErrors": [],
+    "warning": "Local SHA-256 manifest and hash chain verified (tamper detection only; not immutable WORM storage)."
+  }
+}

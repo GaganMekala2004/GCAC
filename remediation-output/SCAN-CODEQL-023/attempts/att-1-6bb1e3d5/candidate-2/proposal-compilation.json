@@ -1,0 +1,11 @@
+{
+  "executed": true,
+  "passed": false,
+  "exitCode": 1,
+  "command": "dotnet build --no-restore --nologo",
+  "backendType": "local-container",
+  "machineStatus": "FAILED",
+  "timedOut": false,
+  "cancelled": false,
+  "diagnostics": "/sandbox-work/src/GcasE2ETestApi/DiagnosticsController.cs(15,63): error CS1056: Unexpected character '\\' [/sandbox-work/src/GcasE2ETestApi/GcasE2ETestApi.csproj]\n/sandbox-work/src/GcasE2ETestApi/DiagnosticsController.cs(15,73): error CS1002: ; expected [/sandbox-work/src/GcasE2ETestApi/GcasE2ETestApi.csproj]\n/sandbox-work/src/GcasE2ETestApi/DiagnosticsController.cs(15,108): error CS1056: Unexpected character '\\' [/sandbox-work/src/GcasE2ETestApi/GcasE2ETestApi.csproj]\n/sandbox-work/src/GcasE2ETestApi/DiagnosticsController.cs(15,122): error CS1002: ; expected [/sandbox-work/src/GcasE2ETestApi/GcasE2ETestApi.csproj]\n/sandbox-work/src/GcasE2ETestApi/DiagnosticsController.cs(15,157): error CS1056: Unexpected character '\\' [/sandbox-work/src/GcasE2ETestApi/GcasE2ETestApi.csproj]\n/sandbox-work/src/GcasE2ETestApi/DiagnosticsController.cs(15,167): error CS1002: ; expected [/sandbox-work/src/GcasE2ETestApi/GcasE2ETestApi.csproj]\n/sandbox-work/src/GcasE2ETestApi/DiagnosticsController.cs(15,168): error CS1056: Unexpected character '\\' [/sandbox-work/src/GcasE2ETestApi/GcasE2ETestApi.csproj]\n/sandbox-work/src/GcasE2ETestApi/DiagnosticsController.cs(15,185): error CS1003: Syntax error, ',' expected [/sandbox-work/src/GcasE2ETestApi/GcasE2ETestApi.csproj]"
+}

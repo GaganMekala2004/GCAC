@@ -1,0 +1,23 @@
+{
+  "status": "RESOLVED",
+  "machineStatus": "RESOLVED",
+  "testOutcome": "PASSED",
+  "executionPolicy": "SANDBOX_GATEWAY",
+  "sandboxStatus": "SANDBOX_READY",
+  "isResolved": true,
+  "reason": "Original security vulnerability (GHSA-2M69-GCR7-JV3Q) is completely absent from targeted re-scan (NuGet Dependency Auditor v8.0.0) with verified post-fix tests and 0 regressions.",
+  "summary": "Original security vulnerability (GHSA-2M69-GCR7-JV3Q) is completely absent from targeted re-scan (NuGet Dependency Auditor v8.0.0) with verified post-fix tests and 0 regressions.",
+  "beforeFingerprint": "92b4c484308d4895",
+  "reScanDurationMs": 2871,
+  "stillPresent": false,
+  "newFindingsCount": 0,
+  "evidence": [
+    "### Post-Remediation Verification & Re-Scan Audit\n- **Scanner**: `NuGet Dependency Auditor` (ID: `nuget-audit`, Version: `8.0.0`)\n- **Execution Policy**: `SANDBOX_GATEWAY` (Sandbox: `SANDBOX_READY`)\n- **Verification Status**: **`RESOLVED`** (`RESOLVED`)\n- **Post-Fix Validation Outcome**: `PASSED`\n- **Target Path**: `tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj`\n- **Original Rule ID**: `GHSA-2M69-GCR7-JV3Q`\n- **Baseline Fingerprint**: `92b4c484308d4895`\n- **Re-Scan Duration**: `2.87s`\n- **Findings Detected Post-Fix**: `0`\n- **Evaluation Summary**: Original security vulnerability (GHSA-2M69-GCR7-JV3Q) is completely absent from targeted re-scan (NuGet Dependency Auditor v8.0.0) with verified post-fix tests and 0 regressions.\n"
+  ],
+  "evidenceMarkdown": "### Post-Remediation Verification & Re-Scan Audit\n- **Scanner**: `NuGet Dependency Auditor` (ID: `nuget-audit`, Version: `8.0.0`)\n- **Execution Policy**: `SANDBOX_GATEWAY` (Sandbox: `SANDBOX_READY`)\n- **Verification Status**: **`RESOLVED`** (`RESOLVED`)\n- **Post-Fix Validation Outcome**: `PASSED`\n- **Target Path**: `tests/GcasE2ETestApi.Tests/GcasE2ETestApi.Tests.csproj`\n- **Original Rule ID**: `GHSA-2M69-GCR7-JV3Q`\n- **Baseline Fingerprint**: `92b4c484308d4895`\n- **Re-Scan Duration**: `2.87s`\n- **Findings Detected Post-Fix**: `0`\n- **Evaluation Summary**: Original security vulnerability (GHSA-2M69-GCR7-JV3Q) is completely absent from targeted re-scan (NuGet Dependency Auditor v8.0.0) with verified post-fix tests and 0 regressions.\n",
+  "scannerDetails": {
+    "id": "nuget-audit",
+    "name": "NuGet Dependency Auditor",
+    "version": "8.0.0"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "vulnerabilityId": "SCAN-NUGETA-020",
+  "vulnerabilityType": "DEPENDENCY_VULNERABILITY",
+  "affectedComponent": "src/GcasE2ETestApi/GcasE2ETestApi.csproj",
+  "ownershipTier": "APPLICATION_AUTHORED",
+  "sourceIsApplicationAuthored": true,
+  "blastRadius": "LOW",
+  "selectedTier": "3_EXISTING_DEPENDENCY_UPGRADE",
+  "recommendedStrategy": "Upgrade dependency in manifest 'src/GcasE2ETestApi/GcasE2ETestApi.csproj' from '2.1.10' to '2.1.13'.",
+  "alternativesEvaluated": [
+    {
+      "tier": "1_SECURE_CONFIG_CHANGE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "Vulnerable third-party package cannot be patched safely via runtime configuration alone."
+    },
+    {
+      "tier": "2_SUPPORTED_RUNTIME_UPGRADE",
+      "feasible": false,
+      "suitable": false,
+      "reason": "No supported framework/runtime upgrade resolves this specific finding without unnecessary global blast radius."
+    },
+    {
+      "tier": "3_EXISTING_DEPENDENCY_UPGRADE",
+      "feasible": true,
+      "suitable": true,
+      "reason": "Existing third-party dependency vulnerability has an approved target version (2.1.13); preferred over custom code workarounds."
+    },
+    {
+      "tier": "5_MANUAL_ARCHITECTURAL_REMEDIATION",
+      "feasible": true,
+      "suitable": false,
+      "reason": "Not required because a lower-risk automated tier is safe and sufficient."
+    }
+  ],
+  "requiresManualReview": false,
+  "automatedExecutionAllowed": true,
+  "disposition": "AUTOMATED_CANDIDATE",
+  "blockingReason": null,
+  "manualReviewPlan": []
+}

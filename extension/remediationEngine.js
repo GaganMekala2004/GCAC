@@ -71,6 +71,7 @@ const {
     FINDING_STATE,
     buildRunEvent,
     normalizeCanonicalRunState,
+    reconcileFailureAttribution,
     createCanonicalStages,
     deriveTerminalBanner,
     RunStateManager
@@ -302,7 +303,7 @@ class RemediationEngine {
         const statePath = this.getRunStatePath(vulnerabilityId);
         if (fs.existsSync(statePath)) {
             try {
-                return reconcileStage4Approval(JSON.parse(fs.readFileSync(statePath, 'utf-8')));
+                return reconcileFailureAttribution(reconcileStage4Approval(JSON.parse(fs.readFileSync(statePath, 'utf-8'))));
             } catch (e) {}
         }
         return null;
@@ -832,7 +833,7 @@ class RemediationEngine {
         }
 
         const transientEligible = isInterruptedReload
-            || ['TIMED_OUT', 'CANCELLED', 'RUNNER_CRASH', 'INTERRUPTED_BY_RELOAD', 'SCAN_FAILED_TRANSIENT'].includes(failureCategory)
+            || ['TIMED_OUT', 'CANCELLED', 'RUNNER_CRASH', 'INTERRUPTED_BY_RELOAD', 'SCAN_FAILED_TRANSIENT', 'GITHUB_PUBLICATION_FAILED'].includes(failureCategory)
             || ((failureCategory === 'SANDBOX_UNAVAILABLE' || failureCategory === 'TEST_TOOL_MISSING') && envRecovered)
             || (failureCategory === 'TOOLCHAIN_IMAGE_UNAVAILABLE' && toolchainRecovered);
 
@@ -1333,6 +1334,16 @@ class RemediationEngine {
         const reviewReason = fixtureReviewReason(resolvedRepositoryPath, finding);
         if (reviewReason) throw new Error(reviewReason);
         if (this.isLocalDevelopment) assertDevelopmentRepository(this.registry, resolvedRepositoryPath, options.workspaceTrusted);
+        if (isScannedFinding && finding.Scanner_ID === 'nuget-audit' && !finding.Fixed_Version) {
+            try {
+                const upgrade = require('./scanning/nugetOfflineAudit').verifiedNugetUpgrade(finding, resolvedRepositoryPath, this.workspaceRoot);
+                if (upgrade) finding = { ...finding, Fixed_Version: upgrade.version, Remediation_Guidance: upgrade.transitive
+                    ? `Pin the resolved transitive package '${finding.Package_Name}' in the project at verified version ${upgrade.version} and validate the restored graph.`
+                    : finding.Remediation_Guidance };
+            } catch (error) {
+                log('DISCOVERY', 'NuGet upgrade verification unavailable: ' + error.message);
+            }
+        }
         const minimizedFinding = buildMinimizedSingleFinding(finding);
 
         let existingState = this.loadRunState(vulnerabilityId);
@@ -2044,17 +2055,29 @@ Return exactly this JSON shape:
 {"edits":[{"oldText":"<exact existing source fragment>","newText":"<replacement fragment>"}]}`;
 
             let patchFeedback = '';
+            let nugetProposal = null;
+            if (finding.Scanner_ID === 'nuget-audit' && /\.csproj$/i.test(targetRelPath)) {
+                try {
+                    const upgrade = require('./scanning/nugetOfflineAudit').verifiedNugetUpgrade(finding, isolatedWorkspace.worktreeDir, this.workspaceRoot);
+                    if (upgrade && upgrade.version === finding.Fixed_Version) {
+                        nugetProposal = require('./dotnetRepairRecipes').nugetRepairProposal({ sourceCode,
+                            packageName: finding.Package_Name, currentVersion: finding.Current_Version, upgrade });
+                    }
+                } catch (error) {
+                    log('REMEDIATE', 'Verified NuGet proposal unavailable: ' + error.message);
+                }
+            }
             const repairProposal = /\.cs$/i.test(targetRelPath)
                 ? require('./dotnetRepairRecipes').dotnetRepairProposal({ sourceCode, cryptoMigrationContract }) : null;
-            const proposalLimit = repairProposal ? 4 : 3;
+            const proposalLimit = nugetProposal ? 1 : (repairProposal ? 4 : 3);
             for (let proposalAttempt = 1; proposalAttempt <= proposalLimit; proposalAttempt++) {
                 if (options.cancellationToken?.isCancellationRequested) throw new Error('Remediation cancelled before patch proposal.');
-                const usingRecipe = proposalAttempt === 4;
-                const remediationResponse = usingRecipe ? repairProposal : sourceRedactor.restore(await modelClient.generateCompletion(remediationPrompt + patchFeedback, { ...llmCallContext, operation: 'proposal', sourceCode: modelSourceCode }));
+                const usingRecipe = Boolean(nugetProposal) || proposalAttempt === 4;
+                const remediationResponse = usingRecipe ? (nugetProposal || repairProposal) : sourceRedactor.restore(await modelClient.generateCompletion(remediationPrompt + patchFeedback, { ...llmCallContext, operation: 'proposal', sourceCode: modelSourceCode }));
                 this._screenUntrustedText(remediationResponse, usingRecipe ? 'recipe:dotnetSourcePattern' : 'llm:remediationProposal',
                     usingRecipe ? TRUST_CLASSES.UNTRUSTED_SOURCE_CODE : TRUST_CLASSES.UNTRUSTED_MODEL_RESPONSE, runId, targetRelPath, screeningRecords, chainEvents);
                 if (usingRecipe) {
-                    log('REMEDIATE', 'Model correction attempts exhausted. Proposing a recognized .NET source-pattern repair; all compiler, scope and approval checks still apply.');
+                    log('REMEDIATE', nugetProposal ? 'Proposing an exact manifest edit for an advisory-verified NuGet upgrade; scope, approval and restored-graph checks still apply.' : 'Model correction attempts exhausted. Proposing a recognized .NET source-pattern repair; all compiler, scope and approval checks still apply.');
                     chainEvents.push({ timestamp: now(), stage: 'PROPOSAL', eventType: 'DETERMINISTIC_REPAIR_PROPOSED', payload: { targetRelPath } });
                 }
                 patchDiff = '';
@@ -2120,7 +2143,7 @@ Return exactly this JSON shape:
                     }, null, 2));
                     if (proposalAttempt === proposalLimit) throw error;
                     log('REMEDIATE', `Proposal ${proposalAttempt} rejected: ${error.message} Regenerating before approval.`);
-                    patchFeedback = `\nThe previous proposal failed validation: ${error.message}\nReturn corrected JSON edits. Copy oldText verbatim from the original source; include every existing line within it.\nPrevious rejected response:\n${sourceRedactor.redactSource(remediationResponse)}\n`;
+                    patchFeedback = `\nThe previous proposal failed validation: ${error.message}\nReturn corrected JSON edits. Encode a line break with one JSON escape (\n), so newText contains real line breaks after JSON.parse. Copy oldText verbatim from the original source; include every existing line within it.\nPrevious rejected response:\n${sourceRedactor.redactSource(remediationResponse)}\n`;
                     continue;
                 }
                 pendingApprovalRequest = createApprovalRequest({
@@ -2430,6 +2453,7 @@ Return exactly this JSON shape:
         log('BENCH_TEST', `Executing genuine post-fix test suite inside isolated worktree '${isolatedWorkspace.isolatedRepoPath}'...`);
 
         postFixValidation = await this.runPostFixTests(finding, isolatedWorkspace.worktreeDir, {
+            operation: /\.csproj$/i.test(targetRelPath) ? 'DOTNET_TEST_RESTORED' : undefined,
             workingDirectory: isolatedWorkspace.isolatedRepoPath,
             repositoryTested: resolvedRepositoryPath,
             runId,
@@ -2533,9 +2557,8 @@ Return exactly this JSON shape:
             reScanVerification.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED
         ));
         const stage6Passed = postTestOutcomeForStage6 === OUTCOME_STATUS.PASSED && (!expectsScannerReScan || reScanVerification?.machineStatus === OUTCOME_STATUS.RESOLVED);
-        activeValidationOutcomeRef = reScanFailedAtStage6
-            ? reScanVerification.machineStatus
-            : postTestOutcomeForStage6;
+        activeValidationOutcomeRef = postTestOutcomeForStage6 === OUTCOME_STATUS.PASSED && expectsScannerReScan && !stage6Passed
+            ? reScanVerification?.machineStatus || OUTCOME_STATUS.NOT_VERIFIED : postTestOutcomeForStage6;
 
         onProgress({
             type: stage6Passed ? 'STAGE_COMPLETE' : (postFixValidation.testsFailed > 0 || postTestOutcomeForStage6 === OUTCOME_STATUS.FAILED || reScanFailedAtStage6 ? 'STAGE_FAILED' : 'STAGE_BLOCKED'),
@@ -2543,7 +2566,7 @@ Return exactly this JSON shape:
             stageNumber: 6,
             summary: stage6Passed
                 ? postFixValidation.summary
-                : (postFixValidation.rootError || reScanVerification?.reason || postFixValidation.summary),
+                : ((!postFixValidation.passed && postFixValidation.rootError) || reScanVerification?.reason || postFixValidation.summary),
             failureCategory: stage6Passed ? null : (postTestOutcomeForStage6 === OUTCOME_STATUS.PASSED ? (reScanVerification?.machineStatus || 'RESCAN_NOT_VERIFIED') : postFixValidation.failureCategory),
             validationOutcome: activeValidationOutcomeRef,
             evidenceRef: 'validation.json',
@@ -2733,14 +2756,16 @@ Return a JSON object with EXACTLY these keys:
             reScanVerification.machineStatus === OUTCOME_STATUS.STILL_PRESENT ||
             reScanVerification.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED
         ));
-        const derivedFailedStage = hasPostTestFailure ? 6 : (hasReScanFailure ? 7 : (!outcomeEvaluation.isResolved ? 8 : null));
+        const scanUnavailable = reScanVerification && ['NOT_VERIFIED', 'INCONCLUSIVE', 'COULD_NOT_RUN', 'BLOCKED'].includes(reScanVerification.machineStatus);
+        const derivedFailedStage = hasPostTestFailure || scanUnavailable ? 6 : (hasReScanFailure ? 7 : (!outcomeEvaluation.isResolved ? 8 : null));
         const derivedFailureCategory = hasPostTestFailure && postFixValidation?.failureCategory && postFixValidation.failureCategory !== 'NONE'
             ? postFixValidation.failureCategory
-            : (reScanVerification?.machineStatus === OUTCOME_STATUS.STILL_PRESENT
+            : scanUnavailable ? 'SCAN_FAILED_TRANSIENT' : (reScanVerification?.machineStatus === OUTCOME_STATUS.STILL_PRESENT
                 ? 'STILL_PRESENT'
                 : (reScanVerification?.machineStatus === OUTCOME_STATUS.REGRESSION_DETECTED ? 'REGRESSION_DETECTED' : (!outcomeEvaluation.isResolved ? 'SECURITY_VERIFICATION_INCOMPLETE' : null)));
         const derivedFailureReason = !outcomeEvaluation.isResolved
-            ? (postFixValidation?.rootError || postFixValidation?.reason || reScanVerification?.reason || outcomeEvaluation.blockingReasons.join('; '))
+            ? ((hasPostTestFailure && (postFixValidation.rootError || postFixValidation.reason)) ||
+                ((hasReScanFailure || scanUnavailable) && reScanVerification.reason) || outcomeEvaluation.blockingReasons.join('; '))
             : null;
 
         onProgress({
@@ -2896,7 +2921,7 @@ Return a JSON object with EXACTLY these keys:
                 failureCategory: currentState.failureCategory,
                 retryEligibility: currentState.retryEligibility,
                 diagnostics: postFixValidation,
-                summary: 'BLOCKED — Post-fix validation failed. Final sign-off is prohibited until validation passes.',
+                summary: derivedFailureReason,
                 message: `Final Review Status: BLOCKED — Post-fix validation ${outcomeEvaluation.finalValidationOutcome}. Review diagnostics and retry or revise the fix.`
             });
 
@@ -2984,6 +3009,7 @@ Return a JSON object with EXACTLY these keys:
                 failedStage: currentState.failedStage,
                 failureCategory: currentState.failureCategory,
                 failureReason: currentState.failureReason,
+                baselineValidation,
                 retryEligibility: currentState.retryEligibility,
                 vulnerabilityId: finding.Vulnerability_ID,
                 reportPath: failedReportPath,
@@ -3106,14 +3132,19 @@ Return a JSON object with EXACTLY these keys:
         log('DOCUMENTATION', 'Finalizing evidence and executing only the publication plan explicitly authorized at Stage 8.');
         if (existingState?.publicationPlan?.status === 'READY') {
             if (!this.publicationService || options.publishPullRequest !== true) throw new Error('GitHub publication requires the reviewed plan and explicit final authorization.');
-            currentState.publicationResult = await this.publicationService.publish({
-                plan: existingState.publicationPlan, worktreeDir: isolatedWorkspace.worktreeDir,
-                approvedFiles: approvedFilePaths, patchDiff, finalApproved: true, runId,
-                expectedHead: isolatedWorkspace.baseCommitSha,
-                expectedFiles: { [targetRelPath]: currentState.expectedPostApplySha256 },
-                commitTitle: `Remediate ${finding.Vulnerability_ID}`,
-                summary: `Remediates ${finding.Vulnerability_ID}.\n\nValidated diff SHA-256: ${proposedDiffSha256}\n\n${postFixValidation.summary}\n\nScanner: ${reScanVerification?.machineStatus || reScanVerification?.status || 'NOT_VERIFIED'}.\n\nFinal human sign-off recorded for run ${runId}.`
-            });
+            try {
+                currentState.publicationResult = await this.publicationService.publish({
+                    plan: existingState.publicationPlan, worktreeDir: isolatedWorkspace.worktreeDir,
+                    approvedFiles: approvedFilePaths, patchDiff, finalApproved: true, runId,
+                    expectedHead: isolatedWorkspace.baseCommitSha,
+                    expectedFiles: { [targetRelPath]: currentState.expectedPostApplySha256 },
+                    commitTitle: `Remediate ${finding.Vulnerability_ID}`,
+                    summary: `Remediates ${finding.Vulnerability_ID}.\n\nValidated diff SHA-256: ${proposedDiffSha256}\n\n${postFixValidation.summary}\n\nScanner: ${reScanVerification?.machineStatus || reScanVerification?.status || 'NOT_VERIFIED'}.\n\nFinal human sign-off recorded for run ${runId}.`
+                });
+            } catch (error) {
+                error.failureCategory = 'GITHUB_PUBLICATION_FAILED';
+                throw error;
+            }
             chainEvents.push({ timestamp: now(), stage: 'PUBLICATION', eventType: 'GITHUB_PR_CREATED', payload: currentState.publicationResult });
             log('PUBLICATION', `GitHub draft pull request created: ${currentState.publicationResult.url}`);
         } else {

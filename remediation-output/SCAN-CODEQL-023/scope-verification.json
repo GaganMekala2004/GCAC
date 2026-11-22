@@ -1,0 +1,12 @@
+{
+  "allowed": true,
+  "status": "SCOPE_VERIFIED",
+  "modified": [],
+  "added": [],
+  "deleted": [],
+  "renamed": [],
+  "symlinkChanges": [],
+  "filesChanged": [],
+  "actualGitDiff": "diff --git a/src/GcasE2ETestApi/DiagnosticsController.cs b/src/GcasE2ETestApi/DiagnosticsController.cs\nindex 4c4334b..8afea1e 100644\n--- a/src/GcasE2ETestApi/DiagnosticsController.cs\n+++ b/src/GcasE2ETestApi/DiagnosticsController.cs\n@@ -12,6 +12,9 @@ public sealed class DiagnosticsController : ControllerBase\n     {\n         using var process = new Process();\n         process.StartInfo.FileName = \"sh\";\n+        if (!System.Text.RegularExpressions.Regex.IsMatch(host, \"^[a-zA-Z0-9.-]+$\")) {\n+            return BadRequest(\"Invalid host input.\");\n+        }\n         process.StartInfo.Arguments = \"-c \\\"ping -c 1 \" + host + \"\\\"\";\n         process.StartInfo.RedirectStandardOutput = true;\n         process.StartInfo.RedirectStandardError = true;\n",
+  "testWeakeningLimitations": "Automated test-weakening checks detect syntactic indicators (skip attributes, deleted test methods/assertions, and trivial Assert.True(true)/assert(true) replacements). Semantic test weakening—such as altering test input fixtures so an exploit payload is no longer exercised or mocking away a vulnerable function—cannot be reliably guaranteed without human diff inspection."
+}
