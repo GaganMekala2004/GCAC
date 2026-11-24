@@ -236,7 +236,14 @@ class WorkspaceStagingManager {
                             let updated = str;
                             for (const root of packageRoots.sort((a, b) => b.length - a.length)) {
                                 const prefix = root.replace(/[\\/]+$/, '');
-                                if (prefix) updated = updated.split(prefix).join('/sandbox-cache/nuget');
+                                if (!prefix) continue;
+                                const encode = value => entry.name === 'project.assets.json'
+                                    ? JSON.stringify(value).slice(1, -1)
+                                    : value;
+                                for (const separator of ['\\', '/']) {
+                                    updated = updated.split(encode(prefix + separator)).join('/sandbox-cache/nuget/');
+                                }
+                                updated = updated.split(encode(prefix)).join('/sandbox-cache/nuget');
                             }
                             if (hostNuget && updated.includes(hostNuget)) {
                                 updated = updated.split(hostNuget).join('/sandbox-cache/nuget');

@@ -270,6 +270,24 @@
         };
     }
 
+    function applyProgressSnapshot(details, event) {
+        if (!Array.isArray(event.stages) || !event.stages.length) return details;
+        const prior = details.stages || [];
+        return {
+            ...details,
+            stages: event.stages.map(stage => ({ ...prior.find(previous => previous.id === stage.id), ...stage }))
+        };
+    }
+
+    function isOlderRunDetails(current, incoming) {
+        if (!current?.runId || !incoming || current.vulnerabilityId !== incoming.vulnerabilityId) return false;
+        if (!incoming.runId || current.runId !== incoming.runId) return true;
+        const currentAttempt = Number(current.attemptNumber || 0);
+        const incomingAttempt = Number(incoming.attemptNumber || 0);
+        return incomingAttempt < currentAttempt || (incomingAttempt === currentAttempt &&
+            Number(incoming.lastAppliedSeq || 0) < Number(current.lastAppliedSeq || 0));
+    }
+
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
             aggregateActivityTrend,
@@ -278,7 +296,9 @@
             normalizeScanProgressEvent,
             formatScanHistoryEntry,
             buildRetryUiState,
-            computeTestEvidenceSummary
+            computeTestEvidenceSummary,
+            applyProgressSnapshot,
+            isOlderRunDetails
         };
     }
 
@@ -481,6 +501,8 @@
 
     const finalGateCard = document.getElementById('finalGateCard');
     const btnFinalApprove = document.getElementById('btnFinalApprove');
+    const btnFinalPublish = document.getElementById('btnFinalPublish');
+    const btnCloseLocallyAfterPublicationFailure = document.getElementById('btnCloseLocallyAfterPublicationFailure');
     const btnFinalReject = document.getElementById('btnFinalReject');
 
     const failureRecoveryCard = document.getElementById('failureRecoveryCard');
@@ -545,6 +567,7 @@
 
     // DOM Elements - Scans View & Controls
     const btnHeaderScan = document.getElementById('btnHeaderScan');
+    const btnPrepareRepository = document.getElementById('btnPrepareRepository');
     const tableSourceFilter = document.getElementById('tableSourceFilter');
     const btnStartScan = document.getElementById('btnStartScan');
     const btnCancelScan = document.getElementById('btnCancelScan');
@@ -822,6 +845,11 @@
                 switchView('scans');
             });
         }
+
+        btnPrepareRepository?.addEventListener('click', () => {
+            const targetRepo = inputScanTargetPath?.value.trim() || currentConfig.activeRepo;
+            postToHost({ command: 'prepareRepository', targetRepo });
+        });
 
         // Dashboard Zero State Call-to-Action
         if (btnDashScanNow) {
@@ -1125,12 +1153,13 @@
         }
 
         // Stage 6 Final Gate Actions
-        if (btnFinalApprove) {
-            btnFinalApprove.addEventListener('click', () => {
-                if (!selectedVulnerability) return;
-                postToHost({ command: 'approveFinalGate', vulnerabilityId: selectedVulnerability.Vulnerability_ID });
-            });
-        }
+        const requestFinalSignOff = publicationMode => {
+            if (!selectedVulnerability || isRemediating) return;
+            postToHost({ command: 'approveFinalGate', vulnerabilityId: selectedVulnerability.Vulnerability_ID, publicationMode });
+        };
+        btnFinalApprove?.addEventListener('click', () => requestFinalSignOff('local'));
+        btnFinalPublish?.addEventListener('click', () => requestFinalSignOff('publish'));
+        btnCloseLocallyAfterPublicationFailure?.addEventListener('click', () => requestFinalSignOff('local'));
 
         if (btnFinalReject) {
             btnFinalReject.addEventListener('click', () => {
@@ -1412,16 +1441,13 @@
 
                 case 'DETAILS_LOADED':
                     if (selectedVulnerability && message.details?.vulnerabilityId !== selectedVulnerability.Vulnerability_ID) break;
-                    if (currentDetails?.runId && currentDetails.runId === message.details?.runId &&
-                        currentDetails.attemptNumber === message.details.attemptNumber &&
-                        message.details.workflowLifecycle === 'IN_PROGRESS' &&
-                        message.details.lastAppliedSeq < currentDetails.lastAppliedSeq) break;
+                    if (isRemediating && isOlderRunDetails(currentDetails, message.details)) break;
                     currentDetails = message.details;
                     if (currentDetails && currentDetails.vulnerabilityId) {
                         detailsCache.set(currentDetails.vulnerabilityId, currentDetails);
                     }
-                    if (!currentDetails || currentDetails.workflowLifecycle !== 'IN_PROGRESS') {
-                        isRemediating = false;
+                    isRemediating = currentDetails?.workflowLifecycle === 'IN_PROGRESS';
+                    if (!isRemediating) {
                         if (headerRunIndicator) headerRunIndicator.style.display = 'none';
                         if (navActiveRunPulse) navActiveRunPulse.style.display = 'none';
                     }
@@ -1474,6 +1500,13 @@
                         renderInspectorDetails(currentDetails);
                     }
                     openCopilotModal(message.prompt, message.manualSubmissionRequired !== false);
+                    break;
+
+                case 'REPOSITORY_SETUP_STATE':
+                    if (btnPrepareRepository) {
+                        btnPrepareRepository.disabled = message.running;
+                        btnPrepareRepository.textContent = message.running ? 'Preparing…' : 'Prepare Repository';
+                    }
                     break;
 
                 case 'ACTION_FEEDBACK':
@@ -1627,10 +1660,15 @@
         if (evt.findingId && selectedVulnerability && evt.findingId !== selectedVulnerability.Vulnerability_ID) {
             return;
         }
+        if (selectedVulnerability && evt.findingId === selectedVulnerability.Vulnerability_ID &&
+            currentDetails?.vulnerabilityId !== evt.findingId) {
+            currentDetails = { vulnerabilityId: evt.findingId };
+        }
         if (currentDetails && currentDetails.runId && evt.runId && evt.runId !== currentDetails.runId && evt.type !== 'RUN_STARTED') {
             return;
         }
         if (evt.type === 'RUN_STARTED' && currentDetails && currentDetails.runId !== evt.runId) {
+            if (currentDetails.runId) currentDetails = { vulnerabilityId: currentDetails.vulnerabilityId };
             currentDetails.lastAppliedSeq = 0;
             currentDetails.attemptNumber = evt.attemptNumber || 1;
         }
@@ -1643,14 +1681,17 @@
         if (currentDetails && evt.seq) {
             currentDetails.lastAppliedSeq = evt.seq;
         }
-        if (currentDetails && Array.isArray(evt.stages) && evt.stages.length === (currentDetails.stages?.length || 0)) {
-            currentDetails.stages = evt.stages.map((s, idx) => ({ ...(currentDetails.stages[idx] || {}), ...s }));
+        if (currentDetails) {
+            currentDetails = applyProgressSnapshot(currentDetails, evt);
+            if (evt.attemptNumber) currentDetails.attemptNumber = evt.attemptNumber;
+            if (evt.provider) currentDetails.provider = evt.provider;
         }
 
         const idx = resolveEventStageIndex(evt);
 
         switch (evt.type) {
             case 'RUN_STARTED':
+                isRemediating = true;
                 if (currentDetails && evt.runId) currentDetails.runId = evt.runId;
                 if (idx >= 0) setStageStatus(idx, 'in_progress', evt.summary || 'Run started...');
                 if (headerRunIndicator) headerRunIndicator.style.display = 'flex';
@@ -1674,6 +1715,7 @@
                 break;
 
             case 'STAGE_START':
+                isRemediating = true;
                 if (idx >= 0) setStageStatus(idx, 'active', evt.summary || `Stage ${evt.stageNumber} executing...`);
                 if (headerRunIndicator) headerRunIndicator.style.display = 'flex';
                 if (headerRunText) headerRunText.textContent = `Stage ${evt.stageNumber} Active (${evt.stageId})`;
@@ -2886,7 +2928,10 @@
                     if (failureSummaryText) {
                         failureSummaryText.textContent = retryState.failureReason;
                     }
+                    const publicationFailed = retryState.failedStage === 9 && retryState.failureCategory === 'GITHUB_PUBLICATION_FAILED';
+                    btnCloseLocallyAfterPublicationFailure?.classList.toggle('u-hidden', !publicationFailed);
                     if (btnRetryStage) {
+                        btnRetryStage.textContent = publicationFailed ? 'Retry Publication' : 'Retry Stage (Transient)';
                         btnRetryStage.disabled = retryState.retryDisabled;
                         btnRetryStage.title = retryState.retryDisabled
                             ? (retryState.unavailableReason || 'Retry unavailable')

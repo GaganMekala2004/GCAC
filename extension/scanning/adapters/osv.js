@@ -20,7 +20,7 @@ class OsvScanner extends ScannerAdapter {
     async isAvailable() {
         return { available: true, reason: 'Requires an approved package list for each scan' };
     }
-    async scan(workspace, target, options) {
+    async scan(workspace, target, options = {}) {
         const start = Date.now();
         const result = {
             scannerId: this.id,
@@ -42,7 +42,14 @@ class OsvScanner extends ScannerAdapter {
                     fs.closeSync(fd);
                 }
             };
-            const snapshot = read();
+            let snapshot;
+            try {
+                snapshot = read();
+            } catch (error) {
+                if (error.code !== 'ENOENT') throw error;
+                return { ...result, status: SCANNER_STATUS.NO_SCANNABLE_INPUTS,
+                    noScannableInputs: true, coverage: 'No root npm lockfile', durationMs: Date.now() - start };
+            }
             const packages = JSON.parse(snapshot).packages;
             if (!packages || Array.isArray(packages) || typeof packages !== 'object')
                 throw Error('Requires npm lockfile version 2 or 3');

@@ -24,7 +24,7 @@ function cachedUpgrade(id, current, advisories, cacheRoot) {
     }) || '';
 }
 
-function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = process.env.NUGET_PACKAGES || path.join(require('os').homedir(), '.nuget', 'packages'), restoredGraph = null) {
+function findAuditProjects(target, abortSignal) {
     const projects = [];
     const skipped = new Set(['.git', 'node_modules', 'bin', 'obj', 'packages', 'output', 'remediation-output', 'workspaces', 'evidence']);
     const walk = dir => {
@@ -40,6 +40,11 @@ function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = proces
     else if (fs.statSync(target).isDirectory()) walk(target);
     else throw new Error('Offline audit requires a project or repository directory.');
     if (!projects.length) throw new Error('No .NET projects available for offline auditing.');
+    return projects;
+}
+
+function auditResolvedProjects(target, snapshot, abortSignal, cacheRoot = process.env.NUGET_PACKAGES || path.join(require('os').homedir(), '.nuget', 'packages'), restoredGraph = null) {
+    const projects = findAuditProjects(target, abortSignal);
     const results = [], seen = new Set(); let packagesChecked = 0;
     for (const project of projects) {
         const dir = path.dirname(project);
@@ -138,4 +143,4 @@ function verifiedNugetUpgrade(finding, repository, workspace) {
     }
     return null;
 }
-module.exports = { auditResolvedProjects, verifiedNugetUpgrade };
+module.exports = { auditResolvedProjects, findAuditProjects, verifiedNugetUpgrade };

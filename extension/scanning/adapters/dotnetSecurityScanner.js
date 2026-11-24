@@ -404,7 +404,9 @@ class DotnetSecurityScanner extends ScannerAdapter {
             applicationIdentitySource: repoContext.applicationIdentitySource || ''
         };
 
-        const findings = this.parseRoslynDiagnostics((gwRes.stdout || '') + '\n' + (gwRes.stderr || ''), effectiveRepoRoot, scanId, meta);
+        const buildOutput = (gwRes.stdout || '') + '\n' + (gwRes.stderr || '');
+        const findings = this.parseRoslynDiagnostics(buildOutput, effectiveRepoRoot, scanId, meta);
+        const buildError = buildOutput.split(/\r?\n/).find(line => /\berror\s+[A-Z]+\d+\s*:/i.test(line));
         return {
             scannerId: this.id,
             status: gwRes.exitCode === 0 ? SCANNER_STATUS.COMPLETED : SCANNER_STATUS.PARTIAL,
@@ -415,8 +417,8 @@ class DotnetSecurityScanner extends ScannerAdapter {
             networkPolicy: gwRes.networkPolicy,
             findings,
             durationMs: Date.now() - startTime,
-            errors: [],
-            warnings: gwRes.exitCode !== 0 ? [`Build did not finish successfully (exit code ${gwRes.exitCode})`] : [],
+            errors: gwRes.exitCode === 0 ? [] : [buildError?.trim() || `Sandboxed .NET build failed (exit code ${gwRes.exitCode}).`],
+            warnings: [],
             coverage: gwRes.exitCode === 0 ? '100% (Sandboxed Roslyn analyzers active)' : 'Partial (sandboxed build failed before full analysis could be confirmed)',
             diagnostics: {
                 repository: repoLabel,

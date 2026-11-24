@@ -43,7 +43,8 @@ async function run() {
         assert(!command.newText.includes('SanitizeReceiptId'));
         assert.strictEqual(dotnetRepairProposal({ sourceCode: 'Process.Start(command, input);' }), null);
         for (const eol of ['\n', '\r\n']) {
-            const sourceCode = ['<Project Sdk="Microsoft.NET.Sdk">', '  <PropertyGroup>', '    <TargetFramework>net9.0</TargetFramework>', '  </PropertyGroup>', '  <ItemGroup>', '    <ProjectReference Include="../../src/App.csproj" />', '  </ItemGroup>', '</Project>'].join(eol);
+            const comment = '    <!-- <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="1.0.0" /> -->';
+            const sourceCode = ['<Project Sdk="Microsoft.NET.Sdk">', '  <PropertyGroup>', '    <TargetFramework>net9.0</TargetFramework>', '  </PropertyGroup>', '  <ItemGroup>', comment, '    <ProjectReference Include="../../src/App.csproj" />', '  </ItemGroup>', '</Project>'].join(eol);
             const args = { sourceCode, packageName: 'SQLitePCLRaw.lib.e_sqlite3', currentVersion: '2.1.10', upgrade: { version: '2.1.13', transitive: true } };
             fs.writeFileSync(path.join(root, 'Test.csproj'), sourceCode);
             const proposal = nugetRepairProposal(args);
@@ -52,6 +53,7 @@ async function run() {
             const updated = fs.readFileSync(path.join(root, 'Test.csproj'), 'utf8');
             assert(updated.includes('<PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />'));
             assert(updated.includes('<ProjectReference Include="../../src/App.csproj" />'));
+            assert(updated.includes(comment));
             if (eol === '\r\n') assert(!updated.replace(/\r\n/g, '').includes('\n'));
             assert.strictEqual(nugetRepairProposal({ ...args, upgrade: null }), null);
             assert.strictEqual(nugetRepairProposal({ ...args, sourceCode: updated }), null);

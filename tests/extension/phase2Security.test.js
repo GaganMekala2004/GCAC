@@ -888,11 +888,12 @@ async function run() {
         assert.notStrictEqual(publicationFailure.formalClosure, 'RESOLVED_CLOSED', 'A failed publication cannot become a completed workflow');
         assert.strictEqual(publicationFailure.approvalRecord.consumedAtStage5, true, 'Failed publication preserves historical consent');
         assert.strictEqual(publicationFailure.securityValidationOutcome, 'PASSED', 'Publication failure cannot rewrite genuine test evidence as unexecuted');
-        engine.publicationService = { publish: async () => ({ status: 'CREATED', number: 1, url: 'https://github.com/fixture/fixture/pull/1' }) };
+        engine.publicationService = { publish: async () => { assert.fail('Local closure must not call the publisher'); } };
 
         // Step 3: Final Sign-off -> complete & verify evidence ledger
-        const finalRes = await engine.executePipeline('VUL-E2E-P2', { isHumanApproved: true, isFinalApproved: true, publishPullRequest: true });
+        const finalRes = await engine.executePipeline('VUL-E2E-P2', { isHumanApproved: true, isFinalApproved: true, closeLocally: true });
         assert.strictEqual(finalRes.isCompleted, true);
+        assert.strictEqual(finalRes.publicationResult.status, 'LOCAL_ONLY');
         assert.strictEqual(engine.loadRunState('VUL-E2E-P2').stages[8].status, 'completed');
         const finalEvDir = path.join(e2eOrigin, 'remediation-output', 'VUL-E2E-P2');
         const finalVerify = verifyEvidencePackage(finalEvDir);

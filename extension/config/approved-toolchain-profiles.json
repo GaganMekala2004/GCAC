@@ -52,7 +52,9 @@
           "executable": "dotnet",
           "baseArgs": [
             "build",
-            "--no-restore",
+            "-p:RestoreSources=/sandbox-cache/nuget",
+            "-p:RestoreForce=true",
+            "-p:NuGetAudit=false",
             "--nologo",
             "/p:EnableNETAnalyzers=true",
             "/p:AnalysisLevel=latest"
@@ -62,7 +64,9 @@
           "executable": "dotnet",
           "baseArgs": [
             "build",
-            "--no-restore",
+            "-p:RestoreSources=/sandbox-cache/nuget",
+            "-p:RestoreForce=true",
+            "-p:NuGetAudit=false",
             "--nologo",
             "/p:EnableNETAnalyzers=true",
             "/p:AnalysisLevel=latest"
@@ -143,7 +147,7 @@
         "/sandbox-out/roslyn.sarif"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "aff0989c5035fa51dd44aaf93f5026eb9943639ea7458b3a80b4e36525adc130",
+      "profileSha256": "82341ef924766693de1e3b8eaac0233ae983cbe7908e2735a2188c898ad1b4dc",
       "digestStatus": "TEMPLATE_PLACEHOLDER"
     },
     {
@@ -181,7 +185,9 @@
           "executable": "dotnet",
           "baseArgs": [
             "build",
-            "--no-restore",
+            "-p:RestoreSources=/sandbox-cache/nuget",
+            "-p:RestoreForce=true",
+            "-p:NuGetAudit=false",
             "--nologo",
             "/p:EnableNETAnalyzers=true",
             "/p:AnalysisLevel=latest"
@@ -191,7 +197,9 @@
           "executable": "dotnet",
           "baseArgs": [
             "build",
-            "--no-restore",
+            "-p:RestoreSources=/sandbox-cache/nuget",
+            "-p:RestoreForce=true",
+            "-p:NuGetAudit=false",
             "--nologo",
             "/p:EnableNETAnalyzers=true",
             "/p:AnalysisLevel=latest"
@@ -272,7 +280,7 @@
         "/sandbox-out/roslyn.sarif"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "fd1a2e4d185d49c21ccb8c159be197b95c213b053af1ae527a3d27402527c41b",
+      "profileSha256": "8d2555931d51f0fb78784c3b67915a6163473b2a9a190b9709af9fac248244fa",
       "digestStatus": "VERIFIED_IMAGE_DIGEST"
     },
     {
@@ -280,19 +288,20 @@
       "supportedStack": "java-maven",
       "toolchainVersion": "jdk-17-maven-3.9",
       "targetFrameworks": [
-        "17",
-        "21"
+        "17"
       ],
-      "imageDigest": "sha256:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
-      "imageRef": "maven@sha256:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
-      "digestPolicyNote": "Template digest; pin enterprise-verified Eclipse Temurin JDK 17 + Maven 3.9 digest before container execution.",
+      "imageDigest": "sha256:1a352420f7aba21f5ad08df31bab55f74c013fb491f1ae8ab1dd7ff9ed698584",
+      "imageRef": "docker.io/library/maven@sha256:1a352420f7aba21f5ad08df31bab55f74c013fb491f1ae8ab1dd7ff9ed698584",
+      "digestPolicyNote": "Pinned to the official Docker Hub Maven 3.9 Eclipse Temurin JDK 17 manifest.",
       "approvedCommands": {
         "MAVEN_COMPILE": {
           "executable": "mvn",
           "baseArgs": [
             "compile",
             "-B",
-            "-o"
+            "-o",
+            "-Dmaven.repo.local=/sandbox-cache/m2",
+            "-Duser.home=/sandbox-home"
           ]
         },
         "MAVEN_TEST": {
@@ -300,7 +309,9 @@
           "baseArgs": [
             "test",
             "-B",
-            "-o"
+            "-o",
+            "-Dmaven.repo.local=/sandbox-cache/m2",
+            "-Duser.home=/sandbox-home"
           ]
         }
       },
@@ -322,8 +333,8 @@
         "/sandbox-out/surefire-reports"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "5b37d26c26ce4c36258360e787e92a8a3534bde23f8ddc25c86704cebef5e760",
-      "digestStatus": "TEMPLATE_PLACEHOLDER"
+      "profileSha256": "44e100699c63730d7a5a95844e8f9b0b4c9a3d77b3126ecd989fd05ee3f6c683",
+      "digestStatus": "VERIFIED_IMAGE_DIGEST"
     },
     {
       "profileId": "node-22-lts",
@@ -403,7 +414,9 @@
           "executable": "dotnet",
           "baseArgs": [
             "build",
-            "--no-restore",
+            "-p:RestoreSources=/sandbox-cache/nuget",
+            "-p:RestoreForce=true",
+            "-p:NuGetAudit=false",
             "--nologo",
             "/p:EnableNETAnalyzers=true",
             "/p:AnalysisLevel=latest"
@@ -413,7 +426,9 @@
           "executable": "dotnet",
           "baseArgs": [
             "build",
-            "--no-restore",
+            "-p:RestoreSources=/sandbox-cache/nuget",
+            "-p:RestoreForce=true",
+            "-p:NuGetAudit=false",
             "--nologo",
             "/p:EnableNETAnalyzers=true",
             "/p:AnalysisLevel=latest"
@@ -494,7 +509,7 @@
         "/sandbox-out/roslyn.sarif"
       ],
       "profileVersion": "1.0.0",
-      "profileSha256": "df3ffeb77321b060e33ea8d9836e8e19a0487b6e1ee34c16b1b1fdf7f433b566",
+      "profileSha256": "88cce17ab76599bc90c6727f609754522b591b3b36a9b875238f2c49921a31b3",
       "digestStatus": "VERIFIED_IMAGE_DIGEST"
     }
   ]

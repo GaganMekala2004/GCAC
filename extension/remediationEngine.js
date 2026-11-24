@@ -554,7 +554,10 @@ class RemediationEngine {
         const isInterruptedReload = Boolean(state && (state.status === 'INTERRUPTED' || (state.status === 'IN_PROGRESS' && !this.activeRuns.has(vulnId))));
         const postVal = state?.postFixValidation || null;
         const reScan = state?.reScanVerification || null;
-        const failureCategory = state?.failureCategory
+        const baseline = state?.baselineValidation;
+        const oldImageInspectionTimeout = state?.failureCategory === 'TEST_TOOL_MISSING' &&
+            baseline?.reasonCode === 'SANDBOX_UNAVAILABLE' && /Could not inspect the approved image.*within 30 seconds/i.test(baseline.rootError || '');
+        const failureCategory = (oldImageInspectionTimeout ? 'TIMED_OUT' : state?.failureCategory)
             || (isInterruptedReload ? 'INTERRUPTED_BY_RELOAD' : null)
             || postVal?.failureCategory
             || null;
@@ -899,6 +902,9 @@ class RemediationEngine {
         if (options.expectedRunId && state.runId && options.expectedRunId !== state.runId) {
             throw new Error(`Run ID Mismatch: Expected run '${options.expectedRunId}', but stored state belongs to '${state.runId}'.`);
         }
+        if (options.isFinalApproved && (options.approvedRunId !== state.runId || options.approvedDiffSha256 !== state.proposedDiffSha256)) {
+            throw new Error('PUBLICATION_APPROVAL_MISMATCH: Review the current run and diff before retrying publication.');
+        }
 
         const rawStage = Number.isInteger(fromStage)
             ? fromStage
@@ -1015,7 +1021,7 @@ class RemediationEngine {
             attemptId: nextAttemptId,
             retryFromStage: resolvedStage,
             isHumanApproved: resolvedStage >= 6 ? (options.isHumanApproved ?? state.stage4Approved === true) : false,
-            isFinalApproved: false
+            isFinalApproved: resolvedStage === 9 && options.isFinalApproved === true
         });
     }
 
@@ -1137,8 +1143,10 @@ class RemediationEngine {
             return { ...prior, isCompleted: true, isResolved: true, isAwaitingFinalApproval: false,
                 isAwaitingApproval: false, duplicateSubmission: true, validation: prior.postFixValidation };
         }
-        if (options.isFinalApproved && prior?.publicationPlan?.status === 'READY' && options.publishPullRequest !== true) {
-            throw new Error('PUBLICATION_CONSENT_REQUIRED: Final sign-off must explicitly authorize the reviewed GitHub pull request.');
+        if (options.isFinalApproved && ((options.publishPullRequest === true && options.closeLocally === true) ||
+            (options.publishPullRequest === true && prior?.publicationPlan?.status !== 'READY') ||
+            (prior?.publicationPlan?.status === 'READY' && options.publishPullRequest !== true && options.closeLocally !== true))) {
+            throw new Error('PUBLICATION_CONSENT_REQUIRED: Choose local closure or authorize the reviewed GitHub pull request.');
         }
         if (options.isHumanApproved && !options.isFinalApproved && !options.retryFromStage && prior?.approvalRecord?.consumedAtStage5) {
             if (!prior.patchAppliedAtStage5) throw new Error('APPROVAL_ALREADY_CONSUMED: Patch application needs recovery; approval cannot be replayed.');
@@ -1334,9 +1342,14 @@ class RemediationEngine {
         const reviewReason = fixtureReviewReason(resolvedRepositoryPath, finding);
         if (reviewReason) throw new Error(reviewReason);
         if (this.isLocalDevelopment) assertDevelopmentRepository(this.registry, resolvedRepositoryPath, options.workspaceTrusted);
-        if (isScannedFinding && finding.Scanner_ID === 'nuget-audit' && !finding.Fixed_Version) {
+        let repositoryNugetUpgrade = null;
+        if (isScannedFinding && finding.Scanner_ID === 'nuget-audit') {
             try {
                 const upgrade = require('./scanning/nugetOfflineAudit').verifiedNugetUpgrade(finding, resolvedRepositoryPath, this.workspaceRoot);
+                if (upgrade) {
+                    const manifest = assertPathWithinWorkspace(finding.Location_Path, resolvedRepositoryPath);
+                    repositoryNugetUpgrade = { upgrade, source: fs.readFileSync(manifest, 'utf8') };
+                }
                 if (upgrade) finding = { ...finding, Fixed_Version: upgrade.version, Remediation_Guidance: upgrade.transitive
                     ? `Pin the resolved transitive package '${finding.Package_Name}' in the project at verified version ${upgrade.version} and validate the restored graph.`
                     : finding.Remediation_Guidance };
@@ -2057,14 +2070,16 @@ Return exactly this JSON shape:
             let patchFeedback = '';
             let nugetProposal = null;
             if (finding.Scanner_ID === 'nuget-audit' && /\.csproj$/i.test(targetRelPath)) {
+                let upgrade = repositoryNugetUpgrade?.source === sourceCode
+                    ? repositoryNugetUpgrade.upgrade : null;
                 try {
-                    const upgrade = require('./scanning/nugetOfflineAudit').verifiedNugetUpgrade(finding, isolatedWorkspace.worktreeDir, this.workspaceRoot);
-                    if (upgrade && upgrade.version === finding.Fixed_Version) {
-                        nugetProposal = require('./dotnetRepairRecipes').nugetRepairProposal({ sourceCode,
-                            packageName: finding.Package_Name, currentVersion: finding.Current_Version, upgrade });
-                    }
+                    upgrade ||= require('./scanning/nugetOfflineAudit').verifiedNugetUpgrade(finding, isolatedWorkspace.isolatedRepoPath, this.workspaceRoot);
                 } catch (error) {
                     log('REMEDIATE', 'Verified NuGet proposal unavailable: ' + error.message);
+                }
+                if (upgrade && upgrade.version === finding.Fixed_Version) {
+                    nugetProposal = require('./dotnetRepairRecipes').nugetRepairProposal({ sourceCode,
+                        packageName: finding.Package_Name, currentVersion: finding.Current_Version, upgrade });
                 }
             }
             const repairProposal = /\.cs$/i.test(targetRelPath)
@@ -3130,8 +3145,8 @@ Return a JSON object with EXACTLY these keys:
         log('FINAL_GATE', `Final Human Sign-Off Granted [RunId:${runId}]. Evaluating strict machine closure criteria...`);
         onProgress({ type: 'STAGE_START', stageId: 'manual-validations', stageNumber: 9, validationOutcome: outcomeEvaluation.finalValidationOutcome });
         log('DOCUMENTATION', 'Finalizing evidence and executing only the publication plan explicitly authorized at Stage 8.');
-        if (existingState?.publicationPlan?.status === 'READY') {
-            if (!this.publicationService || options.publishPullRequest !== true) throw new Error('GitHub publication requires the reviewed plan and explicit final authorization.');
+        if (options.publishPullRequest === true) {
+            if (!this.publicationService || existingState?.publicationPlan?.status !== 'READY') throw new Error('GitHub publication requires a reviewed publication plan.');
             try {
                 currentState.publicationResult = await this.publicationService.publish({
                     plan: existingState.publicationPlan, worktreeDir: isolatedWorkspace.worktreeDir,
@@ -3147,6 +3162,10 @@ Return a JSON object with EXACTLY these keys:
             }
             chainEvents.push({ timestamp: now(), stage: 'PUBLICATION', eventType: 'GITHUB_PR_CREATED', payload: currentState.publicationResult });
             log('PUBLICATION', `GitHub draft pull request created: ${currentState.publicationResult.url}`);
+        } else if (options.closeLocally === true) {
+            currentState.publicationResult = { status: 'LOCAL_ONLY', reason: 'Final reviewer chose to retain the verified remediation in the local isolated worktree.',
+                worktreePath: isolatedWorkspace.worktreeDir };
+            chainEvents.push({ timestamp: now(), stage: 'PUBLICATION', eventType: 'LOCAL_CLOSURE_SELECTED' });
         } else {
             currentState.publicationResult = { status: 'NOT_CONFIGURED', reason: existingState?.publicationPlan?.reason || 'No reviewed GitHub publication plan exists; no remote action performed.' };
         }

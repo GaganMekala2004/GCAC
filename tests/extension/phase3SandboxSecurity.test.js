@@ -115,6 +115,22 @@ async function runPhase3SandboxSecurityTests() {
         assert.strictEqual(winModeEnv.containers.docker.installed, true, 'Mocked Docker Windows daemon should be detected');
         assert.strictEqual(winModeEnv.containers.docker.linuxContainerMode, false, 'Docker Windows OSType must be flagged as non-Linux mode');
 
+        for (const daemonOs of ['linux', 'windows', null]) {
+            let versionChecks = 0;
+            const timedOut = { ok: false, stdout: '', error: 'spawnSync docker ETIMEDOUT' };
+            const delayedInfo = discoverEnvironment(process.cwd(), {
+                pathFinder: names => names.includes('docker') ? 'docker' : null,
+                execProbe: (bin, args) => {
+                    if (bin === 'docker' && args[0] === 'version' && ++versionChecks === 2 && daemonOs) {
+                        return { ok: true, stdout: JSON.stringify({ Client: { Version: '29.0' }, Server: { Version: '29.0', Os: daemonOs, Arch: 'amd64' } }) };
+                    }
+                    return timedOut;
+                }
+            });
+            assert.strictEqual(versionChecks, 2);
+            assert.strictEqual(delayedInfo.sandboxAvailable, daemonOs === 'linux');
+        }
+
         const tmpRepo = mkTempDir('gcac-ph3-unavail-');
         try {
             fs.writeFileSync(path.join(tmpRepo, 'App.csproj'), '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>');

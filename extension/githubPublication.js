@@ -16,6 +16,23 @@ function githubRepository(remote) {
     const match = String(remote).match(/^(?:https:\/\/github\.com\/|git@github\.com:)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/);
     return match ? { owner: match[1], repository: match[2] } : null;
 }
+
+function pushFailureReason(error) {
+    const diagnostic = `${error.stderr || ''}\n${error.stdout || ''}`;
+    if (/403|401|authentication failed|permission to .* denied|write access|repository not found|could not read username/i.test(diagnostic)) {
+        return 'The signed-in GitHub account could not write to the reviewed repository. Sign in with an account that has write access, then retry.';
+    }
+    if (/protected branch|repository rule|GH006|GH013|pre-receive hook declined/i.test(diagnostic)) {
+        return 'GitHub repository rules rejected the branch update. Check the rules for the reviewed destination before retrying.';
+    }
+    if (/non-fast-forward|fetch first|\[rejected\]/i.test(diagnostic)) {
+        return 'GitHub rejected the branch update. Check whether the dedicated remediation branch already contains a different commit.';
+    }
+    if (error.code === 'ETIMEDOUT' || /could not resolve|failed to connect|timed out|certificate|proxy/i.test(diagnostic)) {
+        return 'Git could not complete the connection to GitHub. Check network access, proxy settings, and certificates before retrying.';
+    }
+    return 'Check that the signed-in GitHub account can push to the reviewed repository and that GitHub is reachable.';
+}
 function api(method, resource, token, body) {
     return new Promise((resolve, reject) => {
         const payload = body ? JSON.stringify(body) : null;
@@ -128,7 +145,9 @@ class GitHubPublication {
             this.git(worktreeDir, ['-c', 'http.followRedirects=false', 'push', '--porcelain', plan.remote, `HEAD:refs/heads/${plan.branch}`], {
                 GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${auth}`
             });
-        } catch { throw new Error(`GITHUB_PUSH_FAILED: Approved commit ${commit} remains in the isolated branch; no PR was reported as created.`); }
+        } catch (error) {
+            throw new Error(`GITHUB_PUSH_FAILED: ${pushFailureReason(error)} Approved commit ${commit} remains on the local isolated branch.`);
+        }
         let pr;
         try {
             pr = await this.api('POST', endpoint, token, { title: commitTitle, head: plan.branch, base: plan.baseBranch, body: summary, draft: true });

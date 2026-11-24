@@ -4,7 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
-const { spawn, execFileSync } = require('child_process');
+const { spawn, execFile, execFileSync } = require('child_process');
+const { promisify } = require('util');
 const { SANDBOX_READINESS, discoverEnvironment } = require('./environmentDiscovery');
 const { ExecutionBackend, BACKEND_TYPES, SANDBOX_LIFECYCLE_STATES } = require('./executionBackend');
 const { WorkspaceStagingManager, buildSanitizedContainerEnv } = require('./workspaceStaging');
@@ -73,6 +74,7 @@ class ContainerSandboxBackend extends ExecutionBackend {
         this.activeInstances = new Map();
         this.collectedEvidence = new Map();
         this.execFileFn = options.execFileFn || execFileSync;
+        this.inspectImageFn = options.execFileFn || promisify(execFile);
         this.spawnFn = options.spawnFn || spawn;
     }
 
@@ -421,18 +423,34 @@ class ContainerSandboxBackend extends ExecutionBackend {
 
         // Verify pinned image exists locally so we never download unapproved images silently
         if (preparedEnv.policy.requirePrePulledImage !== false) {
-            try {
-                this.execFileFn(preparedEnv.binaryPath, ['image', 'inspect', preparedEnv.policy.imageRef], {
-                    timeout: 30000,
-                    stdio: ['ignore', 'ignore', 'pipe'],
-                    shell: false
-                });
-            } catch (error) {
-                const missing = /no such (?:image|object)|image not known/i.test(String(error.stderr || ''));
-                const reasonCode = missing ? 'TOOLCHAIN_IMAGE_UNAVAILABLE' : 'SANDBOX_UNAVAILABLE';
-                const reason = missing
+            const probe = new AbortController();
+            const inspectTimeout = Math.min(15000, Math.floor(timeoutMs / 2));
+            preparedEnv.markCancelled = () => probe.abort();
+            let error;
+            let timedOut = false;
+            for (let attempt = 0; attempt < 2 && !probe.signal.aborted; attempt++) {
+                try {
+                    await this.inspectImageFn(preparedEnv.binaryPath, ['image', 'inspect', '--format', '{{.Id}}', preparedEnv.policy.imageRef], {
+                        timeout: inspectTimeout, signal: probe.signal, shell: false, windowsHide: true
+                    });
+                    error = null;
+                    break;
+                } catch (failure) {
+                    error = failure;
+                    timedOut = failure.code === 'ETIMEDOUT' || (failure.killed === true && failure.signal === 'SIGTERM');
+                    if (!timedOut) break;
+                }
+            }
+            preparedEnv.markCancelled = null;
+            const cancelled = probe.signal.aborted;
+            if (error || cancelled) {
+                const missing = /no such (?:image|object)|image not known/i.test(String(error?.stderr || ''));
+                const reasonCode = cancelled ? 'CANCELLED' : timedOut ? 'TIMED_OUT' : missing ? 'TOOLCHAIN_IMAGE_UNAVAILABLE' : 'SANDBOX_UNAVAILABLE';
+                const reason = cancelled ? 'Cancelled before the test container was launched.' : timedOut
+                    ? `${preparedEnv.runtime} did not respond to two checks for the approved image. Retry this stage when the container runtime is responsive.` : missing
                     ? `Approved image '${preparedEnv.policy.imageRef}' is absent. Run '${preparedEnv.runtime} pull ${preparedEnv.policy.imageRef}', then retry.`
-                    : `Could not inspect the approved image with ${preparedEnv.runtime}${error.code === 'ETIMEDOUT' ? ' within 30 seconds' : ''}. Check the container runtime and retry.`;
+                    : `Could not inspect the approved image with ${preparedEnv.runtime}. Check the container runtime and retry.`;
+                const machineStatus = cancelled ? OUTCOME_STATUS.CANCELLED : timedOut ? OUTCOME_STATUS.TIMED_OUT : OUTCOME_STATUS.COULD_NOT_RUN;
                 const endTs = new Date();
                 const evidence = {
                     instanceId: preparedEnv.instanceId,
@@ -441,9 +459,9 @@ class ContainerSandboxBackend extends ExecutionBackend {
                     backendType: this.backendType,
                     runtime: preparedEnv.runtime,
                     sandboxStatus: SANDBOX_READINESS.SANDBOX_UNAVAILABLE,
-                    lifecycleState: SANDBOX_LIFECYCLE_STATES.BLOCKED,
-                    machineStatus: OUTCOME_STATUS.COULD_NOT_RUN,
-                    status: 'COULD NOT RUN',
+                    lifecycleState: cancelled ? SANDBOX_LIFECYCLE_STATES.CANCELLED : timedOut ? SANDBOX_LIFECYCLE_STATES.TIMED_OUT : SANDBOX_LIFECYCLE_STATES.BLOCKED,
+                    machineStatus,
+                    status: machineStatus,
                     failureCategory: reasonCode,
                     reasonCode,
                     reason,
@@ -455,8 +473,8 @@ class ContainerSandboxBackend extends ExecutionBackend {
                     endTime: endTs.toISOString(),
                     durationMs: Date.now() - startMs,
                     exitCode: null,
-                    timedOut: false,
-                    cancelled: false,
+                    timedOut: !cancelled && timedOut,
+                    cancelled,
                     stdout: '',
                     stderr: reason,
                     outputArtifactHashes: {},

@@ -59,6 +59,8 @@ let currentCsvPath = '';
 let hasUserInitiatedScan = false;
 let currentScanTarget = '';
 let activeRepoContext = null;
+let repositorySetupRunning = false;
+const liveProviderProgress = new Map();
 const explicitExternalRoots = new Set();
 
 /**
@@ -98,6 +100,7 @@ const ALLOWED_IPC_COMMANDS = new Set([
     'getScanners',
     'getScanStatus',
     'getScanHistory',
+    'prepareRepository',
     'scanRepository',
     'cancelScan',
     'reScanFinding',
@@ -187,22 +190,26 @@ function githubPublicationService() {
         return session.accessToken;
     } });
 }
-async function requestPublicationConsent(vulnerabilityId) {
+async function requestPublicationConsent(vulnerabilityId, mode) {
     const state = engine.loadRunState(vulnerabilityId);
     const plan = state?.publicationPlan;
     if (state?.formalClosure === 'RESOLVED_CLOSED') return {};
-    if (plan?.status === 'READY') {
-        const answer = await vscode.window.showWarningMessage(
-            `Final sign-off will push the reviewed isolated branch ${plan.branch} and create a draft PR in ${plan.owner}/${plan.repository}, targeting ${plan.baseBranch}. Diff SHA-256: ${state.proposedDiffSha256}. It will not merge the PR.`,
-            { modal: true }, 'Approve and create draft PR');
-        if (answer !== 'Approve and create draft PR') throw new Error('Final sign-off cancelled; no remote action performed.');
-        return { publishPullRequest: true };
-    }
+    const canPublish = plan?.status === 'READY';
+    if (mode === 'publish' && !canPublish) throw new Error(plan?.reason || 'GitHub publication is not configured.');
+    const local = 'Keep changes local';
+    const publish = 'Publish and open draft PR';
+    const actions = mode === 'local' || !canPublish ? [local] : mode === 'publish' ? [publish] : [local, publish];
     const answer = await vscode.window.showWarningMessage(
-        `${plan?.reason || 'GitHub publication is not configured.'} No pull request will be created.`,
-        { modal: true }, 'Close local evidence only');
-    if (answer !== 'Close local evidence only') throw new Error('Final sign-off cancelled. Configure a GitHub origin before preparing a new publication plan.');
-    return {};
+        `Final sign-off for ${vulnerabilityId}`,
+        { modal: true, detail: [
+            actions.includes(local) ? 'Keep the verified patch in the local isolated worktree and finalize evidence.' : '',
+            actions.includes(publish) ? `Push ${plan.branch} to ${plan.owner}/${plan.repository} and open a draft PR targeting ${plan.baseBranch}.` : '',
+            !canPublish ? (plan?.reason || 'GitHub publication is unavailable for this run.') : '',
+            `Diff SHA-256: ${state?.proposedDiffSha256 || 'unavailable'}`
+        ].filter(Boolean).join('\n\n') }, ...actions);
+    if (!actions.includes(answer)) throw new Error('Final sign-off cancelled.');
+    return { publishPullRequest: answer === publish, closeLocally: answer === local,
+        approvedRunId: state?.runId, approvedDiffSha256: state?.proposedDiffSha256 };
 }
 
 async function requestLocalDiffConsent(vulnerabilityId) {
@@ -1392,6 +1399,7 @@ async function handleWebviewMessage(message, webview) {
             if (!details || !details.hasEvidence) {
                 if (finding) {
                     details = {
+                        ...details,
                         vulnerabilityId: finding.Vulnerability_ID,
                         hasEvidence: true,
                         reportMarkdown: [
@@ -1432,6 +1440,8 @@ async function handleWebviewMessage(message, webview) {
                     details.runState = liveState;
                     details.provider = liveState.provider;
                     details.runId = liveState.runId || details.runId || null;
+                    details.stages = liveState.stages || details.stages;
+                    details.lastAppliedSeq = liveState.lastAppliedSeq ?? details.lastAppliedSeq;
                     details.attemptId = liveState.attemptId || details.attemptId || null;
                     details.attemptNumber = Number(liveState.attemptNumber || details.attemptNumber || 1);
                     details.retryCount = Number(liveState.retryCount ?? details.retryCount ?? 0);
@@ -1471,6 +1481,19 @@ async function handleWebviewMessage(message, webview) {
                         workspaceTrusted: vscode?.workspace ? vscode.workspace.isTrusted !== false : true
                     }
                 );
+            }
+            const progress = liveProviderProgress.get(message.vulnerabilityId)?.event;
+            if (details && progress && (!details.runId || details.runId !== progress.runId ||
+                Number(details.lastAppliedSeq || 0) < progress.seq)) {
+                Object.assign(details, {
+                    runId: progress.runId,
+                    attemptId: progress.attemptId,
+                    attemptNumber: progress.attemptNumber,
+                    lastAppliedSeq: progress.seq,
+                    stages: progress.stages,
+                    provider: progress.provider,
+                    workflowLifecycle: 'IN_PROGRESS'
+                });
             }
             webview.postMessage({ type: 'DETAILS_LOADED', details });
             break;
@@ -1518,6 +1541,45 @@ async function handleWebviewMessage(message, webview) {
             if (findingsStore) {
                 const history = findingsStore.getScanHistory();
                 webview.postMessage({ type: 'SCAN_HISTORY_LOADED', history });
+            }
+            break;
+        }
+
+        case 'prepareRepository': {
+            if (repositorySetupRunning) {
+                webview.postMessage({ type: 'ACTION_FEEDBACK', text: 'Repository setup is already running.', status: 'info' });
+                break;
+            }
+            try {
+                if (!vscode.workspace.isTrusted) throw Error('Trust the workspace before preparing a repository.');
+                syncAuthorizedRoots();
+                const requested = message.targetRepo || currentScanTarget || currentWorkspaceRoot;
+                const target = resolveAuthorizedTarget(path.resolve(currentWorkspaceRoot, requested));
+                if (!target || !fs.statSync(target).isDirectory()) throw Error('Select an authorized repository folder first.');
+                repositorySetupRunning = true;
+                webview.postMessage({ type: 'REPOSITORY_SETUP_STATE', running: true });
+                const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification,
+                    title: `GCAC · Preparing ${path.basename(target)}` }, progress =>
+                    require('./scanning/prepareRepository').prepareRepository(currentWorkspaceRoot, target, {
+                        extensionRoot: extensionRootPath,
+                        report: text => progress.report({ message: text }),
+                        approveMaven: async entries => (await vscode.window.showInformationMessage(
+                            'Download Maven dependencies from Maven Central?', { modal: true, detail: entries.join('\n') },
+                            'Prepare Maven Cache')) === 'Prepare Maven Cache',
+                        selectPackages: async packages => {
+                            const items = packages.map(pkg => ({ label: pkg.name, description: pkg.version, picked: false, pkg }));
+                            const selected = await vscode.window.showQuickPick(items, { canPickMany: true,
+                                title: 'Choose public package versions to send to NuGet.org',
+                                placeHolder: 'Select public packages only. Skip to use the existing cache.' });
+                            return (selected || []).map(item => item.pkg);
+                        }
+                    }));
+                vscode.window.showInformationMessage(`GCAC setup · ${path.basename(target)}`, { modal: true, detail: result.join('\n\n') });
+            } catch (error) {
+                vscode.window.showErrorMessage(`GCAC setup failed. ${error.message}`);
+            } finally {
+                repositorySetupRunning = false;
+                webview.postMessage({ type: 'REPOSITORY_SETUP_STATE', running: false });
             }
             break;
         }
@@ -1819,7 +1881,12 @@ async function handleWebviewMessage(message, webview) {
                     return;
                 }
 
-                await engine.retryStage(message.vulnerabilityId, message.fromStage ?? eligibility.recommendedStage, {
+                const retryStage = message.fromStage ?? eligibility.recommendedStage;
+                const retryPublication = retryStage === 9 && liveState?.failureCategory === 'GITHUB_PUBLICATION_FAILED';
+                const publicationConsent = retryPublication ? await requestPublicationConsent(message.vulnerabilityId, 'publish') : {};
+                await engine.retryStage(message.vulnerabilityId, retryStage, {
+                    ...publicationConsent,
+                    isFinalApproved: retryPublication,
                     expectedRunId: message.runId || eligibility.runId || undefined,
                     workspaceTrusted,
                     authorizedRoots: buildAuthorizedRoots(),
@@ -2083,8 +2150,7 @@ async function handleWebviewMessage(message, webview) {
 
             try {
                 syncAuthorizedRoots();
-                vscode.window.showInformationMessage(`Final Gate authorized for ${message.vulnerabilityId}. Finalizing documentation...`);
-                const publicationConsent = await requestPublicationConsent(message.vulnerabilityId);
+                const publicationConsent = await requestPublicationConsent(message.vulnerabilityId, message.publicationMode);
                 await engine.executePipeline(message.vulnerabilityId, {
                     ...publicationConsent,
                     isHumanApproved: true,
@@ -2259,14 +2325,27 @@ async function handleWebviewMessage(message, webview) {
             }
 
             if (message.command === 'runProvider') {
+                const live = {};
                 try {
                     const provider = providerHost.selection();
                     if (provider.id === 'copilot') throw Error('Select a direct inference provider first.');
                     await engine.executePipeline(finding.Vulnerability_ID, {
                         provider, workspaceTrusted: vscode.workspace.isTrusted, authorizedRoots: buildAuthorizedRoots(),
-                        onProgress: event => broadcast({ type: 'REMEDIATION_PROGRESS', event })
+                        onProgress: event => {
+                            const progress = { ...event, provider: { id: provider.id, model: provider.model } };
+                            if (event.stages?.some(stage => stage.status === 'active' || stage.status === 'in_progress')) {
+                                live.event = progress;
+                                liveProviderProgress.set(finding.Vulnerability_ID, live);
+                            } else if (liveProviderProgress.get(finding.Vulnerability_ID) === live) {
+                                liveProviderProgress.delete(finding.Vulnerability_ID);
+                            }
+                            broadcast({ type: 'REMEDIATION_PROGRESS', event: progress });
+                        }
                     });
                 } catch (error) { webview.postMessage({ type: 'ACTION_FEEDBACK', text: error.message, status: 'error' }); }
+                finally {
+                    if (liveProviderProgress.get(finding.Vulnerability_ID) === live) liveProviderProgress.delete(finding.Vulnerability_ID);
+                }
                 await handleWebviewMessage({ command: 'loadDetails', vulnerabilityId: finding.Vulnerability_ID }, webview);
                 break;
             }

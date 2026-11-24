@@ -9,7 +9,7 @@ const { ContainerSandboxBackend } = require('../../sandbox/containerSandboxBacke
 const { resolveProfileForRepository, assertProfileProvisioned } = require('../../sandbox/toolchainProfiles');
 const { resolveDotnetProjectFile, hasDotnetPackageDependencies } = require('../dotnetProjectLocator');
 const { snapshotPath, readSnapshot, refreshSnapshot } = require('../nugetAdvisories');
-const { auditResolvedProjects } = require('../nugetOfflineAudit');
+const { auditResolvedProjects, findAuditProjects } = require('../nugetOfflineAudit');
 
 function extractAdvisoryId(advisoryUrl = '') {
     const m = String(advisoryUrl || '').match(/(?:GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}|CVE-\d{4}-\d{4,7})/i);
@@ -27,7 +27,7 @@ class NuGetAuditScanner extends ScannerAdapter {
         super({
             id: 'nuget-audit',
             name: 'NuGet Dependency Auditor',
-            version: '8.0.0',
+            version: '8.1.0',
             supportedLanguages: ['csharp', 'dotnet'],
             supportedCategories: ['CWE-1395 (Vulnerable 3PP Dependency)']
         });
@@ -381,24 +381,40 @@ class NuGetAuditScanner extends ScannerAdapter {
             }
         };
 
-        if (options.isRescan && snapshot && projectDir.endsWith('.csproj')) {
+        if (snapshot && profile.approvedCommands?.NUGET_RESTORE_GRAPH && !options.abortSignal?.aborted) {
+            const restoreTarget = projectFile.endsWith('.csproj') ? projectFile : projectDirRoot;
+            let restored;
             try {
-                const restored = await gateway.executeOperation({ ...req, operation: OPERATION_TYPES.NUGET_RESTORE_GRAPH,
-                    workspaceRef: boundaryRoot, inputs: [path.relative(boundaryRoot, projectFile).split(path.sep).join('/')],
-                    networkPolicy: 'NO_NETWORK' }, { ...options, originalWorkspaceRoot: boundaryRoot });
-                if (!restored.executed || restored.exitCode !== 0 || restored.machineStatus !== OUTCOME_STATUS.PASSED)
-                    throw Error(restored.reason || 'Offline package restore failed.');
-                const graph = JSON.parse(restored.outputArtifacts?.['project.assets.json']?.content || 'null');
-                if (!graph || graph.project?.restore?.projectPath !== path.posix.join('/sandbox-work', path.relative(boundaryRoot, projectFile).split(path.sep).join('/')))
-                    throw Error('Offline restore did not produce the target project graph.');
-                const audit = auditResolvedProjects(projectFile, snapshot, options.abortSignal, undefined, graph);
+                const projects = findAuditProjects(restoreTarget, options.abortSignal);
+                const audit = { projects: [], packagesChecked: 0 };
+                for (const project of projects) {
+                    options.abortSignal?.throwIfAborted();
+                    const relative = path.relative(boundaryRoot, project).split(path.sep).join('/');
+                    restored = await gateway.executeOperation({ ...req, operation: OPERATION_TYPES.NUGET_RESTORE_GRAPH,
+                        workspaceRef: boundaryRoot, inputs: [relative], networkPolicy: 'NO_NETWORK',
+                        isControlledRestoreOperation: false, requestedFeeds: [] }, { ...options, originalWorkspaceRoot: boundaryRoot });
+                    if (!restored.executed || restored.exitCode !== 0 || restored.machineStatus !== OUTCOME_STATUS.PASSED) {
+                        throw Error(`${relative}: ${restored.reason || 'Offline package restore failed.'}`);
+                    }
+                    const graph = JSON.parse(restored.outputArtifacts?.['project.assets.json']?.content || 'null');
+                    if (!graph || graph.project?.restore?.projectPath !== path.posix.join('/sandbox-work', relative)) {
+                        throw Error(`${relative}: Offline restore did not produce the target project graph.`);
+                    }
+                    const projectAudit = auditResolvedProjects(project, snapshot, options.abortSignal, undefined, graph);
+                    audit.projects.push(...projectAudit.projects);
+                    audit.packagesChecked += projectAudit.packagesChecked;
+                }
                 return { scannerId: this.id, status: SCANNER_STATUS.COMPLETED, executionPolicy: 'SANDBOX_GATEWAY',
                     networkPolicy: 'NO_NETWORK', sandboxStatus: restored.sandboxStatus, errors: [], warnings: [],
-                    coverage: `100% (${audit.packagesChecked} restored packages checked)`,
+                    durationMs: Date.now() - startTime,
+                    coverage: `100% (${audit.packagesChecked} restored packages checked across ${projects.length} projects)`,
                     findings: this.parseJsonAuditOutput(audit, projectFile, boundaryRoot, scanId, { ...repoContext, offlineAudit: true }) };
             } catch (error) {
-                return { scannerId: this.id, status: SCANNER_STATUS.FAILED, findings: [], warnings: [],
-                    errors: ['Post-fix NuGet verification: ' + error.message], coverage: '0% (restore or audit incomplete)' };
+                const cancelled = Boolean(options.abortSignal?.aborted || restored?.cancelled);
+                const status = cancelled ? SCANNER_STATUS.CANCELLED : SCANNER_STATUS.FAILED;
+                return { scannerId: this.id, status, findings: [], warnings: [], durationMs: Date.now() - startTime,
+                    cancelled, timedOut: Boolean(restored?.timedOut),
+                    errors: ['NuGet offline restore or audit: ' + error.message], coverage: '0% (restore or audit incomplete)' };
             }
         }
         const gwRes = await gateway.executeOperation(req, {

@@ -1034,8 +1034,14 @@ async function executeRealTestRunner(executable, args = [], cwd, options = {}) {
         }
     };
 
+    let appCacheDir = options.appCacheDir;
+    if (executable === 'mvn' && !appCacheDir && fs.existsSync(repoTested)) {
+        const preparedCache = require('./scanning/prepareMaven').mavenCachePath(repoTested);
+        if (fs.existsSync(path.join(preparedCache, 'm2'))) appCacheDir = preparedCache;
+    }
     const gwRes = await gateway.executeOperation(request, {
         ...options,
+        appCacheDir,
         originalWorkspaceRoot: workspaceRoot
     });
 
@@ -1046,7 +1052,7 @@ async function executeRealTestRunner(executable, args = [], cwd, options = {}) {
         const guide = buildDiagnosticGuidance(FAILURE_CATEGORIES.TIMED_OUT, testPhase);
         return {
             ...gwRes,
-            executed: true,
+            executed: gwRes.executed !== false,
             passed: false,
             status: 'TIMED OUT',
             machineStatus: OUTCOME_STATUS.TIMED_OUT,
@@ -1093,9 +1099,12 @@ async function executeRealTestRunner(executable, args = [], cwd, options = {}) {
     }
 
     if (gwRes.machineStatus === OUTCOME_STATUS.COULD_NOT_RUN) {
-        const cat = gwRes.reasonCode === 'DEPENDENCY_UNAVAILABLE'
-            ? FAILURE_CATEGORIES.RESTORE_FAILED
-            : FAILURE_CATEGORIES.TEST_TOOL_MISSING;
+        const categories = {
+            DEPENDENCY_UNAVAILABLE: FAILURE_CATEGORIES.RESTORE_FAILED,
+            SANDBOX_UNAVAILABLE: FAILURE_CATEGORIES.SANDBOX_UNAVAILABLE,
+            TOOLCHAIN_IMAGE_UNAVAILABLE: FAILURE_CATEGORIES.TOOLCHAIN_IMAGE_UNAVAILABLE
+        };
+        const cat = categories[gwRes.reasonCode] || FAILURE_CATEGORIES.TEST_TOOL_MISSING;
         const guide = buildDiagnosticGuidance(cat, testPhase);
         return {
             ...gwRes,
@@ -1465,17 +1474,18 @@ async function runBaselineTests(finding, workspaceRoot, options = {}) {
         return { executed: false, passed: false, status: 'UNTESTED', machineStatus: OUTCOME_STATUS.UNTESTED,
             failureCategory: FAILURE_CATEGORIES.TEST_PROJECT_NOT_FOUND, exitCode: null,
             countsKnown: true, testsTotal: 0, testsPassed: 0, testsFailed: 0, testsSkipped: 0,
-            repositoryTested: repoFull, workingDirectory: repoFull, testReportLocation: null,
-            rootError: 'No .NET test project was detected. A solution or stale TestResults directory is not a test suite.',
+            repositoryTested: options.repositoryTested || repoFull, workingDirectory: repoFull, testReportLocation: null,
+            rootError: `No .NET test project was detected in the source snapshot for '${options.repositoryTested || repoFull}'. Commit a runnable test project in this checkout and start a new remediation run.`,
             summary: 'UNTESTED — No .NET test project detected.', retryEligible: false,
-            suggestedNextAction: 'Add genuine tests, or acknowledge the separate development baseline exception where policy permits.' };
+            suggestedNextAction: 'Commit a real test project in the selected checkout and start a new run so GCAC can create a worktree from the updated commit.' };
     }
 
     return await executeRealTestRunner(runner.tool, runner.args, repoFull, {
         ...options,
         workspaceRoot,
         finding,
-        repositoryTested: repoFull,
+        repositoryTested: options.repositoryTested || repoFull,
+        operation: options.operation || (runner.tool === 'dotnet' ? OPERATION_TYPES.DOTNET_TEST_RESTORED : undefined),
         testPhase: 'BASELINE_SECURITY_TEST',
         stageLabel: 'Stage 3: Baseline Security Test'
     });
@@ -1557,7 +1567,8 @@ async function runPostFixTests(finding, workspaceRoot, options = {}) {
         ...options,
         workspaceRoot,
         finding,
-        repositoryTested: repoFull,
+        repositoryTested: options.repositoryTested || repoFull,
+        operation: options.operation || (runner.tool === 'dotnet' ? OPERATION_TYPES.DOTNET_TEST_RESTORED : undefined),
         testPhase: 'POST_FIX_TEST',
         stageLabel: 'Stage 5/6: Post-Fix Bench Test'
     });

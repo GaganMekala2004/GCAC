@@ -32,9 +32,14 @@ async function run() {
         const pushes = [], requests = [];
         let remotePR = null;
         let initialLookup = true;
+        let rejectPush = true;
         const service = new GitHubPublication({ getToken: async () => 'fixture-token',
             gitFn: (cwd, args, env) => {
-                if (args.includes('push')) { pushes.push({ args, env }); return ''; }
+                if (args.includes('push')) {
+                    pushes.push({ args, env });
+                    if (rejectPush) throw Object.assign(new Error('Git failed'), { stderr: 'remote: Write access to repository not granted. fixture-token' });
+                    return '';
+                }
                 return git(args);
             }, apiFn: async (method, endpoint, token, body) => {
                 requests.push({ method, endpoint, body });
@@ -54,16 +59,22 @@ async function run() {
         await assert.rejects(service.publish({ ...input, finalApproved: false }), /APPROVAL_MISMATCH/);
         assert.strictEqual(pushes.length, 0);
         await assert.rejects(service.publish({ ...input, finalApproved: true, patchDiff: 'changed' }), /APPROVAL_MISMATCH/);
+        await assert.rejects(service.publish({ ...input, finalApproved: true }), error =>
+            /GITHUB_PUSH_FAILED: .*could not write/.test(error.message) && !error.message.includes('fixture-token'));
+        assert.strictEqual(requests.filter(r => r.method === 'POST').length, 0);
+        const firstCommit = git(['rev-parse', 'HEAD']);
+        rejectPush = false;
         const result = await service.publish({ ...input, finalApproved: true });
+        assert.strictEqual(git(['rev-parse', 'HEAD']), firstCommit, 'Retry should reuse the reviewed local commit');
         assert.strictEqual(requests.filter(r => r.method === 'POST').length, 1);
         assert.strictEqual(result.url, 'https://github.com/owner/repo/pull/17');
-        assert.strictEqual(pushes.length, 1);
+        assert.strictEqual(pushes.length, 2);
         assert(!pushes[0].args.join(' ').includes('fixture-token'));
         assert(pushes[0].env.GIT_CONFIG_VALUE_0.startsWith('AUTHORIZATION: basic '));
         assert.strictEqual(requests.find(request => request.method === 'POST').body.draft, true);
         const repeated = await service.publish({ ...input, finalApproved: true });
         assert.strictEqual(repeated.reused, true);
-        assert.strictEqual(pushes.length, 1, 'Repeated publication must reuse the remote PR');
+        assert.strictEqual(pushes.length, 2, 'Repeated publication must reuse the remote PR');
         console.log('GitHub publication: real local commit, explicit consent/diff binding, scoped branch push, verified draft URL and duplicate reuse tested with mocked remote services.');
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }

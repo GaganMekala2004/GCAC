@@ -459,6 +459,17 @@ async function run() {
         assert.strictEqual(prog.percent, 50);
         assert(prog.message.includes('Roslyn'));
 
+        const liveStages = require('../../extension/runStateContract').createCanonicalStages();
+        liveStages[0].status = 'completed';
+        liveStages[1].status = 'active';
+        const finding = { vulnerabilityId: 'SCAN-NUGETA-039', runId: 'ollama-run', attemptNumber: 1, lastAppliedSeq: 5 };
+        const liveDetails = dashboardHelpers.applyProgressSnapshot(finding, { stages: liveStages });
+        assert.strictEqual(liveDetails.stages.length, 9, 'First live event must populate a finding without prior stage evidence');
+        assert.strictEqual(liveDetails.stages[1].status, 'active');
+        assert(dashboardHelpers.isOlderRunDetails(liveDetails, { vulnerabilityId: finding.vulnerabilityId }));
+        assert(dashboardHelpers.isOlderRunDetails(liveDetails, { ...finding, lastAppliedSeq: 4 }));
+        assert(!dashboardHelpers.isOlderRunDetails(liveDetails, { ...finding, lastAppliedSeq: 6 }));
+
         const hist = dashboardHelpers.formatScanHistoryEntry({
             scanId: 'SCAN-1',
             timestamp: '2026-04-01T10:00:00Z',

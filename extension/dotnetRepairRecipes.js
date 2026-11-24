@@ -58,12 +58,13 @@ function dotnetRepairProposal({ sourceCode, cryptoMigrationContract }) {
 }
 // Only call with a target verified against the resolved graph and advisory cache.
 function nugetRepairProposal({ sourceCode, packageName, currentVersion, upgrade }) {
+    const manifest = sourceCode.replace(/<!--[\s\S]*?-->/g, comment => comment.replace(/[^\r\n]/g, ' '));
     if (!upgrade || !/^[A-Za-z0-9_.-]+$/.test(packageName || '') ||
         !/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(upgrade.version || '') ||
-        /<!--|<!DOCTYPE|<Import\b|\bCondition\s*=|ManagePackageVersionsCentrally/i.test(sourceCode)) return null;
-    const references = [...sourceCode.matchAll(/<PackageReference\b[^>]*\/\s*>/gi)];
+        /<!--|<!DOCTYPE|<Import\b|\bCondition\s*=|ManagePackageVersionsCentrally/i.test(manifest)) return null;
+    const references = [...manifest.matchAll(/<PackageReference\b[^>]*\/\s*>/gi)];
     // Expanded references and central/conditional ownership require separate handling.
-    if ((sourceCode.match(/<PackageReference\b/gi) || []).length !== references.length) return null;
+    if ((manifest.match(/<PackageReference\b/gi) || []).length !== references.length) return null;
     const matches = references.filter(ref => ref[0].match(/\bInclude\s*=\s*["']([^"']+)["']/i)?.[1].toLowerCase() === packageName.toLowerCase());
     if (matches.length === 1 && !upgrade.transitive) {
         const oldText = matches[0][0];
@@ -72,7 +73,7 @@ function nugetRepairProposal({ sourceCode, packageName, currentVersion, upgrade 
         const newText = oldText.slice(0, version.index) + version[0].replace(currentVersion, upgrade.version) + oldText.slice(version.index + version[0].length);
         return JSON.stringify({ edits: [{ oldText, newText }] });
     }
-    if (matches.length || !upgrade.transitive || /<PackageReference\b[^>]*\bUpdate\s*=/i.test(sourceCode)) return null;
+    if (matches.length || !upgrade.transitive || /<PackageReference\b[^>]*\bUpdate\s*=/i.test(manifest)) return null;
     const endings = [...sourceCode.matchAll(/^[ \t]*<\/Project\s*>[ \t]*(?=\r?$)/gm)];
     if (endings.length !== 1) return null;
     const oldText = endings[0][0];

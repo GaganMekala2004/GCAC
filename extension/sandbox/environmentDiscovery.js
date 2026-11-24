@@ -120,20 +120,37 @@ function probeDocker(execProbe = safeExecProbe, pathFinder = findExecutableOnPat
         };
     }
 
-    const verRes = execProbe(bin, ['version', '--format', '{{json .}}'], { timeoutMs: 4000 });
+    let verRes = execProbe(bin, ['version', '--format', '{{json .}}'], { timeoutMs: 4000 });
     const infoRes = execProbe(bin, ['info', '--format', '{{json .}}'], { timeoutMs: 5000 });
+    const infoTimedOut = /\bETIMEDOUT\b/i.test(infoRes.error || '');
+    if (infoTimedOut && !verRes.ok) {
+        verRes = execProbe(bin, ['version', '--format', '{{json .}}'], { timeoutMs: 8000 });
+    }
 
     let clientVersion = null;
     let serverVersion = null;
+    let server = null;
     if (verRes.stdout) {
         try {
             const v = JSON.parse(verRes.stdout);
             clientVersion = v.Client?.Version || null;
             serverVersion = v.Server?.Version || null;
+            if (verRes.ok) server = v.Server;
         } catch {}
     }
 
     if (!infoRes.ok || !infoRes.stdout) {
+        // A successful daemon response can confirm Linux mode even when the
+        // more expensive info query times out. Client metadata alone is insufficient.
+        if (infoTimedOut && serverVersion && /^(linux|windows)$/i.test(server?.Os || '') && server?.Arch) {
+            const osType = server.Os.toLowerCase();
+            return {
+                installed: true, binaryPath: bin, daemonReachable: true, clientVersion, serverVersion,
+                osType, architecture: server.Arch, linuxContainerMode: osType === 'linux',
+                rootless: false, securityOptions: [], reason: osType === 'linux'
+                    ? 'Linux daemon confirmed by docker version.' : 'Docker is running in Windows container mode.'
+            };
+        }
         return {
             installed: true,
             binaryPath: bin,
@@ -145,7 +162,8 @@ function probeDocker(execProbe = safeExecProbe, pathFinder = findExecutableOnPat
             linuxContainerMode: false,
             rootless: false,
             securityOptions: [],
-            reason: infoRes.stderr || infoRes.error || 'Docker daemon is not reachable.'
+            reason: infoTimedOut ? 'Docker Desktop did not respond to the runtime readiness check. Retry when the Linux engine is responsive.'
+                : infoRes.stderr || infoRes.error || 'Docker daemon is not reachable.'
         };
     }
 
